@@ -9,12 +9,7 @@
     "dark": "#117866"
   },
   "navbar": {
-    "links": [
-      {
-        "type": "github",
-        "href": "https://github.com/ssdavidai/alfred-ctrl"
-      }
-    ]
+    "links": []
   },
   "footer": {
     "socials": {
