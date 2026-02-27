@@ -2,13 +2,12 @@
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
   "name": "Alfred",
-  "description": "API documentation for Alfred — AI-powered Obsidian vault management",
+  "description": "API documentation for Alfred, your agentic butler",
   "colors": {
     "primary": "#0D9373",
     "light": "#55D799",
     "dark": "#117866"
   },
-  "favicon": "/favicon.svg",
   "navbar": {
     "links": [
       {
@@ -201,5 +200,12 @@
         ]
       }
     ]
+  },
+  "appearance": {
+    "default": "dark"
+  },
+  "fonts": {
+    "family": "Inter",
+    "weight": 600
   }
 }
