@@ -1,103 +1,156 @@
 ---
 title: "Architecture"
-description: "How Alfred's components fit together — from ingestion to knowledge extraction."
+description: "How Alfred's components fit together -- from network topology to AI agent execution."
 icon: "sitemap"
 ---
 
-## System overview
+## System Overview
 
 ```mermaid
 graph TB
-    Client["Your App / curl"]
-    TS["Tailscale Serve (HTTPS :3100)"]
-    API["Tenant API (Node.js)"]
-    Docker["Docker Compose"]
+    User["User Browser"]
+    CF["Cloudflare Edge<br/>(TLS termination)"]
+    CFT["cloudflared daemon"]
+    SaaS["SaaS Dashboard<br/>(app.alfred.black)"]
+    TS["Tailscale Mesh<br/>(WireGuard)"]
 
-    Client -->|HTTPS| TS
-    TS -->|HTTP :3100| API
+    User -->|HTTPS| CF
+    User -->|HTTPS| SaaS
+    CF -->|Tunnel| CFT
+    SaaS -->|Tailscale :3100| API
 
-    API -->|docker compose exec| Alfred["Alfred Container"]
-    API -->|docker compose exec| OpenClaw["OpenClaw Container"]
-    API -->|docker compose exec| Temporal["Temporal Container"]
-    API -->|fs read/write| Vault["Vault Volume"]
-    API -->|child_process| Host["Host Commands"]
+    subgraph Tenant VM
+        CFT -->|localhost:18789| OC["OpenClaw Gateway"]
+        API["Tenant API :3100"]
+        Temporal["Temporal :7233/:8233"]
+        Alfred["Alfred Worker"]
 
-    Alfred -->|reads/writes| Vault
-    Alfred -->|schedules via| Temporal
-    OpenClaw -->|agent gateway| Agents["AI Agents"]
+        OC -->|agent gateway| Alfred
+        Alfred -->|schedules| Temporal
+        Alfred -->|reads/writes| Vault
+        API -->|child_process| Alfred
+        API -->|fs read/write| Vault
 
-    subgraph Encrypted Volume
-        Vault
-        OCData["OpenClaw State"]
-        AlfredData["Alfred State"]
+        subgraph Encrypted Volume
+            Vault["Vault Records"]
+            OCData["OpenClaw State"]
+            AlfredData["Alfred State"]
+            TempData["Temporal DB"]
+        end
     end
 ```
 
-## Network architecture
+## Network Architecture
 
-All services bind to `localhost` — nothing is exposed to the public internet. External access is exclusively through your Tailscale mesh network.
+Alfred uses a **four-layer network model**. User-facing traffic flows through Cloudflare Tunnel. Admin and SaaS-to-tenant traffic flows through Tailscale. No application ports are exposed to the public internet.
 
-| Port | Service | Access |
-|------|---------|--------|
-| 3100 | Tenant API | Tailscale Serve (HTTPS) |
-| 443 | OpenClaw Gateway | Tailscale Serve (HTTPS) |
-| 8233 | Temporal UI | Tailscale Serve (HTTPS) |
+| Port | Service | Binding | User Access | Admin Access |
+|------|---------|---------|-------------|-------------|
+| 18789 | OpenClaw Gateway | 127.0.0.1 | Cloudflare Tunnel | -- |
+| 3100 | Tenant API | 127.0.0.1 | -- | Tailscale Serve (HTTPS) |
+| 8233 | Temporal UI | 127.0.0.1 | -- | Tailscale Serve (HTTPS) |
+| 7233 | Temporal gRPC | 127.0.0.1 | -- | Docker internal network |
+
+```
+Internet Users ──HTTPS──> Cloudflare Edge ──Tunnel──> cloudflared ──> localhost:18789 (OpenClaw)
+
+SaaS Dashboard ──Tailscale──> alfred-{name}:3100 (Tenant API)
+
+Admin ──Tailscale──> alfred-{name}:8233 (Temporal UI)
+       ──SSH (22)──> deploy@{ip} (restricted to admin CIDRs)
+```
 
 <Note>
-  The API key authenticates every request. Tailscale provides the encrypted transport and network-level access control. See [Security Model](/concepts/security-model) for details.
+All services bind to `127.0.0.1`. The only way to reach them is through Cloudflare Tunnel (user-facing) or Tailscale (admin/SaaS). See [Security Profile](/concepts/security-model) for the full network security model.
 </Note>
 
-## Component stack
+## Component Stack
 
 ### Tenant API
 
-A standalone Node.js process (`/opt/alfred/api.mjs`) running as a systemd service. It uses `child_process.execFile` with array arguments (no shell interpretation) to communicate with Docker containers and host commands.
+A standalone Node.js process (`/opt/alfred/api.mjs`) running as a systemd service. Zero npm dependencies -- just Node.js 22 built-ins.
 
-- **Auth**: Bearer token via `AAS_API_KEY` environment variable
-- **Binding**: `127.0.0.1:3100` (reverse-proxied by Tailscale Serve)
-- **Dependencies**: Zero — no npm packages, no native addons. Just Node.js 22 built-ins.
+- **Auth**: Bearer token via `AAS_API_KEY` (timing-safe comparison)
+- **Binding**: `127.0.0.1:3100` (exposed via Tailscale Serve)
+- **Execution**: Uses `child_process.execFile` with array arguments (no shell interpretation)
+- **Accessed by**: SaaS dashboard proxy over Tailscale
 
-### Alfred container
+### OpenClaw Container
 
-Runs the four Alfred tools (Curator, Janitor, Distiller, Surveyor) as background daemons. Each tool:
+The AI agent gateway. Manages device pairing, sessions, skills, and agent execution.
+
+- **Image**: `ssdavidai00/alfred-openclaw:latest`
+- **Port**: `127.0.0.1:18789` (exposed via Cloudflare Tunnel at `{tenant}.alfred.black`)
+- **Auth**: Gateway token (URL parameter)
+- **Security**: `no-new-privileges`, `cap_drop: ALL`, `cap_add: DAC_OVERRIDE`, 2GB mem, 256 PIDs
+
+### Alfred Container (Worker)
+
+Runs the four Alfred tools (Curator, Janitor, Distiller, Surveyor) as background daemons:
 
 1. Receives work (inbox file, scan trigger, extraction request)
 2. Builds a prompt from bundled skill files + vault context
-3. Invokes an AI agent backend (OpenClaw, Claude Code, or HTTP API)
-4. The agent reads/writes vault files via `alfred vault` CLI commands
-5. Changes are tracked in a JSONL mutation log
+3. Invokes the AI agent backend (OpenClaw gateway via `ws://openclaw:18789`)
+4. Agent reads/writes vault files via scoped `alfred vault` CLI commands
+5. Changes tracked in append-only JSONL mutation log
 
-### OpenClaw container
+- **Image**: `ssdavidai00/alfred-worker:latest`
+- **Ports**: None (no network exposure)
+- **Security**: `no-new-privileges`, `cap_drop: ALL`, 2GB mem, 256 PIDs
 
-The AI agent gateway. Manages device pairing, sessions, skills, and agent execution. Devices (laptops, phones, Claude Code instances) pair with the gateway to get agent access to the vault.
+### Temporal Container
 
-### Temporal container
+Workflow orchestration using [Temporal](https://temporal.io) in dev mode with SQLite storage.
 
-Workflow orchestration using [Temporal](https://temporal.io). Runs a dev server with SQLite storage. Alfred tools can be triggered as Temporal workflows with cron schedules, retry policies, and signal handling.
+- **Image**: `temporalio/temporal:latest`
+- **Ports**: `127.0.0.1:7233` (gRPC), `127.0.0.1:8233` (UI, admin-only via Tailscale)
+- **Storage**: SQLite at `/mnt/encrypted/temporal/temporal.db`
+- **Security**: `no-new-privileges`, 2GB mem, 256 PIDs
 
-## Data layout
+### Cloudflared (Host Service)
+
+Cloudflare Tunnel daemon running as a systemd service on the host. Establishes an outbound-only tunnel to Cloudflare's edge network.
+
+- **Config**: `/etc/cloudflared/config.yml`
+- **Credentials**: `/etc/cloudflared/credentials.json` (mode 0600)
+- **Route**: `{tenant}.alfred.black` to `localhost:18789`
+- **DNS**: CNAME record `{tenant}.alfred.black` pointing to `{tunnel-id}.cfargotunnel.com`
+
+## Startup Sequence
+
+```mermaid
+graph LR
+    Init["init (scaffold)"] -->|completed| Temporal["temporal (workflow)"]
+    Temporal -->|healthy| OC["openclaw (gateway)"]
+    OC -->|healthy| Alfred["alfred (worker)"]
+```
+
+The `init` container scaffolds the vault directory structure and OpenClaw configuration, then exits (exit code 0 = healthy). Temporal must respond on gRPC before OpenClaw starts. OpenClaw must respond on `/health` before Alfred starts.
+
+## Data Layout
 
 All persistent data lives on a LUKS2-encrypted volume mounted at `/mnt/encrypted/`:
 
 ```
 /mnt/encrypted/
 ├── vault/              # Obsidian vault (Markdown files)
-│   ├── inbox/          # Raw input files (Curator picks these up)
-│   ├── person/         # Person records
-│   ├── org/            # Organization records
-│   ├── project/        # Project records
-│   ├── task/           # Task records
-│   ├── decision/       # Decision records
-│   ├── assumption/     # Assumption records (learning type)
-│   ├── ...             # 14 more type directories (20 total)
+│   ├── inbox/          # Raw inputs (Curator picks these up)
+│   ├── person/         # Entity type directories (20 total)
+│   ├── decision/       # Learning types (5 total)
 │   ├── _templates/     # Per-type Markdown templates
 │   └── _bases/         # Dataview base views
-├── openclaw/           # OpenClaw state (openclaw.json, device DB)
-├── alfred/             # Alfred state (curator_state.json, etc.)
+├── openclaw/           # OpenClaw state (config, device pairing)
+│   └── workspace/vault # Symlink for wikilink resolution
+├── alfred/             # Worker state, config, audit log
+│   └── .gateway-token  # OpenClaw gateway auth
 └── temporal/           # Temporal SQLite database
 ```
 
-## Worker pipeline
+<Tip>
+The encrypted volume is the single source of truth. State files (`*_state.json`) are bookkeeping and can be deleted to force re-processing. The vault records themselves are authoritative.
+</Tip>
+
+## Worker Pipeline
 
 ```mermaid
 graph LR
@@ -111,30 +164,56 @@ graph LR
 
 ### Curator
 
-Watches `inbox/` for new files. When one appears:
-1. Reads the raw content
-2. Loads the curator skill prompt (`SKILL.md`) + vault context
-3. Invokes the AI agent, which creates/edits vault records
-4. Marks the file as processed in `curator_state.json`
+Watches `inbox/` for new files. Reads the raw content, loads the curator skill prompt + vault context, invokes the AI agent (which creates/edits records), and marks the file as processed.
 
 ### Janitor
 
-Periodically sweeps the vault:
-1. Scans for broken wikilinks, invalid frontmatter, missing required fields, orphaned records
-2. Reports issues
-3. Optionally invokes the AI agent to fix them
+Periodically sweeps the vault for broken wikilinks, invalid frontmatter, missing required fields, and orphaned records. Reports issues and optionally invokes the AI agent to fix them.
 
 ### Distiller
 
-Analyzes operational records and extracts knowledge:
-1. Scans records for implicit assumptions, decisions, constraints
-2. Checks for duplicates against existing learning records
-3. Creates new learning records (assumption, decision, constraint, contradiction, synthesis)
+Analyzes operational records and extracts latent knowledge (assumptions, decisions, constraints, contradictions). Checks for duplicates against existing learning records before creating new ones.
 
-## Backup strategy
+## Provisioning Flow
 
-- **Automated daily backups** at 3:00 AM via restic to Hetzner Object Storage
-- Containers are stopped during backup for consistency
+When a new tenant is provisioned, alfred-ctrl orchestrates these steps:
+
+<Steps>
+<Step title="Generate SSH keypair">
+Ed25519 keypair created per-instance and stored locally.
+</Step>
+<Step title="Create infrastructure">
+Hetzner server with hardened firewall, LUKS2-encrypted volume attached.
+</Step>
+<Step title="Cloud-init bootstrap">
+System setup: Docker, Tailscale (APT), cloudflared (APT), SSH hardening, UFW, fail2ban, unattended upgrades, LUKS format + mount.
+</Step>
+<Step title="Upload secrets via SSH">
+API keys, gateway tokens, restic credentials uploaded post-boot. **Never** in cloud-init user_data.
+</Step>
+<Step title="Start containers">
+Docker images pulled, init runs, containers start in dependency order.
+</Step>
+<Step title="Bootstrap OpenClaw + Tailscale">
+OpenClaw device auto-pairing, Tailscale join with `tag:tenant`, Tailscale Serve endpoints configured.
+</Step>
+<Step title="Setup Cloudflare Tunnel">
+Create tunnel, upload credentials, create DNS CNAME, start cloudflared service.
+</Step>
+<Step title="Health check">
+Verify all containers healthy, subdomain reachable, backup successful.
+</Step>
+</Steps>
+
+## Backup Strategy
+
+- **Automated daily backups** at 3:00 AM via restic to Hetzner Object Storage (S3)
+- Containers stopped during backup for consistency (~5 min downtime)
+- **Encryption**: Per-instance random password (AES-256)
 - **Retention**: 7 daily, 4 weekly, 6 monthly snapshots
-- LUKS encryption key and restic credentials are backed up locally on the control plane
+- LUKS keyfile and restic credentials backed up to control plane
 - On-demand backups via `POST /api/v1/admin/backups/trigger`
+
+<Tip>
+Backup failure during provisioning is a **hard error**. Every instance has at least one known-good backup from day one.
+</Tip>
