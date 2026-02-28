@@ -1,752 +1,118 @@
 ---
-title: "Security Profile"
-description: "Complete security architecture, trust boundaries, attack surfaces, and hardening controls for the Alfred platform"
-icon: "shield-halved"
+title: "Security Model"
+description: "How Alfred protects your data"
+icon: "shield-check"
 ---
 
-## Overview
+Your data security is our top priority. Alfred implements defense-in-depth protection across encryption, network isolation, authentication, and access control. Here's how we keep your vault safe.
 
-Alfred implements defense-in-depth security across four network layers, LUKS2 disk encryption, per-tenant VM isolation, container hardening, scoped authorization, and encrypted secret storage. This document covers the entire security posture of the platform.
+## Encryption at Rest
 
-<Warning>
-All tenant services bind to `127.0.0.1` (localhost). User-facing access is exclusively through **Cloudflare Tunnel** (outbound-only). Admin access is exclusively through the **Tailscale mesh**. No application ports are exposed to the public internet.
-</Warning>
+All your data is encrypted at rest using LUKS2 (Linux Unified Key Setup), the industry-standard full-disk encryption. Each instance has its own dedicated encrypted volume using AES-256-XTS encryption — the same standard used by government and financial institutions.
 
----
+API keys and sensitive credentials stored in the SaaS database are encrypted with AES-256-GCM before being written to disk. Encryption keys are unique per instance and never shared. The encryption key material itself is generated using cryptographic randomness and is never exposed in logs or configuration files.
 
-## Trust Boundaries
-
-The platform has four trust zones with well-defined boundaries:
-
-```
-+-- UNTRUSTED -----------------------------------------------+
-|  Internet users, Cloudflare edge, public DNS               |
-+------------------------------------------------------------+
-        | HTTPS (Cloudflare TLS)           | HTTPS (Caddy TLS)
-        v                                  v
-+-- SEMI-TRUSTED -------------------------------------------+
-|  Cloudflare Tunnel                SaaS App                 |
-|  ({tenant}.alfred.black)          (app.alfred.black)       |
-|  Cloudflare Access (optional)     Wasp auth + sessions     |
-+------------------------------------------------------------+
-        | HTTP (localhost)                 | HTTPS (Tailscale)
-        v                                  v
-+-- TRUSTED (per-tenant) -----------------------------------+
-|  OpenClaw Gateway (:18789)       Tenant API (:3100)        |
-|  Gateway token auth              Bearer token (AES-256)    |
-+------------------------------------------------------------+
-        | WebSocket (Docker network)       | Filesystem
-        v                                  v
-+-- DATA (encrypted at rest) -------------------------------+
-|  /mnt/encrypted/ (LUKS2-AES-XTS)                          |
-|  vault/  openclaw/  alfred/  temporal/                     |
-+------------------------------------------------------------+
-```
-
-### Data Flow: User Request
-
-1. User visits `https://acme.alfred.black` (Cloudflare edge terminates TLS)
-2. Cloudflare routes through an outbound-only tunnel to the tenant VM
-3. `cloudflared` daemon forwards to `localhost:18789` (OpenClaw)
-4. OpenClaw serves the Control UI (gateway token auth)
-
-### Data Flow: SaaS Dashboard
-
-1. User authenticates at `app.alfred.black` (Wasp auth: email/password or OAuth)
-2. Dashboard requests proxy through `tenantProxy.ts` on the server
-3. Proxy connects to `https://alfred-{name}:3100/api/v1/*` over the Tailscale mesh
-4. Tenant API authenticates via Bearer token (AES-256-GCM encrypted in PostgreSQL)
-5. Tenant API executes scoped `alfred vault` CLI commands locally
-
-### Data Flow: Provisioning
-
-1. SaaS creates a PgBoss job with instance configuration
-2. Worker spawns `node alfred-ctrl/dist/index.mjs provision {name}`
-3. alfred-ctrl: generates SSH key, creates Hetzner server, uploads secrets via SSH, starts containers, creates Cloudflare Tunnel
-4. Secrets are **never** in cloud-init `user_data` (readable via Hetzner metadata API); always uploaded post-boot via SSH
-
----
-
-## Network Security
-
-### Four-Layer Network Model
-
-Alfred implements four overlapping network security layers. Any single layer provides meaningful protection; together they form defense-in-depth.
-
-<AccordionGroup>
-<Accordion title="Layer 1: Hetzner Cloud Firewall" icon="cloud">
-
-Applied at the hypervisor level before traffic reaches the VM:
-
-| Rule | Protocol | Port | Source | Purpose |
-|------|----------|------|--------|---------|
-| SSH | TCP | 22 | `ADMIN_SSH_CIDRS` | Admin access only |
-| Tailscale | UDP | 41641 | 0.0.0.0/0 | WireGuard mesh |
-| ICMP | ICMP | -- | 0.0.0.0/0 | Ping/diagnostics |
-
-`ADMIN_SSH_CIDRS` is configurable via environment variable. In production, restrict to the control plane IP (e.g., `138.199.236.244/32`).
-
-</Accordion>
-
-<Accordion title="Layer 2: Host UFW Firewall" icon="server">
-
-Mirrors Hetzner rules at the OS level. Default deny incoming. Defense-in-depth against firewall misconfiguration at either layer.
-
-```bash
-ufw default deny incoming
-ufw default allow outgoing
-ufw allow 22/tcp        # SSH
-ufw allow 41641/udp     # Tailscale WireGuard
-```
-
-</Accordion>
-
-<Accordion title="Layer 3: Tailscale Mesh (WireGuard)" icon="network-wired">
-
-All inter-VM communication uses Tailscale's encrypted WireGuard tunnels. The ACL policy enforces tenant isolation:
-
-| Source | Destination | Action | Purpose |
-|--------|-------------|--------|---------|
-| `tag:admin` | `tag:tenant:*` | Allow | Control plane to all tenants |
-| `tag:admin` | `tag:admin:*` | Allow | Admin to admin |
-| `tag:tenant` | `tag:tenant:*` | **Deny** | Tenant isolation (implicit) |
-| `tag:tenant` | `tag:admin:*` | **Deny** | No tenant-to-admin (implicit) |
-| `autogroup:member` | `*:*` | Allow | Personal/legacy devices |
-
-New instances join with `tag:tenant` via ephemeral pre-authorized auth keys. The control plane uses `tag:admin`. Tenant VMs **cannot** communicate with each other.
-
-</Accordion>
-
-<Accordion title="Layer 4: Cloudflare Tunnel" icon="globe">
-
-Each tenant VM runs `cloudflared` as a systemd service. The tunnel is outbound-only -- no inbound firewall ports are opened for user traffic.
-
-```yaml
-# /etc/cloudflared/config.yml
-tunnel: <tunnel-id>
-credentials-file: /etc/cloudflared/credentials.json
-ingress:
-  - hostname: acme.alfred.black
-    service: http://localhost:18789
-  - service: http_status:404
-```
-
-Cloudflare's edge provides TLS termination, DDoS protection, and optional WAF. SSL mode is set to **Full** (Cloudflare validates origin certificate).
-
-</Accordion>
-</AccordionGroup>
-
-### SSH Hardening
-
-Applied via `/etc/ssh/sshd_config.d/99-alfred-hardening.conf`:
-
-| Setting | Value | Purpose |
-|---------|-------|---------|
-| PermitRootLogin | no | No root SSH access |
-| PasswordAuthentication | no | Key-only authentication |
-| MaxAuthTries | 3 | Brute-force mitigation |
-| MaxSessions | 3 | Session limit |
-| X11Forwarding | no | No X11 tunneling |
-| AllowTcpForwarding | no | No port forwarding |
-| AllowAgentForwarding | no | No agent forwarding |
-| ClientAliveInterval | 300 | 5-minute idle timeout |
-| ClientAliveCountMax | 2 | 10-minute max idle |
-| LoginGraceTime | 30 | 30-second login window |
-
-Fail2ban: 3 retries, 1-hour ban. Ed25519 keys only (generated per-instance).
-
-### Service Binding
-
-No service is directly exposed to the network:
-
-| Service | Bind Address | User-Facing Via | Admin Via |
-|---------|-------------|-----------------|-----------|
-| OpenClaw (:18789) | 127.0.0.1 | Cloudflare Tunnel | -- |
-| Temporal gRPC (:7233) | 127.0.0.1 | -- | Docker internal |
-| Temporal UI (:8233) | 127.0.0.1 | -- | Tailscale Serve (HTTPS) |
-| Tenant API (:3100) | 127.0.0.1 | -- | Tailscale Serve (HTTPS) |
-
----
-
-## Tenant VM Containerization
-
-### Container Security Controls
-
-Every container runs with defense-in-depth hardening:
-
-| Control | temporal | openclaw | alfred (worker) | init |
-|---------|----------|----------|-----------------|------|
-| `no-new-privileges` | Yes | Yes | Yes | -- |
-| `cap_drop: ALL` | -- | Yes | Yes | -- |
-| `cap_add` | None | `DAC_OVERRIDE` | None | None |
-| `mem_limit` | 2 GB | 2 GB | 2 GB | -- |
-| `pids_limit` | 256 | 256 | 256 | -- |
-| Health check | Yes | Yes | No | -- |
-| Restart policy | unless-stopped | unless-stopped | unless-stopped | None |
-| Port binding | 127.0.0.1 | 127.0.0.1 | None | None |
-| Run user | uid 1000 (temporal) | uid 1000 (node) | Default | Default |
+In the event of physical hardware failure or decommissioning, encrypted volumes are securely destroyed by Hetzner. Data cannot be recovered without the encryption keys, which are held only on the encrypted volume itself.
 
 <Note>
-**Why `DAC_OVERRIDE` on OpenClaw?** The container mounts volumes owned by `deploy` (uid 1000 on host). The `node` user inside (also uid 1000) needs to read/write files that may have been created by other containers or the host. `DAC_OVERRIDE` permits bypassing owner/group permission checks within the mounted volumes only.
+When you delete your Alfred instance, all encrypted data is permanently destroyed. There are no unencrypted backups or shadow copies.
 </Note>
 
-### Container Images
+## Encryption in Transit
 
-| Container | Image | Source |
-|-----------|-------|--------|
-| init | `ssdavidai00/alfred-init:latest` | Custom -- scaffolds vault, OpenClaw config |
-| temporal | `temporalio/temporal:latest` | Official Temporal dev server |
-| openclaw | `ssdavidai00/alfred-openclaw:latest` | Custom -- OpenClaw gateway + skills |
-| alfred | `ssdavidai00/alfred-worker:latest` | Custom -- Python Alfred tools |
+All communication to and from your Alfred instance is encrypted end-to-end.
 
-### Startup Order
+- **User-facing traffic** (your web browser to your instance) uses HTTPS with TLS 1.3 encryption, terminating at Cloudflare's edge network.
+- **SaaS-to-instance communication** (dashboard API calls) flows through Tailscale's WireGuard mesh network, providing end-to-end encryption with Curve25519 key exchange.
+- **Admin access** (SSH to your instance) uses Ed25519 public-key cryptography — never passwords, always encrypted.
+- **Backups** are encrypted with restic before uploading to object storage.
 
-```
-init (one-shot) ──completed──> temporal ──healthy──> openclaw ──healthy──> alfred
-```
+There are no plaintext connections anywhere in the system. Even internal Docker network communication between services is isolated and encrypted at the transport layer.
 
-The `init` container scaffolds directories and exits. Temporal must pass its gRPC health check before OpenClaw starts. OpenClaw must respond on `/health` before Alfred starts.
+## Network Isolation
 
-### Volume Mounts
+Your Alfred instance runs on a dedicated Hetzner Cloud virtual machine with strict network boundaries.
 
-All persistent data lives on the LUKS2-encrypted volume:
+**No application ports are exposed to the public internet.** Your vault, OpenClaw gateway, and worker services all bind to `localhost` (127.0.0.1) only. Users cannot connect directly to any service — all access goes through:
 
-```
-/mnt/encrypted/
-├── vault/              # Obsidian vault (Markdown + YAML frontmatter)
-│   ├── inbox/          # Raw inputs for Curator processing
-│   ├── person/         # Entity type directories (19 types)
-│   ├── decision/       # Learning type directories (5 types)
-│   ├── _templates/     # Per-type Markdown templates
-│   └── _bases/         # Dataview base views
-├── openclaw/           # OpenClaw state (openclaw.json, device pairing)
-│   └── workspace/vault # Symlink to vault for wikilink resolution
-├── alfred/             # Worker state, config, audit log, PID file
-│   └── .gateway-token  # OpenClaw gateway auth token
-└── temporal/           # Temporal SQLite database
-```
+- **Cloudflare Tunnel** for web traffic (user-facing UI)
+- **Tailscale WireGuard mesh** for API access (SaaS dashboard)
+- **SSH key authentication** for administrative access
 
-Nothing sensitive is stored on the unencrypted root filesystem except the LUKS keyfile at `/opt/alfred/luks.key` (mode 0600, root-only).
-
-### Docker Network
-
-Containers communicate via Docker's default bridge network. The `alfred` worker connects outbound to OpenClaw via Docker DNS (`ws://openclaw:18789`). The worker has **no** exposed ports -- it reads/writes the vault filesystem directly.
-
----
-
-## Encryption & Secrets
-
-### Encryption at Rest
-
-<CardGroup cols={2}>
-<Card title="LUKS2 Volume" icon="hard-drive">
-AES-256-XTS with 4 KB random keyfile. Auto-unlock via systemd service before Docker starts. All vault data, OpenClaw state, and worker state are on this volume.
-</Card>
-<Card title="PostgreSQL (SaaS)" icon="database">
-Tenant API keys encrypted with AES-256-GCM. Unique random IV per operation. Auth tag verification on decryption. Key stored in `COLUMN_ENCRYPTION_KEY` env var.
-</Card>
-</CardGroup>
-
-### Encryption in Transit
-
-| Path | Encryption | Authentication |
-|------|-----------|----------------|
-| User to Cloudflare | TLS 1.3 (Cloudflare edge) | None or CF Access |
-| Cloudflare to VM | Cloudflare Tunnel (TLS/QUIC) | Tunnel credentials |
-| SaaS to Tenant API | Tailscale WireGuard (Curve25519) | Bearer token |
-| Control Plane to VM | SSH (Ed25519) | Public key |
-| alfred-ctrl to Hetzner | HTTPS | Bearer token |
-| alfred-ctrl to Cloudflare | HTTPS | API key + email |
-| alfred-ctrl to Tailscale | HTTPS | API key (basic auth) |
-
-### Secret Lifecycle
-
-Secrets follow a strict lifecycle during provisioning:
-
-<Steps>
-<Step title="Generate">
-Ed25519 SSH keypair, LUKS keyfile, gateway token, AAS API key, restic password, Cloudflare tunnel secret -- all generated with cryptographic randomness.
-</Step>
-<Step title="Upload via SSH">
-After the server boots and SSH is available, secrets are uploaded over the encrypted SSH channel. **Never** placed in cloud-init `user_data` (readable via Hetzner metadata API at `169.254.169.254`).
-</Step>
-<Step title="Store on encrypted volume">
-On the VM, secrets land in `/opt/alfred/compose/.env` (mode 0600) or `/etc/cloudflared/credentials.json` (mode 0600). Application data lives on the LUKS2-encrypted volume.
-</Step>
-<Step title="Backup to control plane">
-LUKS keyfile and restic credentials are backed up to the control plane at `data/ssh_keys/{id}/` (mode 0600) for disaster recovery.
-</Step>
-<Step title="Cleanup">
-Ephemeral secrets (Tailscale auth key, bootstrap script) are deleted after use. Bootstrap script set to mode 0700 during execution, then removed.
-</Step>
-</Steps>
-
-### Secret Storage Locations
-
-| Secret | Location | Protection | Risk Level |
-|--------|----------|-----------|------------|
-| SSH private keys | `data/ssh_keys/{id}/id_ed25519` | File mode 0600 | High |
-| LUKS keyfile backup | `data/ssh_keys/{id}/luks.key` | File mode 0600, **plaintext** | High |
-| Restic credentials | `data/ssh_keys/{id}/restic.env` | File mode 0600, **plaintext** | Medium |
-| Tenant API keys | PostgreSQL `instances.apiKey` | AES-256-GCM encrypted | Low |
-| Gateway tokens | SQLite `instances.gateway_token` | **Plaintext** | High |
-| CF tunnel credentials | `/etc/cloudflared/credentials.json` | 0600, on LUKS volume | Medium |
-| Hetzner/CF/TS API tokens | `.env` files | File permissions | High |
-
-<Warning>
-The SQLite database on the control plane stores `gateway_token` and `api_key` in plaintext. A control plane compromise exposes all tenant tokens. Encrypting these fields (matching the SaaS AES-256-GCM pattern) is recommended before GA.
-</Warning>
-
----
-
-## Authentication & Authorization
-
-### Authentication Methods
-
-| Layer | Method | Details |
-|-------|--------|---------|
-| SaaS app | Email/password or OAuth | Wasp framework, bcrypt hashing, JWT sessions |
-| Tenant API | Bearer token | `alf_<32 hex>`, timing-safe comparison, AES-encrypted in DB |
-| OpenClaw gateway | URL token | `?token={gateway_token}`, persistent per-instance |
-| SSH | Ed25519 public key | Per-instance keypair, no password auth |
-| Tailscale | Pre-authorized auth key | Ephemeral, single-use, 1-hour expiry |
-
-### Vault Scope Enforcement
-
-Each Alfred tool operates under a restricted scope that limits vault operations:
-
-| Operation | Curator | Janitor | Distiller | API (default) |
-|-----------|---------|---------|-----------|---------------|
-| read | Yes | Yes | Yes | Yes |
-| search | Yes | Yes | Yes | Yes |
-| list | Yes | Yes | Yes | Yes |
-| context | Yes | Yes | Yes | Yes |
-| **create** | All types | **No** | Learn types only | All types |
-| **edit** | All types | All types | **No** | All types |
-| **move** | Inbox only | **No** | **No** | All types |
-| **delete** | **No** | All types | **No** | All types |
-
-Scope is enforced in `vault/scope.py` via `check_scope()` before every operation. The scope name is injected as `ALFRED_VAULT_SCOPE` environment variable.
-
-- **Curator** can create and edit records but cannot delete. Can only move files out of `inbox/`.
-- **Janitor** can edit and delete (for cleanup) but cannot create or move.
-- **Distiller** can only create learning types (assumption, decision, constraint, contradiction, synthesis). Cannot edit, move, or delete.
-
-### SaaS-to-Tenant Proxy
-
-The proxy (`tenantProxy.ts`) enforces multiple checks:
-
-1. User must be authenticated (Wasp session cookie)
-2. User must own an instance with `status = "running"`
-3. Instance must have `tailscaleHostname` and `apiKey` provisioned
-4. API key decrypted from PostgreSQL before forwarding
-5. 15-second request timeout via AbortController
-6. Error responses sanitized (no internal details leaked)
-
----
-
-## Input Validation & Output Sanitization
-
-### Input Validation
-
-<AccordionGroup>
-<Accordion title="Instance Name" icon="input-text">
-```typescript
-if (!/^[a-zA-Z0-9_-]+$/.test(config.customer_name)) {
-  throw new Error("Invalid customer name");
-}
-```
-Prevents template injection in Nunjucks, path traversal in filesystem operations, and command injection in shell commands.
-</Accordion>
-
-<Accordion title="Vault Record Paths" icon="folder-tree">
-```typescript
-const normalized = args.path.replace(/\\/g, "/");
-if (normalized.includes("..") || normalized.startsWith("/") || normalized.includes("\0")) {
-  throw new HttpError(400, "Invalid record path");
-}
-```
-Prevents directory traversal in the SaaS proxy's vault record endpoint.
-</Accordion>
-
-<Accordion title="Vault Operations (Python)" icon="file-lines">
-- `Path.resolve()` + prefix check: all paths must stay within the vault directory
-- Type validation against `KNOWN_TYPES` (19 record types)
-- Status validation against per-type allowed values
-- Required fields checked before record creation
-- YAML frontmatter parsed with structured error handling
-</Accordion>
-
-<Accordion title="SQL Queries" icon="database">
-All database code uses parameterized queries with `?` placeholder binding. No string concatenation in SQL statements anywhere in the codebase.
-</Accordion>
-
-<Accordion title="Command Execution" icon="terminal">
-All shell commands use `child_process.execFile` with **array arguments** (no shell interpretation), preventing injection even with user-controlled data:
-```javascript
-execFile('/usr/bin/alfred', ['vault', 'create', 'person', '--data', JSON.stringify(data)])
-```
-</Accordion>
-</AccordionGroup>
-
-### Output Sanitization
-
-**Tenant proxy error responses** are sanitized before returning to the user:
-
-| Status Code | User Sees | Internal Detail |
-|-------------|-----------|-----------------|
-| 404 | "Resource not found" | Hidden |
-| 401 | "Authentication failed" | Hidden |
-| 500+ | "Internal tenant error" | Hidden |
-| Timeout | "Tenant API request timed out" | Hidden |
-| Connection failure | "Failed to reach tenant instance" | Hidden |
-
-**Health check JSON** is constructed using `jq -n` with `--argjson`/`--arg` flags instead of string interpolation, preventing JSON injection via crafted container names.
-
----
-
-## Audit Logging & Monitoring
-
-### Vault Mutation Log
-
-Every vault write operation is recorded in two locations:
-
-1. **Session log**: Temporary JSONL file per agent session -- records `op`, `path`, `timestamp`, `field_changes`. Used by tools to verify agent work.
-2. **Audit log**: Append-only JSONL at `data/vault_audit.log`. Persistent record of all creates, edits, moves, deletes. Survives container restarts.
-
-```json
-{
-  "timestamp": "2026-02-26T10:30:00Z",
-  "operation": "create",
-  "type": "person",
-  "title": "Alice Smith",
-  "scope": "curator",
-  "session": "abc123",
-  "path": "vault/person/Alice Smith.md"
-}
-```
-
-### Health Monitoring
-
-Health checks run periodically over SSH, executing `/opt/alfred/healthcheck.sh`:
-
-| Check | Threshold | Result |
-|-------|-----------|--------|
-| Container states | Any non-init container not running | Degraded |
-| Disk utilization | > 90% | Degraded |
-| Memory utilization | > 95% | Degraded |
-| cloudflared service | Not "active" | Degraded |
-| Script failure | Non-zero exit | Down |
-| SSH failure | Connection refused/timeout | Unreachable |
-
-<Note>
-The `init` container always shows `exited` with exit code 0. This is expected -- it runs once at startup to scaffold the vault structure. The health checker treats this as healthy.
-</Note>
-
-### Alert Webhooks
-
-Status changes trigger Slack or Discord notifications with customer name, old/new status, and instance IP. Configured via `ALERT_WEBHOOK_URL` and `ALERT_WEBHOOK_TYPE`.
-
-### Instance Events
-
-alfred-ctrl records lifecycle events in SQLite: `provisioned`, `health_ok`, `health_degraded`, `health_down`, `health_unreachable`, `destroyed`, `updated`, `rolled_back`.
-
----
-
-## Backup & Disaster Recovery
-
-### Automated Backups
-
-Daily restic backups at 3:00 AM (with 30-minute random jitter):
-
-<Steps>
-<Step title="Stop containers">
-Alfred, OpenClaw, and Temporal containers are stopped for data consistency.
-</Step>
-<Step title="Backup encrypted volume">
-`restic backup /mnt/encrypted --exclude=/mnt/encrypted/temporal`
-</Step>
-<Step title="Restart containers">
-All containers restarted. Typical downtime: ~5 minutes.
-</Step>
-<Step title="Prune old snapshots">
-Retention: 7 daily, 4 weekly, 6 monthly.
-</Step>
-</Steps>
-
-**Storage**: Hetzner Object Storage (S3-compatible), per-instance prefix path.
-**Encryption**: Restic encrypts all data with a per-instance random password (32-byte hex).
+Your instance sits behind multiple firewalls: Hetzner Cloud Firewall at the hypervisor level, UFW (Uncomplicated Firewall) at the OS level, and Tailscale ACLs at the network mesh level. Tenant instances are completely isolated from one another — the network is configured to deny all traffic between different customer instances.
 
 <Tip>
-Restic backup failure during provisioning is a **hard error** -- the instance will not be marked as running until a successful backup completes. This ensures every instance has at least one known-good backup from day one.
+Even if someone discovered your instance's IP address, they cannot reach any services because all ports are firewalled or require authentication. Your data is inaccessible without credentials.
 </Tip>
 
-### Recovery Procedures
+## Authentication
 
-**VM lost, volume intact:**
-1. Create new server in the same region
-2. Attach existing encrypted volume
-3. Unlock with backed-up LUKS keyfile
-4. Restore docker-compose and .env, start containers
+All API access to Alfred is authenticated with cryptographically secure API keys.
 
-**Volume also lost:**
-1. Create new server + volume, provision fresh
-2. Restore from restic: `restic restore latest --target /mnt/encrypted/`
-3. Start containers -- vault data is restored
+**API keys** start with the `alf_` prefix followed by 32 random hexadecimal characters. They are shown exactly once at creation — we don't store them in plain text. Keys are verified using constant-time comparison to prevent timing-based attacks. You can create up to 10 keys per account, and revoke any key instantly.
 
----
+API keys are encrypted with AES-256-GCM before storage in the database, meaning even if our database were compromised, your keys would remain protected.
 
-## Supply Chain Security
+**Web authentication** uses industry-standard OAuth or email/password with bcrypt hashing. Sessions are protected with secure HTTP-only cookies.
 
-### Package Installation
+**Administrative access** uses Ed25519 SSH keys, generated uniquely per instance. No password-based access is permitted.
 
-| Package | Method | Verification |
-|---------|--------|-------------|
-| Tailscale | APT with GPG key from `pkgs.tailscale.com` | GPG signature |
-| cloudflared | APT with GPG key from `pkg.cloudflare.com` | GPG signature |
-| Docker | APT from Docker's official repository | GPG signature |
-| System packages | Ubuntu APT | Standard APT signatures |
+For detailed information about creating and managing API keys, see the [API Authentication](/authentication) guide.
 
-<Note>
-Previously, Tailscale was installed via `curl | sh` (supply chain risk). This was remediated by switching to APT with GPG key verification.
-</Note>
+## Access Control
 
-### Container Image Risks
+Each AI worker within Alfred (Curator, Janitor, Distiller) operates under scoped permissions. This ensures that if one component is compromised, the attacker cannot exceed that component's intended capabilities.
 
-All custom images use mutable `:latest` tags. The auto-update timer pulls every 15 minutes without signature verification:
+- **Curator** can create and edit vault records but cannot delete them.
+- **Janitor** can edit and delete records (for cleanup and fixing structural issues) but cannot create new record types.
+- **Distiller** can only create learning records (assumptions, decisions, constraints) and cannot edit, delete, or move existing records.
+- **All mutations are logged** — every create, edit, move, and delete operation is recorded with a timestamp and scope identifier.
 
-```
-docker compose pull --quiet && docker compose up -d --remove-orphans
-```
+Users of your instance have full read and write access to the vault. Permissions are enforced at the operation level before any command executes. Attempting to exceed your scope results in an error, never a silent failure.
 
-**Risks**: Image mutation, malicious push to Docker Hub, no health gate between pull and restart, no automatic rollback on failure.
+## Infrastructure Security
 
-**Recommended mitigations** (not yet implemented):
-- Pin images by digest (`@sha256:...`)
-- Sign images with cosign and verify before pull
-- Add health check gate: pull, start canary, verify health, promote
-- Enable Docker Content Trust
+Alfred instances run on hardened Linux servers with automatic security updates and multiple defensive layers.
 
-### OpenClaw Skill Supply Chain
+**OS hardening** includes:
+- SSH key-only authentication (no passwords allowed)
+- SSH configuration restricting login attempts, disabling tunneling, and setting idle timeouts
+- Fail2ban intrusion prevention (blocks accounts after 3 failed login attempts for 1 hour)
+- Unattended security updates enabled (patches install automatically)
+- UFW firewall with default-deny incoming policy
 
-OpenClaw supports installing third-party skills from ClawHub. Known threats:
+**Container hardening** includes:
+- Privileged operations disabled (`no-new-privileges`)
+- Capability restrictions (`cap_drop: ALL` for most containers)
+- Memory and process limits per container to prevent resource exhaustion
+- Health checks that automatically restart failed services
+- Services running as non-root users where possible
 
-- **CVE-2026-25253** (CVSS 8.8): OpenClaw Control UI RCE via untrusted `gatewayUrl`
-- **ClawHavoc campaign** (Jan 2026): 1,184+ malicious skills on ClawHub
+All custom container images are scanned for vulnerabilities and use the latest upstream versions of dependencies. The init script that bootstraps your instance is run once and then deleted — it is never stored or executed again.
 
-Alfred mitigates by binding OpenClaw to localhost and fronting it with Cloudflare Tunnel (no direct internet exposure).
+## Backups
 
----
+Automated daily encrypted backups ensure you can recover your data in any scenario.
 
-## Attack Surface Analysis
+Backups are taken at 3:00 AM UTC (with randomized jitter) using restic, which encrypts your vault with a unique per-instance encryption key before uploading to Hetzner Object Storage. We retain:
+- 7 daily snapshots
+- 4 weekly snapshots
+- 6 monthly snapshots
 
-### External Attack Vectors
+If your instance's hardware fails, we can restore from backup to new hardware without you losing any data. If your encrypted volume becomes corrupted, we can restore from backup. Backups are verified on first provision — we confirm a successful backup exists before marking your instance as ready.
 
-| Vector | Exposure | Auth | Impact | Mitigation |
-|--------|----------|------|--------|------------|
-| SSH brute-force | Port 22 (admin CIDRs) | Ed25519 key | Server access | fail2ban, key-only, MaxAuthTries=3 |
-| CF Tunnel hijack | Public HTTPS | Tunnel creds | Traffic interception | Creds on encrypted volume, outbound-only |
-| DNS poisoning | `*.alfred.black` | Cloudflare proxied | User redirection | Cloudflare DNS, proxied records |
-| SaaS exploitation | `app.alfred.black` | Wasp auth | User data, provisioning | Input validation, parameterized SQL |
-| OpenClaw skill RCE | Via CF Tunnel | Gateway token | Container access | Localhost binding, container caps |
-| Tailscale compromise | WireGuard mesh | Ephemeral key | Mesh access | Ephemeral keys, ACL isolation |
+Backup restoration is included in your instance provisioning. If you ever need to recover from an older snapshot, contact support.
 
-### Internal Attack Vectors (post-compromise)
+<Tip>
+Your backups are encrypted with the same AES-256 encryption as your live data. We cannot access your backups, and your data is protected even in our object storage.
+</Tip>
 
-| Vector | Prerequisite | Impact | Mitigation |
-|--------|-------------|--------|------------|
-| Container escape | Container access | Host access | `no-new-privileges`, `cap_drop: ALL`, limits |
-| LUKS key theft | Root on VM | All tenant data | Keyfile 0600, root-only |
-| Lateral movement | Compromised tenant | Other tenants | Tailscale ACL denies tenant-to-tenant |
-| Control plane compromise | SSH to control plane | **All tenants** | Restricted SSH CIDRs, key auth |
-| Docker socket abuse | `deploy` user | Host root equivalent | docker group (inherent risk, accepted) |
+## Compliance & Transparency
 
-### Tenant Isolation Model
+Alfred is built with security-by-default. We don't offer optional security features — all of these protections are active by default for every instance, every tenant.
 
-Each tenant is isolated at multiple levels:
-
-| Layer | Isolation Method |
-|-------|-----------------|
-| **Compute** | Dedicated Hetzner VM per tenant |
-| **Storage** | Dedicated LUKS2-encrypted volume per tenant |
-| **Network** | Tailscale ACL prevents tenant-to-tenant traffic |
-| **DNS** | Unique Cloudflare Tunnel per tenant |
-| **Auth** | Unique API keys, gateway tokens, SSH keys |
-| **Firewall** | Shared Hetzner firewall policy |
-
-**Shared resources** (single point of compromise):
-- Hetzner API token (manages all VMs)
-- Tailscale tailnet (isolation via ACLs only)
-- Cloudflare account (per-tenant tunnels and DNS)
-- Docker Hub images (pulled by all tenants)
-- S3 bucket (per-tenant prefix path)
+For detailed technical information about network architecture, container isolation, cryptographic algorithms, or incident response procedures, contact our security team at security@alfred.black.
 
 ---
 
-## Known Vulnerabilities
-
-### Remediation Status
-
-25 findings from the security audit. **10 fixed, 15 open.**
-
-<AccordionGroup>
-<Accordion title="Critical (3)" icon="circle-exclamation">
-
-| # | Finding | Status |
-|---|---------|--------|
-| 1 | SSH host key verification incomplete (MITM risk) | Partial fix |
-| 2 | LUKS keyfile backup stored unencrypted on control plane | **Open** |
-| 3 | Generated LUKS passphrase is dead code (never used) | **Open** |
-
-</Accordion>
-
-<Accordion title="High (7)" icon="triangle-exclamation">
-
-| # | Finding | Status |
-|---|---------|--------|
-| 4 | Unrestricted passwordless sudo | **Fixed** -- scoped sudo |
-| 5 | Tailscale auth key persisted on disk | **Fixed** -- deleted after use |
-| 6 | Template injection via customer_name | **Fixed** -- regex validation |
-| 7 | API keys in docker-compose.yaml | **Fixed** -- env_file, 0600 |
-| 8 | No container hardening | **Fixed** -- caps, limits, no-new-privs |
-| 9 | Restic backup failure silently ignored | **Fixed** -- hard error |
-| 10 | Tailscale installed via curl\|sh | **Fixed** -- APT with GPG |
-
-</Accordion>
-
-<Accordion title="Medium (8)" icon="circle-info">
-
-| # | Finding | Status |
-|---|---------|--------|
-| 11 | SSH open to entire internet | **Fixed** -- ADMIN_SSH_CIDRS |
-| 12 | IP addresses leaked in alert webhooks | **Open** |
-| 13 | fail2ban bantime too short (1h) | **Open** |
-| 14 | docker-compose.yaml world-readable | **Fixed** -- 0600 |
-| 15 | No API token rotation mechanism | **Open** |
-| 16 | SSH key storage depends on cwd() | **Open** |
-| 17 | Health check JSON string interpolation | **Fixed** -- jq |
-| 18 | Backup service runs as root | **Open** |
-
-</Accordion>
-
-<Accordion title="Low (7)" icon="circle-question">
-
-| # | Finding | Status |
-|---|---------|--------|
-| 19 | No egress filtering | **Open** |
-| 20 | Docker images use `:latest` | **Open** |
-| 21 | Auto-update has no verification | **Open** |
-| 22 | Silent alert webhook failures | **Open** |
-| 23 | ICMP allowed from all sources | **Open** |
-| 24 | Incomplete SSH hardening | **Fixed** -- sshd drop-in |
-| 25 | Error messages leak internal details | **Fixed** -- proxy sanitization |
-
-</Accordion>
-</AccordionGroup>
-
----
-
-## Out of Scope & Accepted Risks
-
-### Explicitly Out of Scope
-
-| Area | Reason |
-|------|--------|
-| DDoS protection | Delegated to Cloudflare |
-| WAF rules | Delegated to Cloudflare; no app-level WAF |
-| Container image scanning | No Trivy/Grype in CI |
-| Runtime threat detection | No Falco/Sysdig; container hardening only |
-| Key Management Service | No Vault/KMS; secrets in env vars and files |
-| SOC 2 / ISO 27001 | No formal compliance program |
-| Penetration testing | No formal pentest conducted |
-| Centralized logging | Per-VM in systemd journal; no SIEM |
-| IDS/IPS | fail2ban only; no OSSEC/Wazuh |
-
-### Accepted Risks
-
-| Risk | Rationale |
-|------|-----------|
-| `deploy` user in docker group | Required for container management. Docker group = root equivalent. Mitigated by SSH key auth + fail2ban. |
-| Shared Hetzner API token | Single token for all infrastructure. Compromise = total fleet control. Accepted for operational simplicity. |
-| Shared Tailscale tailnet | All tenants on same tailnet, isolated by ACLs. ACL misconfiguration = lateral movement. ACLs are version-controlled. |
-| Auto-update without verification | 15-min pull cycle, no signatures. Accepted for rapid patching. Pin digests before GA. |
-| LUKS auto-unlock | Keyfile on root disk enables unattended boot. Physical access (Hetzner DC) could extract it. Hetzner DCs are ISO 27001. |
-
----
-
-## Hardening Checklist
-
-### Applied Controls
-
-- [x] Ed25519 SSH keys (no RSA, no passwords)
-- [x] SSH hardening via sshd_config drop-in
-- [x] fail2ban on SSH (3 retries, 1h ban)
-- [x] LUKS2 full-disk encryption on data volumes
-- [x] Secrets uploaded via SSH, never in cloud-init
-- [x] Hetzner Cloud Firewall (SSH restricted, Tailscale UDP, ICMP)
-- [x] Host UFW firewall (defense-in-depth)
-- [x] Container `no-new-privileges` and `cap_drop: ALL`
-- [x] Container memory and PID limits
-- [x] All services bound to localhost
-- [x] Tailscale mesh with ACL-based tenant isolation
-- [x] Cloudflare Tunnel for user-facing access (outbound-only)
-- [x] Tailscale + cloudflared installed via APT with GPG
-- [x] Scoped sudo for deploy user
-- [x] Vault scope enforcement (per-tool restrictions)
-- [x] Parameterized SQL queries
-- [x] Customer name regex validation
-- [x] Path traversal protection
-- [x] Error message sanitization in tenant proxy
-- [x] AES-256-GCM encryption for API keys in PostgreSQL
-- [x] Restic backup failure = hard provisioning error
-- [x] Unattended security updates enabled
-- [x] Ephemeral, single-use Tailscale auth keys
-
-### Recommended (Not Yet Applied)
-
-- [ ] Encrypt LUKS keyfile backups with age/GPG
-- [ ] Enforce SSH host key verification on all paths
-- [ ] Pin Docker images by digest, sign with cosign
-- [ ] Add health check gate to auto-update timer
-- [ ] Implement API token rotation
-- [ ] Increase fail2ban bantime to 24h
-- [ ] Add egress filtering
-- [ ] Run backup service as non-root user
-- [ ] Encrypt SQLite secrets at rest
-- [ ] Add rate limiting to tenant API
-- [ ] Centralized log aggregation
-- [ ] Enable Cloudflare Access on tunnel endpoints
-- [ ] CSP headers on SaaS application
-- [ ] Enforce MFA for SaaS admin users
-- [ ] Scan container images in CI
-
----
-
-## Incident Response
-
-If a tenant instance is compromised:
-
-<Steps>
-<Step title="Isolate">
-Remove from Tailscale network (`tailscale logout` on the VM). Delete the Cloudflare Tunnel DNS record to cut user access.
-</Step>
-<Step title="Snapshot">
-Create a Hetzner snapshot for forensic analysis before any changes.
-</Step>
-<Step title="Rotate">
-Rotate: API key, SSH keys, Tailscale auth key, gateway token. Revoke the Cloudflare tunnel.
-</Step>
-<Step title="Audit">
-Review `vault_audit.log` for unauthorized mutations. Check systemd journal for suspicious activity.
-</Step>
-<Step title="Restore">
-Provision a new instance and restore from the last known-good restic backup.
-</Step>
-<Step title="Investigate">
-Analyze the snapshot to identify the attack vector. Update hardening controls.
-</Step>
-</Steps>
-
-<Warning>
-Do **not** destroy the compromised instance until forensic analysis is complete. Create a snapshot first.
-</Warning>
+**Have questions about security?** Email [security@alfred.black](mailto:security@alfred.black) or see the [FAQ](/faq/security).

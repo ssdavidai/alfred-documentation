@@ -1,219 +1,165 @@
 ---
 title: "Architecture"
-description: "How Alfred's components fit together -- from network topology to AI agent execution."
+description: "How Alfred's components fit together to process your vault and enhance your note-taking."
 icon: "sitemap"
 ---
 
 ## System Overview
 
+Alfred runs as a private instance in the cloud, containing several specialized components that work together to manage your vault:
+
 ```mermaid
 graph TB
-    User["User Browser"]
-    CF["Cloudflare Edge<br/>(TLS termination)"]
-    CFT["cloudflared daemon"]
+    User["Your Browser"]
     SaaS["SaaS Dashboard<br/>(app.alfred.black)"]
-    TS["Tailscale Mesh<br/>(WireGuard)"]
 
-    User -->|HTTPS| CF
-    User -->|HTTPS| SaaS
-    CF -->|Tunnel| CFT
-    SaaS -->|Tailscale :3100| API
+    User -->|HTTPS| Gateway["OpenClaw Gateway<br/>(secure entry point)"]
+    SaaS -->|API Call| TenantAPI["Tenant API"]
 
-    subgraph Tenant VM
-        CFT -->|localhost:18789| OC["OpenClaw Gateway"]
-        API["Tenant API :3100"]
-        Temporal["Temporal :7233/:8233"]
-        Alfred["Alfred Worker"]
-
-        OC -->|agent gateway| Alfred
-        Alfred -->|schedules| Temporal
-        Alfred -->|reads/writes| Vault
-        API -->|child_process| Alfred
-        API -->|fs read/write| Vault
-
-        subgraph Encrypted Volume
-            Vault["Vault Records"]
-            OCData["OpenClaw State"]
-            AlfredData["Alfred State"]
-            TempData["Temporal DB"]
-        end
+    subgraph "Your Instance"
+        Gateway -->|executes| Worker["Alfred Worker"]
+        TenantAPI -->|manages| Worker
+        Worker -->|reads/writes| Vault["Your Vault<br/>(Markdown files)"]
+        Worker -->|schedules| Temporal["Task Orchestrator"]
+        Temporal -->|tracks| Worker
     end
+
+    Vault -->|encrypted at rest| Storage["Encrypted Storage"]
+    TenantAPI -->|encrypted in transit| SaaS
 ```
 
-## Network Architecture
+**Key principle**: All your data stays on your instance. The SaaS dashboard communicates with your instance via secure API calls, but never stores vault content.
 
-Alfred uses a **four-layer network model**. User-facing traffic flows through Cloudflare Tunnel. Admin and SaaS-to-tenant traffic flows through Tailscale. No application ports are exposed to the public internet.
+## How Requests Flow
 
-| Port | Service | Binding | User Access | Admin Access |
-|------|---------|---------|-------------|-------------|
-| 18789 | OpenClaw Gateway | 127.0.0.1 | Cloudflare Tunnel | -- |
-| 3100 | Tenant API | 127.0.0.1 | -- | Tailscale Serve (HTTPS) |
-| 8233 | Temporal UI | 127.0.0.1 | -- | Tailscale Serve (HTTPS) |
-| 7233 | Temporal gRPC | 127.0.0.1 | -- | Docker internal network |
+When you interact with Alfred, here's what happens:
 
-```
-Internet Users ──HTTPS──> Cloudflare Edge ──Tunnel──> cloudflared ──> localhost:18789 (OpenClaw)
+1. **Dashboard Request**: You click an action in the SaaS dashboard (e.g., "Organize inbox")
+2. **API Call**: Dashboard sends a request to your instance's Tenant API
+3. **Worker Execution**: API invokes the Alfred Worker, which runs the appropriate tool
+4. **Vault Access**: Worker reads and writes records in your vault
+5. **Response**: Results return to the dashboard
 
-SaaS Dashboard ──Tailscale──> alfred-{name}:3100 (Tenant API)
-
-Admin ──Tailscale──> alfred-{name}:8233 (Temporal UI)
-       ──SSH (22)──> deploy@{ip} (restricted to admin CIDRs)
-```
-
-<Note>
-All services bind to `127.0.0.1`. The only way to reach them is through Cloudflare Tunnel (user-facing) or Tailscale (admin/SaaS). See [Security Profile](/concepts/security-model) for the full network security model.
-</Note>
+All communication is encrypted end-to-end. Your API key (stored securely in your browser's local storage) authenticates each request.
 
 ## Component Stack
 
+### OpenClaw Gateway
+
+Your secure entry point. Manages:
+- Device pairing (linking your devices to your instance)
+- Agent sessions (maintaining context for AI operations)
+- Skill execution (running specialized prompts on your vault)
+
+Think of it as the "front door" to your instance.
+
 ### Tenant API
 
-A standalone Node.js process (`/opt/alfred/api.mjs`) running as a systemd service. Zero npm dependencies -- just Node.js 22 built-ins.
+A lightweight API server that:
+- Authenticates requests from the SaaS dashboard
+- Routes commands to the Alfred Worker
+- Returns results and status updates
 
-- **Auth**: Bearer token via `alf_` API keys (timing-safe comparison)
-- **Binding**: `127.0.0.1:3100` (exposed via Tailscale Serve)
-- **Execution**: Uses `child_process.execFile` with array arguments (no shell interpretation)
-- **Accessed by**: SaaS dashboard proxy over Tailscale
+Runs as a simple Node.js process with no external dependencies.
 
-### OpenClaw Container
+### Alfred Worker
 
-The AI agent gateway. Manages device pairing, sessions, skills, and agent execution.
+The brain of your instance. Runs four specialized tools that process your vault:
+- **Curator**: Organizes raw inputs from your inbox into structured records
+- **Janitor**: Scans for broken links, missing fields, and orphaned notes
+- **Distiller**: Extracts insights (decisions, assumptions, constraints) from your records
+- **Surveyor** (optional): Clusters similar notes and suggests connections
 
-- **Image**: `ssdavidai00/alfred-openclaw:latest`
-- **Port**: `127.0.0.1:18789` (exposed via Cloudflare Tunnel at `{tenant}.alfred.black`)
-- **Auth**: Gateway token (URL parameter)
-- **Security**: `no-new-privileges`, `cap_drop: ALL`, `cap_add: DAC_OVERRIDE`, 2GB mem, 256 PIDs
+### Task Orchestrator
 
-### Alfred Container (Worker)
-
-Runs the four Alfred tools (Curator, Janitor, Distiller, Surveyor) as background daemons:
-
-1. Receives work (inbox file, scan trigger, extraction request)
-2. Builds a prompt from bundled skill files + vault context
-3. Invokes the AI agent backend (OpenClaw gateway via `ws://openclaw:18789`)
-4. Agent reads/writes vault files via scoped `alfred vault` CLI commands
-5. Changes tracked in append-only JSONL mutation log
-
-- **Image**: `ssdavidai00/alfred-worker:latest`
-- **Ports**: None (no network exposure)
-- **Security**: `no-new-privileges`, `cap_drop: ALL`, 2GB mem, 256 PIDs
-
-### Temporal Container
-
-Workflow orchestration using [Temporal](https://temporal.io) in dev mode with SQLite storage.
-
-- **Image**: `temporalio/temporal:latest`
-- **Ports**: `127.0.0.1:7233` (gRPC), `127.0.0.1:8233` (UI, admin-only via Tailscale)
-- **Storage**: SQLite at `/mnt/encrypted/temporal/temporal.db`
-- **Security**: `no-new-privileges`, 2GB mem, 256 PIDs
-
-### Cloudflared (Host Service)
-
-Cloudflare Tunnel daemon running as a systemd service on the host. Establishes an outbound-only tunnel to Cloudflare's edge network.
-
-- **Config**: `/etc/cloudflared/config.yml`
-- **Credentials**: `/etc/cloudflared/credentials.json` (mode 0600)
-- **Route**: `{tenant}.alfred.black` to `localhost:18789`
-- **DNS**: CNAME record `{tenant}.alfred.black` pointing to `{tunnel-id}.cfargotunnel.com`
-
-## Startup Sequence
-
-```mermaid
-graph LR
-    Init["init (scaffold)"] -->|completed| Temporal["temporal (workflow)"]
-    Temporal -->|healthy| OC["openclaw (gateway)"]
-    OC -->|healthy| Alfred["alfred (worker)"]
-```
-
-The `init` container scaffolds the vault directory structure and OpenClaw configuration, then exits (exit code 0 = healthy). Temporal must respond on gRPC before OpenClaw starts. OpenClaw must respond on `/health` before Alfred starts.
-
-## Data Layout
-
-All persistent data lives on a LUKS2-encrypted volume mounted at `/mnt/encrypted/`:
-
-```
-/mnt/encrypted/
-├── vault/              # Obsidian vault (Markdown files)
-│   ├── inbox/          # Raw inputs (Curator picks these up)
-│   ├── person/         # Entity type directories (19 total)
-│   ├── decision/       # Learning types (5 total)
-│   ├── _templates/     # Per-type Markdown templates
-│   └── _bases/         # Dataview base views
-├── openclaw/           # OpenClaw state (config, device pairing)
-│   └── workspace/vault # Symlink for wikilink resolution
-├── alfred/             # Worker state, config, audit log
-│   └── .gateway-token  # OpenClaw gateway auth
-└── temporal/           # Temporal SQLite database
-```
-
-<Tip>
-The encrypted volume is the single source of truth. State files (`*_state.json`) are bookkeeping and can be deleted to force re-processing. The vault records themselves are authoritative.
-</Tip>
+Temporal workflow engine that schedules and tracks background tasks. Ensures work completes reliably, even if your instance restarts.
 
 ## Worker Pipeline
 
+Your vault is processed through a simple, repeatable flow:
+
 ```mermaid
 graph LR
-    Inbox["inbox/"] -->|new file| Curator
-    Curator -->|creates records| Vault["Vault Records"]
-    Vault -->|periodic scan| Janitor
-    Janitor -->|fixes issues| Vault
-    Vault -->|extraction| Distiller
-    Distiller -->|creates| Learnings["Learning Records"]
+    Inbox["inbox/"] -->|Curator reads| Step1["Processes raw input"]
+    Step1 -->|Creates/edits| Vault["Vault Records"]
+    Vault -->|Janitor scans| Step2["Finds & fixes issues"]
+    Step2 -->|Updates| Vault
+    Vault -->|Distiller analyzes| Step3["Extracts insights"]
+    Step3 -->|Creates| Learning["Learning Records<br/>(assumptions, decisions, etc.)"]
 ```
 
 ### Curator
 
-Watches `inbox/` for new files. Reads the raw content, loads the curator skill prompt + vault context, invokes the AI agent (which creates/edits records), and marks the file as processed.
+Watches your inbox for new files. When it finds one:
+1. Reads the raw content
+2. Uses AI to extract structure (title, type, relationships)
+3. Creates a new record in the appropriate vault directory
+4. Marks the inbox file as processed
 
 ### Janitor
 
-Periodically sweeps the vault for broken wikilinks, invalid frontmatter, missing required fields, and orphaned records. Reports issues and optionally invokes the AI agent to fix them.
+Runs periodically (by default, once daily) to:
+- Find broken wikilinks (references to non-existent notes)
+- Detect invalid frontmatter
+- Identify orphaned records (notes with no relationships)
+- Fix common issues automatically
+
+Think of it as a spell-checker for your vault.
 
 ### Distiller
 
-Analyzes operational records and extracts latent knowledge (assumptions, decisions, constraints, contradictions). Checks for duplicates against existing learning records before creating new ones.
+Analyzes your operational records to extract hidden knowledge:
+- **Assumptions**: "We assume users want fast results"
+- **Decisions**: "We chose SQLite for simplicity"
+- **Constraints**: "Limited to 10GB vault size"
+- **Contradictions**: "Plan says X, records show Y"
 
-## Provisioning Flow
+Deduplicates automatically—won't create learning records you already have.
 
-When a new tenant is provisioned, alfred-ctrl orchestrates these steps:
+## Data Layout
 
-<Steps>
-<Step title="Generate SSH keypair">
-Ed25519 keypair created per-instance and stored locally.
-</Step>
-<Step title="Create infrastructure">
-Hetzner server with hardened firewall, LUKS2-encrypted volume attached.
-</Step>
-<Step title="Cloud-init bootstrap">
-System setup: Docker, Tailscale (APT), cloudflared (APT), SSH hardening, UFW, fail2ban, unattended upgrades, LUKS format + mount.
-</Step>
-<Step title="Upload secrets via SSH">
-API keys, gateway tokens, restic credentials uploaded post-boot. **Never** in cloud-init user_data.
-</Step>
-<Step title="Start containers">
-Docker images pulled, init runs, containers start in dependency order.
-</Step>
-<Step title="Bootstrap OpenClaw + Tailscale">
-OpenClaw device auto-pairing, Tailscale join with `tag:tenant`, Tailscale Serve endpoints configured.
-</Step>
-<Step title="Setup Cloudflare Tunnel">
-Create tunnel, upload credentials, create DNS CNAME, start cloudflared service.
-</Step>
-<Step title="Health check">
-Verify all containers healthy, subdomain reachable, backup successful.
-</Step>
-</Steps>
+Your vault is organized into entity types (person, org, project, task, etc.) and learning types (assumption, decision, constraint, etc.):
 
-## Backup Strategy
+```
+vault/
+├── inbox/              # Where you drop raw inputs
+├── person/             # People (contacts, team members)
+├── org/                # Organizations
+├── project/            # Projects and initiatives
+├── task/               # Tasks and to-dos
+├── decision/           # Learning: decisions made
+├── assumption/         # Learning: assumptions held
+├── constraint/         # Learning: constraints discovered
+└── _templates/         # Template files for each type
+```
 
-- **Automated daily backups** at 3:00 AM via restic to Hetzner Object Storage (S3)
-- Containers stopped during backup for consistency (~5 min downtime)
-- **Encryption**: Per-instance random password (AES-256)
-- **Retention**: 7 daily, 4 weekly, 6 monthly snapshots
-- LUKS keyfile and restic credentials backed up to control plane
-- On-demand backups managed by the control plane
+**Important**: Your vault is the source of truth. All processing is non-destructive—tools create new records and fix issues, but your original notes are never deleted without your permission.
 
 <Tip>
-Backup failure during provisioning is a **hard error**. Every instance has at least one known-good backup from day one.
+All data is encrypted at rest on your instance's storage. For details on security, see the [Security Profile](/concepts/security-model).
 </Tip>
+
+## Reliability & Recovery
+
+Your instance is designed for reliability:
+
+- **Automated health checks**: We periodically verify your instance is responding
+- **Task persistence**: If your instance restarts, background tasks resume from where they left off
+- **Encrypted backups**: Daily automatic backups ensure you can recover if something goes wrong
+- **Mutation tracking**: Every change to your vault is logged in an append-only audit trail
+
+If you need to reset a tool (e.g., re-process everything with Curator), the underlying state files can be cleared—the vault records themselves are never affected.
+
+## Isolation & Multi-Tenancy
+
+Each user's instance is completely isolated:
+- Separate cloud infrastructure
+- Separate encrypted storage volume
+- Separate task queue and worker
+- Separate gateway and API credentials
+
+Your vault data never touches another user's instance, and the SaaS control plane never stores vault content.
+
+---
+
+**Want deeper details?** See [Security Profile](/concepts/security-model) for encryption, authentication, and network security. Or check out [Vault Schema](/reference/vault-schema) to understand the record types and structure.

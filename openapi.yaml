@@ -1,0 +1,2236 @@
+openapi: 3.1.0
+info:
+  title: Alfred API
+  version: 1.0.0
+  description: >
+    API for managing an Alfred-powered Obsidian vault. Alfred is an AI-powered
+    knowledge management system that provides CRUD operations on vault records,
+    daemon worker management, Temporal workflow orchestration, schedule
+    management, and OpenClaw device pairing.
+
+servers:
+  - url: https://app.alfred.black
+    description: Production
+
+security:
+  - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: >
+        API key in the format `alf_<32 hex chars>`. Pass in the Authorization
+        header as `Bearer alf_...`.
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              description: Machine-readable error code
+              examples:
+                - UNAUTHORIZED
+                - EXEC_ERROR
+                - VALIDATION_ERROR
+            message:
+              type: string
+              description: Human-readable error message
+              examples:
+                - Unauthorized
+                - Command failed with exit code 1
+          required:
+            - code
+            - message
+      required:
+        - error
+
+    RawResponse:
+      type: object
+      description: >
+        Wraps raw CLI text output when the underlying command does not return
+        valid JSON. If the command does return JSON, the parsed object is
+        returned directly instead.
+      properties:
+        raw:
+          type: string
+          description: Raw text output from the CLI command
+          examples:
+            - "127 records across 18 types."
+
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Human-readable confirmation message
+      required:
+        - message
+
+    VaultType:
+      type: string
+      enum:
+        - person
+        - org
+        - project
+        - task
+        - event
+        - note
+        - location
+        - process
+        - account
+        - asset
+        - conversation
+        - input
+        - run
+        - session
+        - assumption
+        - decision
+        - constraint
+        - contradiction
+        - synthesis
+      description: One of the 19 known vault record types (14 entity + 5 learning)
+
+    VaultSchema:
+      type: object
+      properties:
+        known_types:
+          type: array
+          items:
+            $ref: "#/components/schemas/VaultType"
+        status_by_type:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          description: Map of record type to allowed status values
+        list_fields:
+          type: array
+          items:
+            type: string
+          description: Field names treated as multi-value lists
+        required_fields:
+          type: array
+          items:
+            type: string
+          description: Globally required frontmatter fields
+        name_field_by_type:
+          type: object
+          additionalProperties:
+            type: string
+          description: Map of type to its display name field override
+        type_directory:
+          type: object
+          additionalProperties:
+            type: string
+          description: Map of type to its vault subdirectory
+
+    InboxUploadResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          examples:
+            - "Uploaded meeting-notes.md to inbox"
+        filename:
+          type: string
+          examples:
+            - meeting-notes.md
+      required:
+        - message
+        - filename
+
+    InboxBulkUploadResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          examples:
+            - "Uploaded 3 files to inbox"
+        filenames:
+          type: array
+          items:
+            type: string
+      required:
+        - message
+        - filenames
+
+    InboxListResponse:
+      type: object
+      properties:
+        files:
+          type: array
+          items:
+            type: string
+      required:
+        - files
+
+    DeviceListResponse:
+      type: object
+      properties:
+        pending:
+          type: array
+          items:
+            type: object
+          description: Pending pairing requests
+        paired:
+          type: array
+          items:
+            type: object
+          description: Already-paired devices
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid API key
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error:
+              code: UNAUTHORIZED
+              message: Unauthorized
+
+    InternalError:
+      description: Internal server error (CLI command failure)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error:
+              code: EXEC_ERROR
+              message: Command failed with exit code 1
+
+    ValidationError:
+      description: Request validation error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error:
+              code: VALIDATION_ERROR
+              message: Request body required
+
+paths:
+  # ---------------------------------------------------------------------------
+  # Vault
+  # ---------------------------------------------------------------------------
+  /api/v1/vault/context:
+    get:
+      operationId: getVaultContext
+      summary: Get Vault Context
+      description: >
+        Returns the output of `alfred vault context`. If the CLI returns valid
+        JSON it is passed through directly; otherwise the raw text output is
+        wrapped in a `{ "raw": "..." }` object.
+      tags:
+        - Vault
+      responses:
+        "200":
+          description: Vault context returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RawResponse"
+              example:
+                raw: "127 records across 18 types.\n\nMost recent activity: 3 tasks updated today, 2 people added this week."
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/vault/search:
+    get:
+      operationId: searchVault
+      summary: Search Vault
+      description: >
+        Search for vault records using file glob patterns or full-text content
+        search. Both search methods can be combined.
+      tags:
+        - Vault
+      parameters:
+        - name: glob
+          in: query
+          required: false
+          description: "File glob pattern to match (e.g., `person/*.md`, `**/*alice*.md`)"
+          schema:
+            type: string
+        - name: grep
+          in: query
+          required: false
+          description: Text to search for in file contents (case-insensitive)
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Search results returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RawResponse"
+              example:
+                raw: "project/ML Pipeline Redesign.md\nproject/Customer Segmentation Model.md\nproject/NLP Research Initiative.md"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/vault/list/{type}:
+    get:
+      operationId: listRecordsByType
+      summary: List Records by Type
+      description: >
+        Returns a list of all records for a given type. The type must be one of
+        the 19 types defined in the vault schema.
+      tags:
+        - Vault
+      parameters:
+        - name: type
+          in: path
+          required: true
+          description: The record type to list
+          schema:
+            $ref: "#/components/schemas/VaultType"
+      responses:
+        "200":
+          description: List of records returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RawResponse"
+              example:
+                raw: "person/Alice Chen.md\nperson/Bob Martinez.md\nperson/Carol Zhang.md"
+        "400":
+          description: Unknown vault type
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error:
+                  code: VALIDATION_ERROR
+                  message: "Unknown vault type: unknown_type. Known types: person, org, project, task, event, note, location, process, account, asset, conversation, input, run, session, decision, assumption, constraint, contradiction, synthesis"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/vault/records/{path}:
+    get:
+      operationId: readRecord
+      summary: Read Record
+      description: >
+        Returns the contents of a vault record. If the CLI returns valid JSON
+        (e.g., parsed frontmatter and body) it is passed through directly;
+        otherwise the raw text is wrapped in `{ "raw": "..." }`.
+      tags:
+        - Vault
+      parameters:
+        - name: path
+          in: path
+          required: true
+          description: >
+            Relative path to the record (e.g., `person/Alice.md`). URL-encode
+            if the path contains spaces or special characters.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Record contents returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RawResponse"
+              example:
+                raw: "---\ntype: person\nrole: ML Engineer\norg: \"[[org/Acme Corp]]\"\nstatus: active\n---\n\n## Background\n\nAlice joined Acme in December 2025 as a senior ML engineer."
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    patch:
+      operationId: editRecord
+      summary: Edit Record
+      description: >
+        Modifies an existing vault record. You can set or replace frontmatter
+        fields, append to list fields, append to the markdown body, or replace
+        the body entirely.
+      tags:
+        - Vault
+      parameters:
+        - name: path
+          in: path
+          required: true
+          description: >
+            Relative path to the record (e.g., `person/Alice.md`). URL-encode
+            if the path contains spaces or special characters.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                set:
+                  type: object
+                  additionalProperties: true
+                  description: Key-value pairs to set in frontmatter (replaces existing values)
+                append:
+                  type: object
+                  additionalProperties: true
+                  description: Key-value pairs to append to list fields in frontmatter
+                body_append:
+                  type: string
+                  description: Text to append to the markdown body
+                body_stdin:
+                  type: string
+                  description: Replace the markdown body with this text
+                scope:
+                  type: string
+                  enum: [curator, janitor, distiller]
+                  description: Operation scope for authorization
+      responses:
+        "200":
+          description: Record edited
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RawResponse"
+              example:
+                raw: "Edited person/Alice Chen.md"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    delete:
+      operationId: deleteRecord
+      summary: Delete Record
+      description: >
+        Permanently deletes a vault record. This operation cannot be undone
+        unless you have vault backups.
+      tags:
+        - Vault
+      parameters:
+        - name: path
+          in: path
+          required: true
+          description: >
+            Relative path to the record (e.g., `person/Alice.md`). URL-encode
+            if the path contains spaces or special characters.
+          schema:
+            type: string
+        - name: scope
+          in: query
+          required: false
+          description: "Operation scope for authorization (`curator`, `janitor`, `distiller`)"
+          schema:
+            type: string
+            enum: [curator, janitor, distiller]
+      responses:
+        "200":
+          description: Record deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RawResponse"
+              example:
+                raw: "Deleted person/Alice Chen.md"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/vault/records:
+    post:
+      operationId: createRecord
+      summary: Create Record
+      description: >
+        Creates a new record in the vault with the specified type, name,
+        frontmatter fields, and markdown body.
+      tags:
+        - Vault
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - type
+                - name
+              properties:
+                type:
+                  $ref: "#/components/schemas/VaultType"
+                name:
+                  type: string
+                  description: >
+                    Display name for the record. Becomes the filename
+                    (e.g., `Alice Chen` -> `person/Alice Chen.md`).
+                fields:
+                  type: object
+                  additionalProperties: true
+                  description: Key-value pairs for frontmatter metadata
+                body:
+                  type: string
+                  description: Markdown body content (everything after frontmatter)
+                scope:
+                  type: string
+                  enum: [curator, janitor, distiller]
+                  description: Operation scope for authorization
+      responses:
+        "201":
+          description: Record created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RawResponse"
+              example:
+                raw: "Created person/Alice Chen.md"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error:
+                  code: VALIDATION_ERROR
+                  message: type and name are required
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/vault/move:
+    post:
+      operationId: moveRecord
+      summary: Move Record
+      description: >
+        Moves or renames a vault record. If the Obsidian CLI is available,
+        wikilinks in other vault records referencing the moved record may also
+        be updated.
+      tags:
+        - Vault
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - from
+                - to
+              properties:
+                from:
+                  type: string
+                  description: "Current relative path to the record (e.g., `person/Alice.md`)"
+                to:
+                  type: string
+                  description: "New relative path for the record (e.g., `person/Alice Chen.md`)"
+      responses:
+        "200":
+          description: Record moved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RawResponse"
+              example:
+                raw: "Moved person/Alice.md to person/Alice Chen.md"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error:
+                  code: VALIDATION_ERROR
+                  message: from and to are required
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/vault/schema:
+    get:
+      operationId: getVaultSchema
+      summary: Get Vault Schema
+      description: >
+        Returns the API server's hardcoded vault schema definition including all
+        19 known record types, status values, list fields, required fields, name
+        fields, and directory mappings. This endpoint does not call the Alfred
+        CLI.
+      tags:
+        - Vault
+      responses:
+        "200":
+          description: Vault schema returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VaultSchema"
+              example:
+                known_types:
+                  - person
+                  - org
+                  - project
+                  - task
+                  - event
+                  - note
+                  - location
+                  - process
+                  - account
+                  - asset
+                  - conversation
+                  - input
+                  - run
+                  - session
+                  - decision
+                  - assumption
+                  - constraint
+                  - contradiction
+                  - synthesis
+                status_by_type:
+                  project: [active, paused, completed, abandoned, proposed]
+                  task: [todo, active, blocked, done, cancelled]
+                required_fields: [type, created]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/vault/inbox:
+    post:
+      operationId: uploadInboxFile
+      summary: Upload Inbox File
+      description: >
+        Uploads a single file to the vault's inbox directory. Files in the inbox
+        are processed by Alfred's Curator daemon, which converts raw inputs into
+        structured vault records. The filename is sanitized before writing.
+      tags:
+        - Vault
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - filename
+                - content
+              properties:
+                filename:
+                  type: string
+                  description: "Name of the file to create in the inbox (e.g., `meeting-notes-2026-02-26.md`)"
+                content:
+                  type: string
+                  description: File contents as a string
+      responses:
+        "201":
+          description: File uploaded to inbox
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InboxUploadResponse"
+              example:
+                message: "Uploaded meeting-notes-2026-02-26.md to inbox"
+                filename: meeting-notes-2026-02-26.md
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              examples:
+                missingFields:
+                  summary: Missing required fields
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: filename and content are required
+                invalidFilename:
+                  summary: Invalid filename
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Invalid filename
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+    get:
+      operationId: listInboxFiles
+      summary: List Inbox Files
+      description: >
+        Returns a list of all files currently in the vault's inbox directory.
+        Hidden files (starting with `.`) are excluded. If the inbox directory
+        does not exist yet, an empty array is returned.
+      tags:
+        - Vault
+      responses:
+        "200":
+          description: Inbox file listing returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InboxListResponse"
+              example:
+                files:
+                  - meeting-notes-2026-02-26.md
+                  - project-idea.md
+                  - contact-info.txt
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/vault/inbox/bulk:
+    post:
+      operationId: uploadInboxFilesBulk
+      summary: Upload Inbox Files (Bulk)
+      description: >
+        Uploads multiple files to the vault's inbox directory in a single
+        request. Each filename is sanitized before writing. If any file has an
+        invalid filename or missing content, the entire request fails.
+      tags:
+        - Vault
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - files
+              properties:
+                files:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - filename
+                      - content
+                    properties:
+                      filename:
+                        type: string
+                        description: Name of the file to create in the inbox
+                      content:
+                        type: string
+                        description: File contents as a string
+      responses:
+        "201":
+          description: Files uploaded to inbox
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InboxBulkUploadResponse"
+              example:
+                message: "Uploaded 3 files to inbox"
+                filenames:
+                  - meeting-notes-2026-02-26.md
+                  - project-idea.md
+                  - contact-info.txt
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              examples:
+                missingArray:
+                  summary: Missing files array
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: files array is required
+                invalidEntry:
+                  summary: Invalid file entry
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Each file must have filename and content
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ---------------------------------------------------------------------------
+  # Workers
+  # ---------------------------------------------------------------------------
+  /api/v1/workers/status:
+    get:
+      operationId: getWorkerStatus
+      summary: Get Worker Status
+      description: >
+        Retrieve the overall status of all Alfred daemon workers (curator,
+        janitor, distiller, surveyor). Always returns raw text output from
+        `alfred status`.
+      tags:
+        - Workers
+      responses:
+        "200":
+          description: Worker status returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RawResponse"
+              example:
+                raw: "curator: running\njanitor: running\ndistiller: stopped\nsurveyor: not configured"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/workers/up:
+    post:
+      operationId: startWorkers
+      summary: Start Workers
+      description: >
+        Starts the Alfred daemon workers in foreground mode. Can optionally
+        start only specific workers by providing a comma-separated list.
+      tags:
+        - Workers
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                only:
+                  type: string
+                  description: >
+                    Comma-separated list of workers to start. Valid values:
+                    `curator`, `janitor`, `distiller`, `surveyor`. If omitted,
+                    all configured workers will start.
+                  examples:
+                    - "curator,janitor"
+      responses:
+        "200":
+          description: Workers started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+              example:
+                message: Workers started
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/workers/down:
+    post:
+      operationId: stopWorkers
+      summary: Stop Workers
+      description: Gracefully stops all running Alfred daemon workers.
+      tags:
+        - Workers
+      responses:
+        "200":
+          description: Workers stopped
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+              example:
+                message: Workers stopped
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/workers/restart:
+    post:
+      operationId: restartContainer
+      summary: Restart Container
+      description: >
+        Performs a hard restart of the Alfred worker process. Stops all workers
+        and starts them fresh. Use this for applying configuration changes or
+        recovering from severe errors. Causes brief downtime (typically 10-30
+        seconds).
+      tags:
+        - Workers
+      responses:
+        "200":
+          description: Container restarted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+              example:
+                message: Alfred container restarted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/workers/ingest:
+    post:
+      operationId: ingestConversation
+      summary: Ingest Conversation
+      description: >
+        Processes a bulk conversation export and splits it into individual
+        inbox files for curator processing. Each message becomes a separate
+        file in the vault's inbox directory.
+      tags:
+        - Workers
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dry_run:
+                  type: boolean
+                  default: false
+                  description: >
+                    If true, performs a dry run without writing any files.
+                    Returns what would be created.
+      responses:
+        "200":
+          description: Ingest result returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RawResponse"
+              example:
+                raw: "Ingested 47 messages"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/workers/process:
+    post:
+      operationId: processInbox
+      summary: Process Inbox
+      description: >
+        Processes inbox files in batches using the curator. This is a one-time
+        batch operation, distinct from the continuous daemon watcher.
+      tags:
+        - Workers
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                limit:
+                  type: integer
+                  description: Maximum number of inbox files to process. If omitted, processes all.
+                dry_run:
+                  type: boolean
+                  default: false
+                  description: >
+                    If true, performs a dry run without invoking the agent.
+                    Returns what would be processed.
+                jobs:
+                  type: integer
+                  description: Number of parallel processing jobs
+      responses:
+        "200":
+          description: Processing result returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RawResponse"
+              example:
+                raw: "Processed 10 inbox files"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/workers/janitor/status:
+    get:
+      operationId: getJanitorStatus
+      summary: Get Janitor Status
+      description: Returns the current status of the janitor daemon.
+      tags:
+        - Workers
+      responses:
+        "200":
+          description: Janitor status returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RawResponse"
+              example:
+                raw: "Janitor daemon: running\nLast sweep: 2026-02-26 10:15 (12 issues found)"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/workers/janitor/scan:
+    post:
+      operationId: janitorScan
+      summary: Scan for Issues
+      description: >
+        Performs a one-time structural scan of the vault without attempting to
+        fix any issues. Returns a report of all detected problems.
+      tags:
+        - Workers
+      responses:
+        "200":
+          description: Scan result returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RawResponse"
+              example:
+                raw: "Scanned 423 files, found 12 issues"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/workers/janitor/fix:
+    post:
+      operationId: janitorFix
+      summary: Fix Issues
+      description: >
+        Performs a structural scan followed by agent-based automated fixing.
+        The janitor agent will attempt to resolve all detected issues by editing
+        vault files, updating frontmatter, fixing links, and removing orphans.
+        All changes are logged in the mutation audit log.
+      tags:
+        - Workers
+      responses:
+        "200":
+          description: Fix result returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RawResponse"
+              example:
+                raw: "Scanned 423 files, found 12 issues, fixed 10"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/workers/janitor/history:
+    get:
+      operationId: getJanitorHistory
+      summary: Get Sweep History
+      description: Returns a chronological history of janitor sweeps.
+      tags:
+        - Workers
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of sweep records to return
+          schema:
+            type: integer
+            default: 10
+      responses:
+        "200":
+          description: Sweep history returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RawResponse"
+              example:
+                raw: "Sweep history (last 10):\n..."
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/workers/janitor/ignore:
+    post:
+      operationId: janitorIgnoreFile
+      summary: Ignore File
+      description: >
+        Adds a file to the janitor's ignore list, preventing it from being
+        scanned or fixed in future sweeps.
+      tags:
+        - Workers
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  description: "Vault-relative path to the file to ignore"
+                  examples:
+                    - "projects/archive/legacy-project.md"
+                reason:
+                  type: string
+                  description: Human-readable reason for ignoring this file
+                  examples:
+                    - "Archived project with intentional broken links"
+      responses:
+        "200":
+          description: File added to ignore list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+              example:
+                message: File ignored
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/workers/distiller/status:
+    get:
+      operationId: getDistillerStatus
+      summary: Get Distiller Status
+      description: Returns the current status of the distiller daemon.
+      tags:
+        - Workers
+      responses:
+        "200":
+          description: Distiller status returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RawResponse"
+              example:
+                raw: "Distiller daemon: running\nLast run: 2026-02-26 09:00 (8 candidates, 12 learnings extracted)"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/workers/distiller/scan:
+    post:
+      operationId: distillerScan
+      summary: Scan for Learnings
+      description: >
+        Performs a one-time scan of vault records to identify extraction
+        candidates without actually extracting learnings.
+      tags:
+        - Workers
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                project:
+                  type: string
+                  description: Filter candidates to a specific project. If omitted, scans all.
+                  examples:
+                    - acme-redesign
+      responses:
+        "200":
+          description: Scan result returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RawResponse"
+              example:
+                raw: "Scanned 423 records, found 8 candidates"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/workers/distiller/run:
+    post:
+      operationId: distillerRun
+      summary: Extract Learnings
+      description: >
+        Performs a scan for extraction candidates followed by agent-based
+        learning extraction. Creates new learning records (assumptions,
+        decisions, constraints, contradictions, synthesis) for each piece of
+        latent knowledge discovered.
+      tags:
+        - Workers
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                project:
+                  type: string
+                  description: Filter extraction to a specific project. If omitted, extracts from all.
+                  examples:
+                    - acme-redesign
+      responses:
+        "200":
+          description: Extraction result returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RawResponse"
+              example:
+                raw: "Scanned 423 records, found 8 candidates, extracted 18 learnings"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/workers/distiller/history:
+    get:
+      operationId: getDistillerHistory
+      summary: Get Extraction History
+      description: Returns a chronological history of distiller extraction runs.
+      tags:
+        - Workers
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of run records to return
+          schema:
+            type: integer
+            default: 10
+      responses:
+        "200":
+          description: Extraction history returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RawResponse"
+              example:
+                raw: "Extraction history (last 10):\n..."
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # ---------------------------------------------------------------------------
+  # Workflows
+  # ---------------------------------------------------------------------------
+  /api/v1/workflows:
+    get:
+      operationId: listWorkflows
+      summary: List Workflows
+      description: >
+        Returns a list of workflows in the Temporal namespace. Supports
+        optional filtering using Temporal's SQL-like query syntax.
+      tags:
+        - Workflows
+      parameters:
+        - name: query
+          in: query
+          required: false
+          description: >
+            Temporal visibility query string for filtering. Examples:
+            `ExecutionStatus='Running'`,
+            `WorkflowType='MyWorkflow' AND ExecutionStatus='Completed'`
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Workflow list returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    execution:
+                      type: object
+                      properties:
+                        workflowId:
+                          type: string
+                        runId:
+                          type: string
+                    type:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                    startTime:
+                      type: string
+                      format: date-time
+                    closeTime:
+                      type: string
+                      format: date-time
+                    status:
+                      type: string
+              example:
+                - execution:
+                    workflowId: curator-sweep-20260226-143022
+                    runId: f47ac10b-58cc-4372-a567-0e02b2c3d479
+                  type:
+                    name: CuratorWorkflow
+                  startTime: "2026-02-26T14:30:22.154Z"
+                  status: WORKFLOW_EXECUTION_STATUS_RUNNING
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    post:
+      operationId: startWorkflow
+      summary: Start Workflow
+      description: >
+        Initiates a new workflow execution. Returns 201 with the Temporal CLI's
+        parsed JSON output, or `{ "raw": "..." }` if the output is not valid
+        JSON.
+      tags:
+        - Workflows
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - workflow_type
+                - task_queue
+              properties:
+                workflow_type:
+                  type: string
+                  description: The workflow type to execute. Must match a registered workflow name.
+                task_queue:
+                  type: string
+                  description: The task queue where this workflow should be executed.
+                workflow_id:
+                  type: string
+                  description: Custom workflow ID. If omitted, a unique ID is generated.
+                input:
+                  description: Input data for the workflow. Will be JSON-serialized.
+      responses:
+        "201":
+          description: Workflow started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  workflowId:
+                    type: string
+                  runId:
+                    type: string
+              example:
+                workflowId: manual-run-001
+                runId: 9b8e7f6a-5d4c-3b2a-1f0e-9d8c7b6a5f4e
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/workflows/{wfId}:
+    get:
+      operationId: describeWorkflow
+      summary: Describe Workflow
+      description: >
+        Returns detailed information about a workflow execution from
+        `temporal workflow describe --output json`.
+      tags:
+        - Workflows
+      parameters:
+        - name: wfId
+          in: path
+          required: true
+          description: The workflow ID to describe
+          schema:
+            type: string
+        - name: run_id
+          in: query
+          required: false
+          description: Specific run ID. If omitted, describes the most recent run.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Workflow details returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  executionConfig:
+                    type: object
+                    properties:
+                      taskQueue:
+                        type: object
+                        properties:
+                          name:
+                            type: string
+                  workflowExecutionInfo:
+                    type: object
+                    properties:
+                      execution:
+                        type: object
+                        properties:
+                          workflowId:
+                            type: string
+                          runId:
+                            type: string
+                      type:
+                        type: object
+                        properties:
+                          name:
+                            type: string
+                      startTime:
+                        type: string
+                        format: date-time
+                      status:
+                        type: string
+              example:
+                executionConfig:
+                  taskQueue:
+                    name: alfred-curator
+                workflowExecutionInfo:
+                  execution:
+                    workflowId: curator-sweep-20260226-143022
+                    runId: f47ac10b-58cc-4372-a567-0e02b2c3d479
+                  type:
+                    name: CuratorWorkflow
+                  startTime: "2026-02-26T14:30:22.154Z"
+                  status: WORKFLOW_EXECUTION_STATUS_RUNNING
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/workflows/{wfId}/terminate:
+    post:
+      operationId: terminateWorkflow
+      summary: Terminate Workflow
+      description: >
+        Immediately terminates a workflow execution. This is a hard stop -- the
+        workflow cannot be resumed and will not execute cleanup logic.
+      tags:
+        - Workflows
+      parameters:
+        - name: wfId
+          in: path
+          required: true
+          description: The workflow ID to terminate
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  description: Human-readable reason for termination. Recorded in workflow history.
+                run_id:
+                  type: string
+                  description: Specific run ID to terminate. If omitted, terminates the most recent run.
+      responses:
+        "200":
+          description: Workflow terminated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+              example:
+                message: Workflow terminated
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/workflows/{wfId}/signal:
+    post:
+      operationId: signalWorkflow
+      summary: Signal Workflow
+      description: >
+        Sends a signal to a running workflow. Signals allow external systems to
+        communicate with workflows, triggering actions or passing data.
+      tags:
+        - Workflows
+      parameters:
+        - name: wfId
+          in: path
+          required: true
+          description: The workflow ID to signal
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - signal_name
+              properties:
+                signal_name:
+                  type: string
+                  description: >
+                    The name of the signal to send. Must match a signal handler
+                    defined in the workflow.
+                input:
+                  description: Data to pass with the signal. Will be JSON-serialized.
+                run_id:
+                  type: string
+                  description: Specific run ID to signal. If omitted, signals the most recent run.
+      responses:
+        "200":
+          description: Signal sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+              example:
+                message: Signal sent
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/workflows/{wfId}/cancel:
+    post:
+      operationId: cancelWorkflow
+      summary: Cancel Workflow
+      description: >
+        Requests graceful cancellation of a workflow. Unlike terminate, this
+        allows the workflow to execute cleanup logic before stopping.
+      tags:
+        - Workflows
+      parameters:
+        - name: wfId
+          in: path
+          required: true
+          description: The workflow ID to cancel
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                run_id:
+                  type: string
+                  description: Specific run ID to cancel. If omitted, cancels the most recent run.
+      responses:
+        "200":
+          description: Workflow cancelled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+              example:
+                message: Workflow cancelled
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/workflows/{wfId}/history:
+    get:
+      operationId: getWorkflowHistory
+      summary: Get Workflow History
+      description: >
+        Returns the complete event history for a workflow execution from
+        `temporal workflow show --output json`.
+      tags:
+        - Workflows
+      parameters:
+        - name: wfId
+          in: path
+          required: true
+          description: The workflow ID to retrieve history for
+          schema:
+            type: string
+        - name: run_id
+          in: query
+          required: false
+          description: Specific run ID. If omitted, returns history for the most recent run.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Workflow history returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    eventId:
+                      type: string
+                    eventType:
+                      type: string
+                    eventTime:
+                      type: string
+                      format: date-time
+              example:
+                - eventId: "1"
+                  eventType: EVENT_TYPE_WORKFLOW_EXECUTION_STARTED
+                  eventTime: "2026-02-26T14:30:22.154Z"
+                  workflowExecutionStartedEventAttributes:
+                    workflowType:
+                      name: CuratorWorkflow
+                    taskQueue:
+                      name: alfred-curator
+                - eventId: "2"
+                  eventType: EVENT_TYPE_WORKFLOW_TASK_SCHEDULED
+                  eventTime: "2026-02-26T14:30:22.160Z"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # ---------------------------------------------------------------------------
+  # Schedules
+  # ---------------------------------------------------------------------------
+  /api/v1/schedules:
+    get:
+      operationId: listSchedules
+      summary: List Schedules
+      description: >
+        Returns a list of all workflow schedules from
+        `temporal schedule list --output json`.
+      tags:
+        - Schedules
+      responses:
+        "200":
+          description: Schedule list returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    scheduleId:
+                      type: string
+                    info:
+                      type: object
+                      properties:
+                        spec:
+                          type: object
+                          properties:
+                            cronExpressions:
+                              type: array
+                              items:
+                                type: string
+                        workflowType:
+                          type: object
+                          properties:
+                            name:
+                              type: string
+                        paused:
+                          type: boolean
+              example:
+                - scheduleId: curator-hourly
+                  info:
+                    spec:
+                      cronExpressions: ["0 * * * *"]
+                    workflowType:
+                      name: CuratorWorkflow
+                    paused: false
+                - scheduleId: janitor-daily
+                  info:
+                    spec:
+                      cronExpressions: ["0 2 * * *"]
+                    workflowType:
+                      name: JanitorWorkflow
+                    paused: false
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    post:
+      operationId: createSchedule
+      summary: Create Schedule
+      description: Creates a new workflow schedule via `temporal schedule create`.
+      tags:
+        - Schedules
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - schedule_id
+                - workflow_type
+                - task_queue
+                - cron
+              properties:
+                schedule_id:
+                  type: string
+                  description: Unique identifier for this schedule
+                workflow_type:
+                  type: string
+                  description: The workflow type to execute on each trigger
+                task_queue:
+                  type: string
+                  description: Task queue where scheduled workflows will be executed
+                cron:
+                  type: string
+                  description: >
+                    Cron expression (5-field format: minute hour day month
+                    weekday). Examples: `0 * * * *` (hourly), `0 2 * * *`
+                    (daily at 2 AM).
+                input:
+                  description: Input data for each scheduled workflow execution
+                overlap_policy:
+                  type: string
+                  enum: [Skip, BufferOne, BufferAll, CancelOther, TerminateOther, AllowAll]
+                  description: >
+                    Policy for handling overlapping executions when a new run is
+                    scheduled while a previous run is still active.
+      responses:
+        "201":
+          description: Schedule created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+              example:
+                message: Schedule created
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/schedules/{schId}:
+    get:
+      operationId: describeSchedule
+      summary: Describe Schedule
+      description: >
+        Returns detailed information about a workflow schedule from
+        `temporal schedule describe --output json`.
+      tags:
+        - Schedules
+      parameters:
+        - name: schId
+          in: path
+          required: true
+          description: The schedule ID to describe
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Schedule details returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  schedule:
+                    type: object
+                    properties:
+                      spec:
+                        type: object
+                        properties:
+                          cronExpressions:
+                            type: array
+                            items:
+                              type: string
+                      action:
+                        type: object
+                        properties:
+                          startWorkflow:
+                            type: object
+                            properties:
+                              workflowType:
+                                type: object
+                                properties:
+                                  name:
+                                    type: string
+                              taskQueue:
+                                type: object
+                                properties:
+                                  name:
+                                    type: string
+                      state:
+                        type: object
+                        properties:
+                          paused:
+                            type: boolean
+                          notes:
+                            type: string
+                  info:
+                    type: object
+                    properties:
+                      recentActions:
+                        type: array
+                        items:
+                          type: object
+                      nextActionTimes:
+                        type: array
+                        items:
+                          type: string
+                          format: date-time
+              example:
+                schedule:
+                  spec:
+                    cronExpressions: ["0 * * * *"]
+                  action:
+                    startWorkflow:
+                      workflowType:
+                        name: CuratorWorkflow
+                      taskQueue:
+                        name: alfred-curator
+                  state:
+                    paused: false
+                    notes: ""
+                info:
+                  recentActions: []
+                  nextActionTimes: ["2026-02-26T15:00:00Z"]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    delete:
+      operationId: deleteSchedule
+      summary: Delete Schedule
+      description: >
+        Permanently deletes a workflow schedule. Does not affect workflows
+        already started by the schedule.
+      tags:
+        - Schedules
+      parameters:
+        - name: schId
+          in: path
+          required: true
+          description: The schedule ID to delete
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Schedule deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+              example:
+                message: Schedule deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/schedules/{schId}/pause:
+    post:
+      operationId: pauseSchedule
+      summary: Pause Schedule
+      description: >
+        Pauses a workflow schedule. No new workflow executions will be started
+        until the schedule is unpaused. Currently running workflows are not
+        affected.
+      tags:
+        - Schedules
+      parameters:
+        - name: schId
+          in: path
+          required: true
+          description: The schedule ID to pause
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  description: Human-readable reason for pausing
+      responses:
+        "200":
+          description: Schedule paused
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+              example:
+                message: Schedule paused
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/schedules/{schId}/unpause:
+    post:
+      operationId: unpauseSchedule
+      summary: Unpause Schedule
+      description: >
+        Resumes a paused workflow schedule. The schedule will begin executing
+        according to its cron expression.
+      tags:
+        - Schedules
+      parameters:
+        - name: schId
+          in: path
+          required: true
+          description: The schedule ID to unpause
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  description: Human-readable reason for unpausing
+      responses:
+        "200":
+          description: Schedule unpaused
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+              example:
+                message: Schedule unpaused
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/schedules/{schId}/trigger:
+    post:
+      operationId: triggerSchedule
+      summary: Trigger Schedule
+      description: >
+        Immediately triggers a workflow execution from a schedule, bypassing
+        the normal cron timing. The schedule's overlap policy is respected.
+      tags:
+        - Schedules
+      parameters:
+        - name: schId
+          in: path
+          required: true
+          description: The schedule ID to trigger
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Schedule triggered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+              example:
+                message: Schedule triggered
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # ---------------------------------------------------------------------------
+  # Devices
+  # ---------------------------------------------------------------------------
+  /api/v1/devices:
+    get:
+      operationId: listDevices
+      summary: List Devices
+      description: >
+        Returns a list of all pending and paired devices associated with the
+        OpenClaw gateway. Always returns structured JSON.
+      tags:
+        - Devices
+      responses:
+        "200":
+          description: Device list returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeviceListResponse"
+              example:
+                pending: []
+                paired: []
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/devices/{requestId}/approve:
+    post:
+      operationId: approveDevice
+      summary: Approve Device
+      description: >
+        Approves a pending device pairing request, allowing the device to
+        connect to the OpenClaw gateway. Note: uses `requestId` (the pairing
+        request identifier), not `deviceId`.
+      tags:
+        - Devices
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          description: The unique identifier of the pending pairing request to approve
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                latest:
+                  type: boolean
+                  default: false
+                  description: >
+                    If true, passes `--latest` to approve only the most recent
+                    request from this device. Prevents approval of stale
+                    requests.
+      responses:
+        "200":
+          description: Device approved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+              example:
+                message: Device approved
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/devices/{requestId}/reject:
+    post:
+      operationId: rejectDevice
+      summary: Reject Device
+      description: >
+        Rejects a pending device pairing request, preventing the device from
+        connecting to the OpenClaw gateway. Note: uses `requestId` (the pairing
+        request identifier), not `deviceId`.
+      tags:
+        - Devices
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          description: The unique identifier of the pending pairing request to reject
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Device rejected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+              example:
+                message: Device rejected
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/devices/{deviceId}:
+    delete:
+      operationId: removeDevice
+      summary: Remove Device
+      description: >
+        Removes a paired device from the OpenClaw gateway, revoking its access
+        and invalidating any existing tokens. Note: uses `deviceId` (the
+        paired device identifier), not `requestId`.
+      tags:
+        - Devices
+      parameters:
+        - name: deviceId
+          in: path
+          required: true
+          description: The unique identifier of the paired device to remove
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Device removed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+              example:
+                message: Device removed
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/devices/clear:
+    post:
+      operationId: clearDevices
+      summary: Clear Devices
+      description: >
+        Clears multiple devices at once. Can clear only pending requests or all
+        devices (both pending and paired).
+      tags:
+        - Devices
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pending_only:
+                  type: boolean
+                  description: >
+                    If true, only clears pending device requests. If omitted or
+                    false, clears all devices.
+      responses:
+        "200":
+          description: Devices cleared
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+              example:
+                message: Devices cleared
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/devices/{deviceId}/rotate:
+    post:
+      operationId: rotateDeviceToken
+      summary: Rotate Device Token
+      description: >
+        Rotates the authentication token for a paired device. The device will
+        need to re-authenticate with the new token.
+      tags:
+        - Devices
+      parameters:
+        - name: deviceId
+          in: path
+          required: true
+          description: The unique identifier of the paired device
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - role
+              properties:
+                role:
+                  type: string
+                  enum: [agent, user, admin]
+                  description: The role to assign to the device
+                scope:
+                  type: string
+                  description: Optional scope restrictions for the device token
+      responses:
+        "200":
+          description: Token rotated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+              example:
+                message: Token rotated
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error:
+                  code: VALIDATION_ERROR
+                  message: role is required
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/devices/{deviceId}/revoke:
+    post:
+      operationId: revokeDeviceAccess
+      summary: Revoke Device Access
+      description: >
+        Revokes specific role-based access for a paired device without fully
+        removing it. The device remains paired but loses access to operations
+        requiring the revoked role.
+      tags:
+        - Devices
+      parameters:
+        - name: deviceId
+          in: path
+          required: true
+          description: The unique identifier of the paired device
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - role
+              properties:
+                role:
+                  type: string
+                  enum: [agent, user, admin]
+                  description: The role to revoke from the device
+      responses:
+        "200":
+          description: Access revoked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+              example:
+                message: Access revoked
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error:
+                  code: VALIDATION_ERROR
+                  message: role is required
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+tags:
+  - name: Vault
+    description: >
+      CRUD operations on vault records, search, schema introspection, and
+      inbox file management
+  - name: Workers
+    description: >
+      Manage Alfred daemon workers (curator, janitor, distiller, surveyor)
+      including start/stop, status, scanning, and one-shot operations
+  - name: Workflows
+    description: >
+      Temporal workflow management -- list, start, describe, signal, cancel,
+      terminate, and view history
+  - name: Schedules
+    description: >
+      Temporal schedule management -- create, list, describe, pause, unpause,
+      trigger, and delete recurring workflow schedules
+  - name: Devices
+    description: >
+      OpenClaw device pairing and access management -- list, approve, reject,
+      remove, clear, rotate tokens, and revoke access

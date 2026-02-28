@@ -13,10 +13,12 @@
   },
   "footer": {
     "socials": {
-      "github": "https://github.com/ssdavidai/alfred-docs"
+      "github": "https://alfred.black"
     }
   },
+  "openapi": "openapi.yaml",
   "api": {
+    "baseUrl": "https://app.alfred.black",
     "mdx": {
       "auth": {
         "method": "bearer",
@@ -46,7 +48,8 @@
               "guides/inbox-workflow",
               "guides/vault-management",
               "guides/worker-operations",
-              "guides/device-pairing"
+              "guides/device-pairing",
+              "guides/recipes"
             ]
           },
           {
