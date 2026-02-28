@@ -155,5 +155,6 @@
   },
   "styling": {
     "latex": true
-  }
+  },
+  "logo": "/images/alfred-logo.png"
 }
