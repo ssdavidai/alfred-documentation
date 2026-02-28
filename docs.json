@@ -4,9 +4,9 @@
   "name": "Alfred",
   "description": "API documentation for Alfred, your agentic butler",
   "colors": {
-    "primary": "#0D9373",
-    "light": "#55D799",
-    "dark": "#117866"
+    "primary": "#f4ac3b",
+    "light": "#ffbd59",
+    "dark": "#d49a5b"
   },
   "navbar": {
     "links": []
