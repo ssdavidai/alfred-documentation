@@ -1,6 +1,6 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
+  "theme": "aspen",
   "name": "Alfred",
   "description": "API documentation for Alfred, your agentic butler",
   "colors": {
@@ -150,8 +150,7 @@
     "default": "dark"
   },
   "fonts": {
-    "family": "Inter",
-    "weight": 600
+    "family": "Ubuntu"
   },
   "styling": {
     "latex": true
