@@ -215,7 +215,7 @@ All persistent data lives on the LUKS2-encrypted volume:
 /mnt/encrypted/
 ├── vault/              # Obsidian vault (Markdown + YAML frontmatter)
 │   ├── inbox/          # Raw inputs for Curator processing
-│   ├── person/         # Entity type directories (20 types)
+│   ├── person/         # Entity type directories (19 types)
 │   ├── decision/       # Learning type directories (5 types)
 │   ├── _templates/     # Per-type Markdown templates
 │   └── _bases/         # Dataview base views
@@ -371,7 +371,7 @@ Prevents directory traversal in the SaaS proxy's vault record endpoint.
 
 <Accordion title="Vault Operations (Python)" icon="file-lines">
 - `Path.resolve()` + prefix check: all paths must stay within the vault directory
-- Type validation against `KNOWN_TYPES` (20 entity types)
+- Type validation against `KNOWN_TYPES` (19 record types)
 - Status validation against per-type allowed values
 - Required fields checked before record creation
 - YAML frontmatter parsed with structured error handling

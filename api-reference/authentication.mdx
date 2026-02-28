@@ -127,7 +127,7 @@ API requests are subject to a **15-second timeout**. If the upstream operation t
 }
 ```
 
-Most endpoints respond well within this limit. Long-running operations like `POST /api/v1/workers/ingest` or `POST /api/v1/workers/distiller/run` trigger background processing and return immediately, so they are not affected.
+Most endpoints respond well within this limit. Operations that invoke AI processing (e.g., `POST /api/v1/workers/process`, `POST /api/v1/workers/janitor/fix`, `POST /api/v1/workers/distiller/run`) run synchronously and may exceed this timeout for complex inputs. If you receive a `504`, the operation is likely still running on the instance — check status or history endpoints to confirm completion.
 
 ## Testing authentication
 
