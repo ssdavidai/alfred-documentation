@@ -60,7 +60,8 @@
               "guides/api-keys",
               "guides/how-the-api-works",
               "guides/recipes",
-              "guides/monitoring"
+              "guides/monitoring",
+              "guides/security"
             ]
           },
           {

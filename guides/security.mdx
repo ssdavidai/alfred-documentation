@@ -1,0 +1,278 @@
+---
+title: "Security"
+description: "How Alfred Black protects your data, your vault, and your privacy — from infrastructure to encryption to agent sandboxing."
+icon: "shield-halved"
+---
+
+## Overview
+
+Alfred Black handles your most personal information — your relationships, your commitments, your decisions. Security isn't a feature. It's the foundation.
+
+This page explains how every layer of Alfred's infrastructure is designed to keep your data private, your vault safe, and your world protected.
+
+## Your Alfred is yours alone
+
+Every Alfred Black subscriber gets a **dedicated, isolated server**. Your data never shares hardware, databases, or services with anyone else.
+
+| Property | Detail |
+|----------|--------|
+| **Server** | Dedicated Hetzner Cloud instance (cx53: 8 vCPU, 32GB RAM) |
+| **Storage** | LUKS2 full-disk encryption (AES-256-XTS) |
+| **Network** | Private Tailscale mesh (WireGuard-based VPN) |
+| **Exposure** | Zero public-facing ports — no inbound access from the internet |
+
+Your Alfred is not a container on a shared cluster. It's a dedicated machine, encrypted at rest, accessible only through a private network.
+
+## Encryption
+
+### At rest
+
+Your vault and all associated data are stored on a LUKS2-encrypted volume using AES-256-XTS. The encryption key is generated per instance during provisioning.
+
+### In transit
+
+All communication is encrypted:
+
+- **SaaS to your Alfred**: Tailscale (WireGuard) — encrypted, authenticated, and private
+- **Your browser to the dashboard**: HTTPS (TLS 1.3) via Cloudflare
+- **OpenClaw device connections**: HTTPS via Cloudflare Tunnel (outbound-only from your server)
+
+### API key storage
+
+Your API keys are never stored in plain text. When you create an API key:
+
+1. The full key (`alf_...`) is shown to you once
+2. A **SHA-256 hash** is computed and stored in the database
+3. The original key is discarded — it cannot be recovered
+
+When you make an API request, your key is hashed and compared against the stored hash. The key itself is never persisted.
+
+### Tenant credentials
+
+The internal credentials connecting the SaaS to your Alfred are encrypted at rest using **AES-256-GCM** with:
+
+- A unique 12-byte initialization vector per encryption
+- A GCM authentication tag for integrity verification
+- Decryption only in memory during request forwarding — never logged, never cached
+
+## Network architecture
+
+Your Alfred has **no public IP addresses and no open ports** facing the internet.
+
+```
+                  ┌──────────────────────────────────┐
+                  │         Your Alfred               │
+                  │    (dedicated, encrypted server)   │
+                  │                                    │
+                  │  ┌──────────┐  ┌──────────────┐  │
+                  │  │ Alfred   │  │   OpenClaw    │  │
+You ──HTTPS──→    │  │ Worker   │  │   Gateway     │  │
+  Cloudflare ──→  │  │ 127.0.0.1│  │  127.0.0.1   │  │
+                  │  └──────────┘  └──────────────┘  │
+                  │  ┌──────────┐  ┌──────────────┐  │
+SaaS Proxy ──→    │  │ Temporal │  │  Tenant API   │  │
+  Tailscale ──→   │  │ Engine   │  │  port 3100    │  │
+                  │  │ 127.0.0.1│  │  127.0.0.1   │  │
+                  │  └──────────┘  └──────────────┘  │
+                  │                                    │
+                  │  Tailscale (WireGuard) ◄──────────┘
+                  │  Cloudflare Tunnel (outbound only)  │
+                  └──────────────────────────────────┘
+```
+
+### Tailscale mesh
+
+Your Alfred communicates with the SaaS layer through [Tailscale](https://tailscale.com), a WireGuard-based mesh VPN. This means:
+
+- **No inbound ports open** — your server accepts connections only from the private Tailscale network
+- **End-to-end encryption** — WireGuard provides authenticated encryption between nodes
+- **Identity-based access** — each node is cryptographically identified, preventing impersonation
+
+### Cloud firewall
+
+Each instance is protected by a Hetzner Cloud firewall that permits only:
+
+| Port | Protocol | Purpose |
+|------|----------|---------|
+| 41641/udp | UDP | Tailscale WireGuard tunnel |
+| ICMP | ICMP | Health diagnostics |
+
+SSH access is restricted to pre-authorized IP ranges and disabled by default for all other sources.
+
+### Service binding
+
+All services on your Alfred bind to `127.0.0.1` (localhost only):
+
+- Tenant API: `127.0.0.1:3100`
+- OpenClaw Gateway: `127.0.0.1:18789`
+- Temporal Engine: `127.0.0.1:7233`
+
+No service listens on a public interface. External access is only possible through Tailscale (for the SaaS proxy) or Cloudflare Tunnel (for OpenClaw device connectivity, outbound-only).
+
+## Authentication
+
+### Dashboard authentication
+
+The Alfred Black dashboard uses email and password authentication with:
+
+- **Argon2** password hashing — the current gold standard for password storage
+- Email verification required on signup
+- Secure, time-limited password reset tokens
+- HTTP-only session cookies with SameSite protection
+
+### API key authentication
+
+API requests are authenticated using Bearer tokens:
+
+```
+Authorization: Bearer alf_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4
+```
+
+Security properties:
+- Keys generated with `crypto.randomBytes(16)` — 128 bits of entropy
+- Stored as **SHA-256 hashes** only — raw keys are never persisted
+- Maximum **10 keys per account** — limits attack surface
+- Each key tracks `lastUsedAt` for activity monitoring
+- Keys can be revoked instantly from your dashboard
+
+### Tenant API authentication
+
+Your Alfred's internal API uses timing-safe token comparison (`crypto.timingSafeEqual`) to prevent timing attacks on authentication.
+
+### Payment webhook verification
+
+Payment events from Polar are verified using cryptographic signature validation before any action is taken. Invalid signatures are rejected.
+
+## Agent sandboxing
+
+Alfred's specialists (Curator, Janitor, Distiller, Surveyor) are constrained by multiple layers of security.
+
+### Scope enforcement
+
+Each specialist has strict rules about what vault operations it can perform:
+
+| Specialist | Create | Read | Edit | Move | Delete |
+|-----------|--------|------|------|------|--------|
+| **Curator** | Yes | Yes | Yes | Inbox only | No |
+| **Janitor** | No | Yes | Yes | No | Yes |
+| **Distiller** | Learning types only | Yes | No | No | No |
+
+- The **Curator** can create and edit records but cannot delete anything — preventing data loss during intake
+- The **Janitor** can edit and remove broken records but cannot create new ones — limiting its blast radius to fixes only
+- The **Distiller** can only create learning records (assumptions, decisions, constraints, contradictions, syntheses) — it cannot modify your existing records
+
+These rules are enforced in code before every vault operation. A specialist that attempts an unauthorized action receives a scope error and the operation is blocked.
+
+### Path traversal prevention
+
+Every vault file operation passes through path validation that:
+
+1. Resolves the full path (eliminating `..`, symlinks, and relative references)
+2. Verifies the resolved path is within the vault directory
+3. Rejects any path that would escape the vault boundary
+
+This prevents a compromised or misbehaving agent from accessing files outside your vault.
+
+### Subprocess isolation
+
+Specialists run as isolated subprocesses with:
+
+- **No shell execution** — commands are passed as clean argument arrays, preventing shell injection
+- **Unique session files** — each invocation gets its own temporary mutation log
+- **Restricted tool access** — CLI-based specialists are limited to the `Bash` tool only, with vault access mediated through the `alfred vault` CLI
+- **Timeouts** — each specialist invocation has a configurable timeout (default 300 seconds) to prevent runaway execution
+
+### Session isolation
+
+Each specialist invocation receives a unique, temporary session file. Mutations are tracked per-session, and sessions are cleaned up after processing. Concurrent invocations cannot interfere with each other.
+
+## Container hardening
+
+Services on your Alfred run in Docker containers with defense-in-depth hardening:
+
+| Protection | Detail |
+|-----------|--------|
+| **Privilege escalation** | `no-new-privileges: true` on all containers |
+| **Capabilities** | `cap_drop: ALL` — all Linux capabilities removed, only specific ones added back where strictly necessary |
+| **Memory limits** | 2GB per container — prevents memory exhaustion |
+| **PID limits** | 256 processes per container — prevents fork bombs |
+| **Network** | All containers bound to localhost only |
+
+## Audit trail
+
+Every vault mutation is recorded in an append-only audit log:
+
+```json
+{
+  "ts": "2026-02-28T14:30:45.123456+00:00",
+  "tool": "curator",
+  "op": "create",
+  "path": "person/Alice Smith.md",
+  "detail": "inbox/meeting-notes.md"
+}
+```
+
+The audit log records:
+- **Timestamp** — when the operation occurred
+- **Specialist** — which specialist performed the operation (curator, janitor, distiller)
+- **Operation** — what was done (create, modify, delete)
+- **Path** — which record was affected
+- **Detail** — source context (e.g., which inbox item triggered the creation)
+
+This log is append-only — entries cannot be modified or deleted. It provides a complete, tamper-evident history of every change to your vault.
+
+## Health monitoring
+
+The SaaS layer checks your Alfred's health every 2 minutes:
+
+- Service status (running, degraded, down)
+- Disk usage
+- Memory usage
+- Container health
+
+Health checks are authenticated and travel over the encrypted Tailscale network. Results are stored for your dashboard's Command Center view.
+
+## Data lifecycle
+
+### During your subscription
+
+- Your vault is stored on encrypted disk
+- Automatic encrypted backups run daily
+- All access is authenticated and logged
+
+### After cancellation
+
+- Your data is preserved for **30 days** after your subscription ends
+- During the grace period, resubscribing restores access immediately
+- After 30 days, the environment is permanently decommissioned and all data is destroyed
+
+### Data portability
+
+Your vault is an Obsidian-compatible collection of Markdown files. You can pair a device to access your vault directly and maintain your own local copies at any time.
+
+## Summary
+
+| Layer | Protection |
+|-------|-----------|
+| **Infrastructure** | Dedicated server per subscriber, no shared resources |
+| **Storage** | LUKS2 full-disk encryption (AES-256-XTS) |
+| **Network** | Tailscale WireGuard mesh, zero public ports, cloud firewall |
+| **Transit** | TLS 1.3 (browser), WireGuard (API), Cloudflare (devices) |
+| **API keys** | SHA-256 hashed, never stored in plain, 10 per account max |
+| **Credentials** | AES-256-GCM encrypted at rest, decrypted only in memory |
+| **Passwords** | Argon2 hashing with email verification |
+| **Agent scope** | Per-specialist operation restrictions enforced in code |
+| **File access** | Path traversal prevention on every vault operation |
+| **Subprocesses** | No shell execution, clean argument arrays, timeouts |
+| **Containers** | Hardened: no-new-privileges, dropped capabilities, resource limits |
+| **Audit** | Append-only mutation log with timestamps and attribution |
+| **Monitoring** | Health checks every 2 minutes over encrypted channel |
+
+<Columns cols={2}>
+  <Card title="How the API Works" icon="route" href="/guides/how-the-api-works">
+    Understand the full request path and proxy architecture
+  </Card>
+  <Card title="API Keys" icon="key" href="/guides/api-keys">
+    Create and manage your API keys
+  </Card>
+</Columns>
