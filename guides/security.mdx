@@ -143,9 +143,103 @@ Your Alfred's internal API uses timing-safe token comparison (`crypto.timingSafe
 
 Payment events from Polar are verified using cryptographic signature validation before any action is taken. Invalid signatures are rejected.
 
-## Agent sandboxing
+## Conversational access (OpenClaw)
 
-Alfred's specialists (Curator, Janitor, Distiller, Surveyor) are constrained by multiple layers of security.
+Alfred uses [OpenClaw](https://openclaw.com) as the gateway for conversational access — the interface you use when you pair a device and talk to Alfred directly. Because OpenClaw connects a language model to your vault, it introduces a surface area that demands careful layering.
+
+### How you connect
+
+Your devices reach Alfred through a **Cloudflare Tunnel** — an outbound-only encrypted channel from your server to Cloudflare's edge network.
+
+```
+Your device → Cloudflare Edge (TLS 1.3) → Cloudflare Tunnel → localhost:18789
+```
+
+This means:
+- **No inbound port is opened** — the tunnel is initiated from your Alfred, not from the outside
+- **Your server's IP is never exposed** — your device only sees Cloudflare
+- **DDoS and WAF protection** — Cloudflare's network sits in front of every connection
+
+### Device pairing
+
+Before any device can talk to your Alfred, it must be **paired and approved**:
+
+1. A device requests pairing through the OpenClaw gateway
+2. The request appears in your dashboard as **pending**
+3. You approve or reject it
+4. On approval, a cryptographically random **device token** is generated and returned once
+5. The device uses this token for all subsequent connections
+
+Every conversation requires a valid device token. Tokens can be **revoked instantly** from your dashboard — cutting off access immediately. You can also **rotate** a device's token if you suspect it's been compromised, without removing the device.
+
+### What the agent can do
+
+When you talk to Alfred through OpenClaw, the language model can interact with your vault — but only through a tightly controlled gate.
+
+The agent **does not have direct filesystem access**. Every vault operation goes through the `alfred vault` CLI, a mediation layer that enforces rules before any read or write touches your data:
+
+```
+You → OpenClaw → Language Model → alfred vault CLI → Your Vault
+                                        ↑
+                              Scope check, path validation,
+                              schema validation, mutation log
+```
+
+The agent can:
+- **Read** records, search your vault, and get context
+- **Create** or **edit** records (when running as the Curator)
+- **Fix** or **remove** broken records (when running as the Janitor)
+- **Surface** learning records (when running as the Distiller)
+
+What it **cannot** do:
+- **Access files outside your vault** — path traversal is blocked at the CLI layer
+- **Bypass its scope** — a Curator session cannot delete, a Janitor session cannot create, a Distiller session can only create learning types
+- **Run arbitrary commands** — the agent's only tool is the vault CLI, not a general-purpose shell
+- **Access the network** — the OpenClaw container has no outbound internet access except to configured LLM providers
+- **Escape its container** — no privilege escalation, no Docker socket, no system capabilities
+
+### Third-party integrations
+
+Alfred uses external LLM providers (like OpenRouter, Anthropic, or OpenAI) to power the language model behind conversations. These are the **only** third-party services your Alfred connects to.
+
+- **No third-party plugins** — Alfred ships only its own curated skills (Curator, Janitor, Distiller). Third-party skill installation from ClawHub is **disabled by default**.
+- **No arbitrary API access** — the agent cannot make outbound HTTP requests to services you haven't configured
+- **Provider credentials** are stored on your encrypted volume (LUKS2) with restricted file permissions (mode 0600)
+- **You choose the model** — you can select which language model each specialist uses from your dashboard
+
+### Prompt injection defenses
+
+Prompt injection — where malicious content in your data tricks the language model into doing something unintended — is one of the most discussed risks in AI systems. Alfred defends against this at multiple layers.
+
+<Note>
+  No AI system can guarantee 100% immunity to prompt injection. Alfred's approach is **defense in depth** — even if the language model is tricked, the damage it can do is bounded by technical enforcement that the model cannot override.
+</Note>
+
+**Layer 1 — Scope enforcement (code-level)**
+
+Even if the model is manipulated, it physically cannot perform operations outside its scope. A Curator session cannot delete records. A Distiller session cannot edit your existing data. These rules are checked in code before every operation — not by the model, but by the vault CLI itself.
+
+**Layer 2 — Path validation (code-level)**
+
+Every file path is resolved to its absolute form and verified to be within your vault directory. Attempts to reference `../`, symlinks, or paths outside the vault boundary are rejected. This is enforced at the filesystem level, not by the model.
+
+**Layer 3 — Schema validation (code-level)**
+
+Record types are validated against a fixed set of 19 known types. Status values are checked against per-type allowed values. List fields must be arrays. Invalid frontmatter is rejected. The model cannot invent new record types or set impossible statuses.
+
+**Layer 4 — Mutation logging (code-level)**
+
+Every write operation — every create, edit, move, and delete — is recorded in an append-only audit log with timestamps and attribution. If something unexpected happens, you have a complete record of what changed, when, and which specialist did it.
+
+**Layer 5 — Skill instructions (prompt-level)**
+
+Each specialist receives detailed instructions that define its role, boundaries, and acceptable behavior. These include explicit constraints: "never access the filesystem directly," "never delete unless it's garbage," "never modify source records." While prompt-level defenses are not absolute, they significantly reduce the likelihood of unintended behavior.
+
+**The key insight:** Layers 1 through 4 are **technical controls enforced in code**. The language model cannot bypass them regardless of what instructions it receives. Layer 5 adds behavioral guidance on top. Even in a worst-case prompt injection scenario, the blast radius is bounded by the technical layers beneath.
+
+## Specialist sandboxing
+
+Alfred's specialists (Curator, Janitor, Distiller, Surveyor) are constrained by multiple layers of security — whether they're running as background workers or through an OpenClaw conversation.
 
 ### Scope enforcement
 
@@ -179,7 +273,7 @@ Specialists run as isolated subprocesses with:
 
 - **No shell execution** — commands are passed as clean argument arrays, preventing shell injection
 - **Unique session files** — each invocation gets its own temporary mutation log
-- **Restricted tool access** — CLI-based specialists are limited to the `Bash` tool only, with vault access mediated through the `alfred vault` CLI
+- **Restricted tool access** — specialists are limited to the vault CLI only, with every operation mediated and validated
 - **Timeouts** — each specialist invocation has a configurable timeout (default 300 seconds) to prevent runaway execution
 
 ### Session isolation
@@ -257,22 +351,29 @@ Your vault is an Obsidian-compatible collection of Markdown files. You can pair 
 | **Infrastructure** | Dedicated server per subscriber, no shared resources |
 | **Storage** | LUKS2 full-disk encryption (AES-256-XTS) |
 | **Network** | Tailscale WireGuard mesh, zero public ports, cloud firewall |
-| **Transit** | TLS 1.3 (browser), WireGuard (API), Cloudflare (devices) |
+| **Transit** | TLS 1.3 (browser), WireGuard (API), Cloudflare Tunnel (devices) |
 | **API keys** | SHA-256 hashed, never stored in plain, 10 per account max |
 | **Credentials** | AES-256-GCM encrypted at rest, decrypted only in memory |
 | **Passwords** | Argon2 hashing with email verification |
-| **Agent scope** | Per-specialist operation restrictions enforced in code |
+| **OpenClaw gateway** | Device pairing with approval, per-device tokens, instant revocation |
+| **OpenClaw connection** | Outbound-only Cloudflare Tunnel, no exposed server IP |
+| **Vault CLI gate** | All agent vault access mediated through validated CLI — no direct filesystem |
+| **Specialist scope** | Per-specialist operation restrictions enforced in code |
+| **Prompt injection** | Defense in depth: scope, path, schema, and audit layers enforced in code |
+| **Third-party access** | Only configured LLM providers, no plugins, no arbitrary network access |
 | **File access** | Path traversal prevention on every vault operation |
-| **Subprocesses** | No shell execution, clean argument arrays, timeouts |
 | **Containers** | Hardened: no-new-privileges, dropped capabilities, resource limits |
 | **Audit** | Append-only mutation log with timestamps and attribution |
 | **Monitoring** | Health checks every 2 minutes over encrypted channel |
 
-<Columns cols={2}>
+<Columns cols={3}>
   <Card title="How the API Works" icon="route" href="/guides/how-the-api-works">
     Understand the full request path and proxy architecture
   </Card>
   <Card title="API Keys" icon="key" href="/guides/api-keys">
     Create and manage your API keys
+  </Card>
+  <Card title="Device Pairing" icon="mobile" href="/guides/device-pairing">
+    Pair devices and manage conversational access
   </Card>
 </Columns>
