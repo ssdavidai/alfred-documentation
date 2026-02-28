@@ -4,7 +4,7 @@ description: "Manually trigger an immediate workflow execution from a schedule"
 api: "POST /api/v1/schedules/{schId}/trigger"
 ---
 
-Immediately triggers a workflow execution from a schedule, bypassing the normal cron timing. The schedule's overlap policy is respected.
+Immediately trigger a workflow execution from a schedule, bypassing the normal cron timing. The schedule's configured overlap policy is respected. This is useful for on-demand runs without waiting for the next scheduled time.
 
 <ParamField path="schId" type="string" required>
   The schedule ID to trigger
@@ -13,8 +13,8 @@ Immediately triggers a workflow execution from a schedule, bypassing the normal 
 <RequestExample>
 ```bash cURL
 curl -X POST \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  https://app.alfred.black/api/v1/schedules/curator-hourly/trigger
+  -H "Authorization: Bearer alf_your_key_here" \
+  /api/v1/schedules/curator-hourly/trigger
 ```
 </RequestExample>
 

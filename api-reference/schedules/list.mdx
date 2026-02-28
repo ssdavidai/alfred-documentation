@@ -4,13 +4,13 @@ description: "Retrieve all workflow schedules"
 api: "GET /api/v1/schedules"
 ---
 
-Returns a list of all workflow schedules from `temporal schedule list --output json`. The JSONL output is parsed into an array.
+List all configured workflow schedules for your instance. Returns an array of schedule summaries including their cron expressions, associated workflow types, and paused state.
 
 <RequestExample>
 ```bash cURL
 curl -X GET \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  https://app.alfred.black/api/v1/schedules
+  -H "Authorization: Bearer alf_your_key_here" \
+  /api/v1/schedules
 ```
 </RequestExample>
 
@@ -44,7 +44,3 @@ curl -X GET \
 ]
 ```
 </ResponseExample>
-
-<Note>
-  The response is a JSON array parsed from the Temporal CLI's JSONL output. The exact field names and structure are determined by the Temporal CLI version.
-</Note>

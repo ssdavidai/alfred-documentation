@@ -12,9 +12,7 @@
     "links": []
   },
   "footer": {
-    "socials": {
-      "github": "https://alfred.black"
-    }
+    "socials": {}
   },
   "openapi": "openapi.yaml",
   "api": {
@@ -39,25 +37,36 @@
             "pages": [
               "introduction",
               "quickstart",
-              "architecture"
+              "how-it-works"
+            ]
+          },
+          {
+            "group": "Your Vault",
+            "pages": [
+              "vault/understanding-your-vault",
+              "vault/record-types",
+              "vault/vault-schema"
             ]
           },
           {
             "group": "Guides",
             "pages": [
-              "guides/inbox-workflow",
-              "guides/vault-management",
-              "guides/worker-operations",
+              "guides/billing",
+              "guides/your-dashboard",
+              "guides/using-the-inbox",
+              "guides/browsing-your-vault",
+              "guides/your-ai-agents",
               "guides/device-pairing",
-              "guides/recipes"
+              "guides/api-keys",
+              "guides/how-the-api-works",
+              "guides/recipes",
+              "guides/monitoring"
             ]
           },
           {
-            "group": "Concepts",
+            "group": "Reference",
             "pages": [
-              "concepts/vault-schema",
-              "concepts/record-types",
-              "concepts/security-model"
+              "reference/faq"
             ]
           }
         ]
@@ -143,6 +152,57 @@
               "api-reference/devices/clear",
               "api-reference/devices/rotate",
               "api-reference/devices/revoke"
+            ]
+          },
+          {
+            "group": "OpenClaw",
+            "pages": [
+              "api-reference/openclaw/health",
+              "api-reference/openclaw/status",
+              "api-reference/openclaw/restart",
+              "api-reference/openclaw/skills",
+              "api-reference/openclaw/sessions",
+              "api-reference/openclaw/agents",
+              "api-reference/openclaw/cron",
+              "api-reference/openclaw/plugins",
+              "api-reference/openclaw/hooks",
+              "api-reference/openclaw/secrets",
+              "api-reference/openclaw/doctor",
+              "api-reference/openclaw/security",
+              "api-reference/openclaw/memory"
+            ]
+          },
+          {
+            "group": "Agents",
+            "pages": [
+              "api-reference/agents/list",
+              "api-reference/agents/get-agent",
+              "api-reference/agents/set-model"
+            ]
+          },
+          {
+            "group": "Credentials",
+            "pages": [
+              "api-reference/credentials/list",
+              "api-reference/credentials/update"
+            ]
+          },
+          {
+            "group": "Logs",
+            "pages": [
+              "api-reference/logs/stream"
+            ]
+          },
+          {
+            "group": "Instance",
+            "pages": [
+              "api-reference/admin/health",
+              "api-reference/admin/system-info",
+              "api-reference/admin/list-containers",
+              "api-reference/admin/restart-container",
+              "api-reference/admin/stop-container",
+              "api-reference/admin/start-container",
+              "api-reference/admin/container-logs"
             ]
           }
         ]

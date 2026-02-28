@@ -1,20 +1,20 @@
 ---
 title: "Fix Issues"
-description: "Scan vault and fix detected issues using the agent"
+description: "Fix issues found by Janitor scan"
 api: "POST /api/v1/workers/janitor/fix"
 ---
 
-Performs a structural scan followed by agent-based automated fixing. The janitor agent will attempt to resolve all detected issues by editing vault files, updating frontmatter, fixing links, and removing orphans.
+Runs a vault health scan and then automatically fixes the detected issues. The Janitor agent will update frontmatter, repair broken links, and clean up orphaned records.
 
 <Warning>
-  This operation modifies vault files. All changes are logged in the mutation audit log, but consider backing up your vault first.
+  This operation modifies vault files. All changes are tracked in the audit log, but consider backing up your vault first.
 </Warning>
 
 <RequestExample>
 
 ```bash cURL
-curl -X POST https://app.alfred.black/api/v1/workers/janitor/fix \
-  -H "Authorization: Bearer YOUR_API_KEY" \
+curl -X POST /api/v1/workers/janitor/fix \
+  -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json"
 ```
 
@@ -22,13 +22,15 @@ curl -X POST https://app.alfred.black/api/v1/workers/janitor/fix \
 
 <ResponseExample>
 
-```json Structured Response (if alfred outputs JSON)
+```json Structured Response
 {
-  "...": "Structure depends on alfred janitor fix output"
+  "files_scanned": 423,
+  "issues_found": 12,
+  "issues_fixed": 10
 }
 ```
 
-```json Raw Response (if alfred outputs text)
+```json Raw Response
 {
   "raw": "Scanned 423 files, found 12 issues, fixed 10"
 }
@@ -37,9 +39,9 @@ curl -X POST https://app.alfred.black/api/v1/workers/janitor/fix \
 </ResponseExample>
 
 <Note>
-  The response format depends on the `alfred janitor fix` command output. If the command outputs valid JSON, it is returned as-is. Otherwise, the raw text output is returned in a `raw` field.
+  If the response contains structured JSON, it is returned directly. Otherwise, the output is returned in a `raw` field.
 </Note>
 
 <ResponseField name="raw" type="string">
-  Raw text output from `alfred janitor fix` when the output is not valid JSON. Only present when structured JSON parsing fails.
+  Human-readable output when structured JSON is not available.
 </ResponseField>

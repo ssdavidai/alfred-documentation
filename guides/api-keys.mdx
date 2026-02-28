@@ -1,0 +1,148 @@
+---
+title: "API Keys"
+description: "Creating and using API keys to access the Alfred Black API."
+icon: "key"
+---
+
+## Overview
+
+API keys let you access the Alfred Black API from scripts, automations, and integrations. Each key provides full access to your instance's API endpoints.
+
+## Creating an API key
+
+1. Go to your [Alfred Black dashboard](https://app.alfred.black)
+2. Navigate to **Settings → API Keys**
+3. Click **Create**
+4. Give it a descriptive name (e.g., "CI pipeline", "n8n automation", "shell scripts")
+5. Click **Create** and copy the key immediately
+
+<Warning>
+  Your API key is shown only once. Copy it immediately and store it somewhere safe. If you lose it, you'll need to create a new one.
+</Warning>
+
+## Key format
+
+Alfred Black API keys use the format:
+
+```
+alf_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4
+```
+
+The `alf_` prefix followed by 32 hexadecimal characters.
+
+## Making API requests
+
+Include your key in the `Authorization` header as a Bearer token:
+
+<CodeGroup>
+```bash cURL
+curl /api/v1/vault/context \
+  -H "Authorization: Bearer alf_your_key_here"
+```
+
+```javascript JavaScript
+const response = await fetch('/api/v1/vault/context', {
+  headers: {
+    'Authorization': 'Bearer alf_your_key_here'
+  }
+});
+const data = await response.json();
+```
+
+```python Python
+import requests
+
+response = requests.get(
+    '/api/v1/vault/context',
+    headers={'Authorization': 'Bearer alf_your_key_here'}
+)
+data = response.json()
+```
+</CodeGroup>
+
+All API endpoints use the base path `/api/v1/...`.
+
+## Managing your keys
+
+From the **Settings → API Keys** page in your dashboard, you can:
+
+- **View all keys** — See names, creation dates, and last used timestamps
+- **Track usage** — Check when each key was last used
+- **Revoke keys** — Delete keys you no longer need
+
+<Note>
+  You can create up to 10 API keys per account.
+</Note>
+
+## Best practices
+
+- **Don't hardcode keys** — Use environment variables instead:
+  ```bash
+  export ALFRED_API_KEY="alf_your_key_here"
+  curl /api/v1/vault/context -H "Authorization: Bearer $ALFRED_API_KEY"
+  ```
+- **Use descriptive names** — Name keys after their purpose so you know which to revoke
+- **Rotate periodically** — Create a new key and revoke the old one every few months
+- **Revoke unused keys** — If you're no longer using an integration, revoke its key
+
+## Example integrations
+
+### Shell script
+
+```bash
+#!/bin/bash
+ALFRED_API_KEY="${ALFRED_API_KEY:?Set ALFRED_API_KEY}"
+
+# Drop content into the inbox
+curl -X POST /api/v1/vault/inbox \
+  -H "Authorization: Bearer $ALFRED_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d "{\"filename\": \"$(date +%Y-%m-%d)-notes.md\", \"content\": \"$1\"}"
+```
+
+### Python automation
+
+```python
+import os
+import requests
+
+API_KEY = os.environ['ALFRED_API_KEY']
+HEADERS = {'Authorization': f'Bearer {API_KEY}'}
+
+# Check vault status
+response = requests.get('/api/v1/vault/context', headers=HEADERS)
+print(response.json())
+```
+
+## Error responses
+
+If your key is missing or invalid, you'll receive a `401 Unauthorized` response:
+
+```json
+{
+  "error": {
+    "code": "UNAUTHORIZED",
+    "message": "Missing or malformed Authorization header"
+  }
+}
+```
+
+## Testing your key
+
+Use the health endpoint to verify your key works:
+
+```bash
+curl /api/v1/admin/health \
+  -H "Authorization: Bearer alf_your_key_here"
+```
+
+A successful response confirms your key is valid and your instance is reachable.
+
+<Columns cols={2}>
+  <Card title="API Reference" icon="code" href="/api-reference/introduction">
+    See all available endpoints
+  </Card>
+  <Card title="Authentication" icon="lock" href="/api-reference/authentication">
+    Full authentication documentation
+  </Card>
+</Columns>

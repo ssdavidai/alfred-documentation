@@ -1,0 +1,123 @@
+---
+title: "Browsing Your Vault"
+description: "How to explore, search, and read records in your vault."
+icon: "vault"
+---
+
+## Overview
+
+Your vault grows with every piece of content you feed to Alfred. Here's how to explore it — from your dashboard or via the API.
+
+## Dashboard vault browser
+
+Your [Alfred Black dashboard](https://app.alfred.black) includes a vault browser where you can:
+
+- **Filter by type** — Use the dropdown to show only people, tasks, decisions, or any other record type
+- **Search by keyword** — Find records matching a search term
+- **Click to view** — Open any record to see its full content and connections
+
+## API methods
+
+### Get a vault overview
+
+See a summary of your vault — how many records of each type, recent activity, and overall statistics.
+
+```bash
+curl -s /api/v1/vault/context \
+  -H "Authorization: Bearer alf_your_key_here" | jq .
+```
+
+### List records by type
+
+Browse all records of a specific type:
+
+<CodeGroup>
+```bash cURL
+curl -s /api/v1/vault/list/person \
+  -H "Authorization: Bearer alf_your_key_here" | jq .
+```
+
+```javascript JavaScript
+const response = await fetch('/api/v1/vault/list/person', {
+  headers: { 'Authorization': 'Bearer alf_your_key_here' }
+});
+const people = await response.json();
+```
+
+```python Python
+import requests
+
+response = requests.get(
+    '/api/v1/vault/list/person',
+    headers={'Authorization': 'Bearer alf_your_key_here'}
+)
+people = response.json()
+```
+</CodeGroup>
+
+Replace `person` with any record type: `task`, `project`, `decision`, `assumption`, etc.
+
+### Search your vault
+
+Find records matching a keyword or pattern:
+
+<CodeGroup>
+```bash Search by keyword
+curl -s "/api/v1/vault/search?grep=Platform+v2" \
+  -H "Authorization: Bearer alf_your_key_here" | jq .
+```
+
+```bash Search by file pattern
+curl -s "/api/v1/vault/search?glob=project/*.md" \
+  -H "Authorization: Bearer alf_your_key_here" | jq .
+```
+</CodeGroup>
+
+### Read a specific record
+
+Get the full content of any record by its path:
+
+```bash
+curl -s "/api/v1/vault/records/person/Alice%20Smith.md" \
+  -H "Authorization: Bearer alf_your_key_here" | jq .
+```
+
+## Example workflows
+
+### "Find everything about Project X"
+
+```bash
+# Search across all record types
+curl -s "/api/v1/vault/search?grep=Project+X" \
+  -H "Authorization: Bearer alf_your_key_here" | jq .
+```
+
+### "See all open tasks"
+
+```bash
+curl -s /api/v1/vault/list/task \
+  -H "Authorization: Bearer alf_your_key_here" | jq .
+```
+
+### "Review recent decisions"
+
+```bash
+curl -s /api/v1/vault/list/decision \
+  -H "Authorization: Bearer alf_your_key_here" | jq .
+```
+
+### "What assumptions are we making?"
+
+```bash
+curl -s /api/v1/vault/list/assumption \
+  -H "Authorization: Bearer alf_your_key_here" | jq .
+```
+
+<Columns cols={2}>
+  <Card title="Record Types" icon="shapes" href="/vault/record-types">
+    See all 19 record types
+  </Card>
+  <Card title="API Reference: Vault" icon="code" href="/api-reference/vault/get-context">
+    Full vault API documentation
+  </Card>
+</Columns>

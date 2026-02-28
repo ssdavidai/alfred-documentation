@@ -4,7 +4,7 @@ description: "Permanently delete a workflow schedule"
 api: "DELETE /api/v1/schedules/{schId}"
 ---
 
-Permanently deletes a workflow schedule. This does not affect workflows that have already been started by the schedule.
+Permanently delete a workflow schedule. Any workflows that have already been started by this schedule will continue running -- only future scheduled executions are prevented.
 
 <ParamField path="schId" type="string" required>
   The schedule ID to delete
@@ -13,8 +13,8 @@ Permanently deletes a workflow schedule. This does not affect workflows that hav
 <RequestExample>
 ```bash cURL
 curl -X DELETE \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  https://app.alfred.black/api/v1/schedules/surveyor-daily
+  -H "Authorization: Bearer alf_your_key_here" \
+  /api/v1/schedules/surveyor-daily
 ```
 </RequestExample>
 

@@ -4,7 +4,7 @@ description: "Start a new workflow execution"
 api: "POST /api/v1/workflows"
 ---
 
-Initiates a new workflow execution via `temporal workflow start`. Returns 201 with the Temporal CLI's parsed JSON output, or `{ "raw": "..." }` if the output is not valid JSON.
+Start a new workflow execution. Provide the workflow type, task queue, and optional input data. Returns the assigned workflow ID and run ID on success.
 
 <ParamField body="workflow_type" type="string" required>
   The workflow type to execute. Must match a registered workflow name.
@@ -19,13 +19,13 @@ Initiates a new workflow execution via `temporal workflow start`. Returns 201 wi
 </ParamField>
 
 <ParamField body="input" type="any" optional>
-  Input data for the workflow. Will be JSON-serialized and passed to the Temporal CLI.
+  Input data for the workflow. Will be JSON-serialized and passed to the workflow.
 </ParamField>
 
 <RequestExample>
 ```bash cURL
 curl -X POST \
-  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
   -d '{
     "workflow_type": "MyWorkflow",
@@ -35,7 +35,7 @@ curl -X POST \
       "key": "value"
     }
   }' \
-  https://app.alfred.black/api/v1/workflows
+  /api/v1/workflows
 ```
 </RequestExample>
 
@@ -47,7 +47,3 @@ curl -X POST \
 }
 ```
 </ResponseExample>
-
-<Note>
-  The response structure is determined by the Temporal CLI's output. If the CLI outputs non-JSON text, the response will be `{ "raw": "..." }` instead.
-</Note>

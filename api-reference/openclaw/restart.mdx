@@ -1,0 +1,28 @@
+---
+title: "Restart Gateway"
+description: "Restart the agent gateway"
+api: "POST /api/v1/openclaw/restart"
+---
+
+Restart your instance's agent gateway. This is useful when you need to pick up configuration changes or recover from an error state.
+
+All active agent connections will be terminated during the restart. Running sessions will need to reconnect once the gateway is back online.
+
+<RequestExample>
+
+```bash cURL
+curl -X POST /api/v1/openclaw/restart \
+  -H "Authorization: Bearer alf_your_key_here"
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Response
+{
+  "message": "OpenClaw container restarted"
+}
+```
+
+</ResponseExample>

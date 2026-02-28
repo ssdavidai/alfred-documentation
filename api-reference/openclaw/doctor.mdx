@@ -1,0 +1,38 @@
+---
+title: "Run Diagnostics"
+description: "Run diagnostics on the agent gateway"
+api: "POST /api/v1/openclaw/doctor"
+---
+
+Run a comprehensive diagnostic check on your instance's agent gateway. This performs health checks across all gateway components and attempts to auto-fix common issues it finds.
+
+The response is returned as structured JSON when available, or as raw text in a `raw` field.
+
+<RequestExample>
+
+```bash cURL
+curl -X POST /api/v1/openclaw/doctor \
+  -H "Authorization: Bearer alf_your_key_here"
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Structured Response
+{
+  "...": "Structure depends on gateway doctor output"
+}
+```
+
+```json Raw Response
+{
+  "raw": "All checks passed"
+}
+```
+
+</ResponseExample>
+
+<Note>
+  The response format depends on the gateway's output. If the gateway returns valid JSON, it is passed through as-is. Otherwise, the raw text is returned in a `raw` field.
+</Note>

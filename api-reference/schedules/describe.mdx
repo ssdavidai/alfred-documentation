@@ -4,7 +4,7 @@ description: "Get detailed information about a specific schedule"
 api: "GET /api/v1/schedules/{schId}"
 ---
 
-Returns detailed information about a workflow schedule from `temporal schedule describe --output json`. If the output is a single JSON object, it is returned parsed. Otherwise, JSONL lines are parsed into an array.
+Retrieve detailed information about a specific schedule, including its cron expression, associated workflow configuration, paused state, recent executions, and upcoming execution times.
 
 <ParamField path="schId" type="string" required>
   The schedule ID to describe
@@ -13,8 +13,8 @@ Returns detailed information about a workflow schedule from `temporal schedule d
 <RequestExample>
 ```bash cURL
 curl -X GET \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  https://app.alfred.black/api/v1/schedules/curator-hourly
+  -H "Authorization: Bearer alf_your_key_here" \
+  /api/v1/schedules/curator-hourly
 ```
 </RequestExample>
 
@@ -47,7 +47,3 @@ curl -X GET \
 }
 ```
 </ResponseExample>
-
-<Note>
-  The response structure is determined by the Temporal CLI's output. The exact fields may vary across Temporal versions.
-</Note>

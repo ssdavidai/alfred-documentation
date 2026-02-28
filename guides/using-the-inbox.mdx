@@ -1,0 +1,145 @@
+---
+title: "Using the Inbox"
+description: "How to feed content to Alfred for processing."
+icon: "inbox"
+---
+
+## Overview
+
+The inbox is how you feed content to Alfred. Drop in meeting notes, conversation exports, research, ideas — any raw text. The Curator agent processes each item within seconds, creating structured vault records and linking them together automatically.
+
+## Ways to submit content
+
+### From the dashboard
+
+1. Go to your [Alfred Black dashboard](https://app.alfred.black)
+2. Navigate to the **Inbox** page
+3. Enter a title and paste your content
+4. Click **Submit**
+
+The Curator begins processing immediately.
+
+### Via the API — single item
+
+<CodeGroup>
+```bash cURL
+curl -X POST /api/v1/vault/inbox \
+  -H "Authorization: Bearer alf_your_key_here" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filename": "meeting-2026-02-26.md",
+    "content": "# Product Sync\n\nAttendees: Alice, Bob\n\nAlice presented the Q1 roadmap. Decision: prioritize mobile app over desktop.\nBob will handle the API migration by end of March."
+  }'
+```
+
+```javascript JavaScript
+const response = await fetch('/api/v1/vault/inbox', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer alf_your_key_here',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    filename: 'meeting-2026-02-26.md',
+    content: '# Product Sync\n\nAttendees: Alice, Bob\n\nAlice presented the Q1 roadmap. Decision: prioritize mobile app over desktop.\nBob will handle the API migration by end of March.'
+  })
+});
+```
+
+```python Python
+import requests
+
+response = requests.post(
+    '/api/v1/vault/inbox',
+    headers={'Authorization': 'Bearer alf_your_key_here'},
+    json={
+        'filename': 'meeting-2026-02-26.md',
+        'content': '# Product Sync\n\nAttendees: Alice, Bob\n\nAlice presented the Q1 roadmap. Decision: prioritize mobile app over desktop.\nBob will handle the API migration by end of March.'
+    }
+)
+```
+</CodeGroup>
+
+### Via the API — bulk upload
+
+Send multiple items at once:
+
+```bash
+curl -X POST /api/v1/vault/inbox/bulk \
+  -H "Authorization: Bearer alf_your_key_here" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "files": [
+      {"filename": "standup-monday.md", "content": "# Monday Standup\n\n..."},
+      {"filename": "standup-tuesday.md", "content": "# Tuesday Standup\n\n..."},
+      {"filename": "research-notes.md", "content": "# Competitor Analysis\n\n..."}
+    ]
+  }'
+```
+
+## What to send
+
+Alfred works best with rich, natural-language content:
+
+- **Meeting notes** — standups, planning sessions, 1:1s, retrospectives
+- **Conversation exports** — email threads, chat logs, discussion summaries
+- **Research** — competitor analysis, market research, technical investigations
+- **Voice transcripts** — transcribed calls, voice memos, interviews
+- **Ideas and brainstorms** — rough thoughts, feature proposals, strategy notes
+- **Project updates** — status reports, progress summaries, post-mortems
+
+<Tip>
+  For best results, include names (people, companies, projects), dates, and specific details. The more context you provide, the richer the records Alfred creates.
+</Tip>
+
+## What happens next
+
+Once content hits the inbox:
+
+1. The **Curator** picks it up within seconds
+2. It identifies entities: people, organizations, projects, tasks, decisions
+3. It creates structured records for each entity
+4. All records are cross-linked to each other
+5. The original input is marked as processed
+
+## Checking results
+
+After submitting content, you can see what Alfred produced:
+
+**From the dashboard:** Browse the vault, filter by type, and see newly created records.
+
+**Via the API:**
+
+<CodeGroup>
+```bash List recent people
+curl -s /api/v1/vault/list/person \
+  -H "Authorization: Bearer alf_your_key_here" | jq .
+```
+
+```bash List recent decisions
+curl -s /api/v1/vault/list/decision \
+  -H "Authorization: Bearer alf_your_key_here" | jq .
+```
+
+```bash Search for a keyword
+curl -s "/api/v1/vault/search?grep=Q1+roadmap" \
+  -H "Authorization: Bearer alf_your_key_here" | jq .
+```
+</CodeGroup>
+
+## Tips for best results
+
+- **Include people's full names** — "Alice Smith" works better than just "Alice"
+- **Mention project names explicitly** — "the Platform v2 project" helps Alfred create proper links
+- **Be specific about decisions** — "Decision: use PostgreSQL" is clearer than "we talked about databases"
+- **Include dates** — helps Alfred create accurate timelines
+- **Don't worry about formatting** — raw text, markdown, or bullet points all work
+
+<Columns cols={2}>
+  <Card title="Browsing Your Vault" icon="vault" href="/guides/browsing-your-vault">
+    See what Alfred created from your content
+  </Card>
+  <Card title="API Reference: Inbox" icon="code" href="/api-reference/vault/upload-inbox">
+    Full inbox API documentation
+  </Card>
+</Columns>

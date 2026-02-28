@@ -4,10 +4,10 @@ description: "Retrieve a list of workflows with optional filtering"
 api: "GET /api/v1/workflows"
 ---
 
-Returns a list of workflows in the Temporal namespace. Runs `temporal workflow list --output json` inside the temporal container; the JSONL output is parsed into an array. Supports optional filtering using Temporal query syntax.
+List all workflow executions for your instance. Returns an array of workflow summaries including their current status, type, and timing information. Supports optional filtering to narrow results by status, type, or time range.
 
 <ParamField query="query" type="string" optional>
-  Temporal visibility query string for filtering workflows. Uses Temporal's SQL-like query syntax. Examples:
+  Query string for filtering workflows. Uses SQL-like syntax. Examples:
   - `ExecutionStatus='Running'`
   - `WorkflowType='MyWorkflow' AND ExecutionStatus='Completed'`
   - `StartTime > '2026-01-01T00:00:00Z'`
@@ -17,13 +17,13 @@ Returns a list of workflows in the Temporal namespace. Runs `temporal workflow l
 ```bash cURL
 # List all workflows
 curl -X GET \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  https://app.alfred.black/api/v1/workflows
+  -H "Authorization: Bearer alf_your_key_here" \
+  /api/v1/workflows
 
 # List running workflows
 curl -X GET \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  "https://app.alfred.black/api/v1/workflows?query=ExecutionStatus%3D%27Running%27"
+  -H "Authorization: Bearer alf_your_key_here" \
+  "/api/v1/workflows?query=ExecutionStatus%3D%27Running%27"
 ```
 </RequestExample>
 
@@ -56,7 +56,3 @@ curl -X GET \
 ]
 ```
 </ResponseExample>
-
-<Note>
-  The response is a JSON array where each element is a workflow execution object from the Temporal CLI's JSONL output. The exact field names and structure are determined by the Temporal CLI version.
-</Note>

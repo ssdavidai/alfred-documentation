@@ -1,215 +1,124 @@
 ---
 title: "Device Pairing"
-description: "Managing OpenClaw device pairing and access control"
+description: "Connect apps and tools to your Alfred instance."
 icon: "mobile"
 ---
 
-OpenClaw devices (mobile, desktop, web clients) connect to your Alfred instance via a pairing workflow. This guide covers the full device lifecycle: pairing, approval, token management, and revocation.
+## Overview
 
-## Pairing Workflow
+Devices are apps and tools that connect directly to your Alfred instance — like Obsidian on your laptop or a mobile app. Device pairing lets you control which devices have access.
+
+## How it works
 
 <Steps>
-  <Step title="Device initiates pairing">
-    Client generates a pairing request with device info (name, platform, model)
+  <Step title="Device requests to pair">
+    A client app initiates a pairing request with your Alfred instance.
   </Step>
-  <Step title="Request appears in pending list">
-    Admin reviews the request via API or TUI
+  <Step title="Review the request">
+    The request appears as "pending" in your dashboard or via the API.
   </Step>
-  <Step title="Admin approves or rejects">
-    Approval grants an access token; rejection discards the request
+  <Step title="Approve or reject">
+    Approve to grant access, or reject to discard the request.
   </Step>
   <Step title="Device connects">
-    Client uses the token to access Alfred
+    Approved devices receive credentials and can interact with your vault.
   </Step>
 </Steps>
 
-## Listing Devices
+## Managing devices from the dashboard
 
-### List All Devices
+Go to your [Alfred Black dashboard](https://app.alfred.black) and navigate to the **Devices** page to:
 
-Get both pending and paired devices:
+- **View pending requests** — See devices waiting for approval
+- **Approve or reject** — Grant or deny access to each device
+- **See paired devices** — View all currently connected devices
+- **Remove devices** — Revoke access from previously paired devices
 
-```bash
-curl -X GET https://app.alfred.black/api/v1/devices \
-  -H "Authorization: Bearer YOUR_API_KEY"
-```
+## Managing devices via the API
 
-**Response:**
+### List all devices
 
-The response is the parsed JSON output from the `openclaw devices list --json` command. The exact shape depends on the OpenClaw version, but typically includes `pending` and `paired` arrays:
-
-```json
-{
-  "pending": [
-    {
-      "requestId": "req_abc123",
-      "displayName": "Alice's iPhone",
-      "platform": "ios"
-    }
-  ],
-  "paired": [
-    {
-      "deviceId": "dev_xyz789",
-      "displayName": "Bob's MacBook",
-      "platform": "macos",
-      "role": "user"
-    }
-  ]
-}
-```
-
-## Approving Devices
-
-Approve a pending pairing request using the `requestId`:
+See both pending and paired devices:
 
 ```bash
-curl -X POST https://app.alfred.black/api/v1/devices/req_abc123/approve \
-  -H "Authorization: Bearer YOUR_API_KEY"
+curl -s /api/v1/devices \
+  -H "Authorization: Bearer alf_your_key_here" | jq .
 ```
 
-You can also pass `{"latest": true}` in the body to approve the latest pending request.
+### Approve a device
 
-**Response:**
-
-```json
-{
-  "message": "Device approved"
-}
-```
-
-<Note>
-Approve and reject operations use the `:requestId` path parameter (from the pending device's `requestId` field).
-</Note>
-
-## Rejecting Devices
-
-Reject a pending pairing request using the `requestId`:
+Approve a pending pairing request:
 
 ```bash
-curl -X POST https://app.alfred.black/api/v1/devices/req_abc123/reject \
-  -H "Authorization: Bearer YOUR_API_KEY"
+curl -X POST /api/v1/devices/req_abc123/approve \
+  -H "Authorization: Bearer alf_your_key_here"
 ```
 
-**Response:**
+### Reject a device
 
-```json
-{
-  "message": "Device rejected"
-}
+```bash
+curl -X POST /api/v1/devices/req_abc123/reject \
+  -H "Authorization: Bearer alf_your_key_here"
 ```
 
 The request is permanently discarded. The device must initiate a new pairing request.
 
-## Removing Paired Devices
-
-Remove a paired device using the `deviceId` (HTTP DELETE):
+### Remove a paired device
 
 ```bash
-curl -X DELETE https://app.alfred.black/api/v1/devices/dev_xyz789 \
-  -H "Authorization: Bearer YOUR_API_KEY"
+curl -X DELETE /api/v1/devices/dev_xyz789 \
+  -H "Authorization: Bearer alf_your_key_here"
 ```
-
-**Response:**
-
-```json
-{
-  "message": "Device removed"
-}
-```
-
-The device's token is revoked immediately. Any subsequent API requests will fail with 401 Unauthorized.
 
 <Warning>
-Removing a device is permanent. The device must re-pair to regain access.
+  Removing a device is permanent and revokes access immediately. The device must re-pair to regain access.
 </Warning>
 
-## Token Management
+### Rotate device credentials
 
-### Rotating Tokens
-
-Rotate a device's access token using the `deviceId`:
+Regenerate credentials for a specific device:
 
 ```bash
-curl -X POST https://app.alfred.black/api/v1/devices/dev_xyz789/rotate \
-  -H "Authorization: Bearer YOUR_API_KEY" \
+curl -X POST /api/v1/devices/dev_xyz789/rotate \
+  -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
-  -d '{
-    "role": "user"
-  }'
+  -d '{"role": "user"}'
 ```
-
-**Response:**
-
-```json
-{
-  "message": "Token rotated"
-}
-```
-
-<Note>
-The `role` field is required for token rotation. You can optionally include a `scope` field.
-</Note>
 
 <Tip>
-Rotate tokens periodically (every 90 days) for security. The device should support token refresh.
+  Rotate credentials periodically (every 90 days) for security.
 </Tip>
 
-### Revoking Access
+### Revoke device access
 
-Revoke a device's access using the `deviceId`:
+Immediately revoke a device's access:
 
 ```bash
-curl -X POST https://app.alfred.black/api/v1/devices/dev_xyz789/revoke \
-  -H "Authorization: Bearer YOUR_API_KEY" \
+curl -X POST /api/v1/devices/dev_xyz789/revoke \
+  -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
-  -d '{
-    "role": "user"
-  }'
+  -d '{"role": "user"}'
 ```
 
-**Response:**
+### Clear all pending requests
 
-```json
-{
-  "message": "Access revoked"
-}
-```
-
-<Note>
-The `role` field is required for revocation.
-</Note>
-
-## Bulk Operations
-
-### Clear Devices
-
-Clear all devices, or only pending requests:
+Remove all pending device requests at once:
 
 ```bash
-# Clear all devices
-curl -X POST https://app.alfred.black/api/v1/devices/clear \
-  -H "Authorization: Bearer YOUR_API_KEY"
+curl -X POST /api/v1/devices/clear \
+  -H "Authorization: Bearer alf_your_key_here"
+```
 
-# Clear pending requests only
-curl -X POST https://app.alfred.black/api/v1/devices/clear \
-  -H "Authorization: Bearer YOUR_API_KEY" \
+To clear only pending requests (leaving paired devices intact):
+
+```bash
+curl -X POST /api/v1/devices/clear \
+  -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
   -d '{"pending_only": true}'
 ```
 
-**Response:**
-
-```json
-{
-  "message": "Devices cleared"
-}
-```
-
-<Warning>
-Clearing all devices revokes all device tokens immediately. Use with caution. Typically used during security incidents or instance resets.
-</Warning>
-
-## Endpoint Summary
+## Endpoint summary
 
 | Operation | Method | Path | Identifier |
 |-----------|--------|------|------------|
@@ -221,163 +130,17 @@ Clearing all devices revokes all device tokens immediately. Use with caution. Ty
 | **Revoke** | POST | `/api/v1/devices/:deviceId/revoke` | `deviceId` |
 | **Clear** | POST | `/api/v1/devices/clear` | -- |
 
-## Error Handling
+## Security tips
 
-All errors follow a consistent format:
+<Warning>
+  Only approve devices you recognize. If you see an unfamiliar pairing request, reject it immediately.
+</Warning>
 
-```json
-{
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "role is required"
-  }
-}
-```
+- Review pending requests regularly
+- Remove devices you no longer use
+- Rotate credentials if you suspect a device may be compromised
+- Use the revoke endpoint for immediate access removal in emergencies
 
-Error codes: `UNAUTHORIZED` (401), `VALIDATION_ERROR` (400), `NOT_FOUND` (404), `EXEC_ERROR` (500), `INTERNAL_ERROR` (500).
-
-## Example Workflows
-
-### New Device Pairing
-
-<Steps>
-  <Step title="Device initiates pairing">
-    User opens the OpenClaw app and taps "Pair with Alfred"
-  </Step>
-  <Step title="Admin checks pending requests">
-    ```bash
-    curl -X GET https://app.alfred.black/api/v1/devices \
-      -H "Authorization: Bearer YOUR_API_KEY"
-    ```
-  </Step>
-  <Step title="Admin approves the device">
-    ```bash
-    curl -X POST https://app.alfred.black/api/v1/devices/req_abc123/approve \
-      -H "Authorization: Bearer YOUR_API_KEY"
-    ```
-  </Step>
-  <Step title="Device receives token and connects">
-    The app receives the token and starts syncing with Alfred
-  </Step>
-</Steps>
-
-### Lost Device
-
-<Steps>
-  <Step title="User reports device lost">
-    User contacts admin
-  </Step>
-  <Step title="Admin identifies the device">
-    ```bash
-    curl -X GET https://app.alfred.black/api/v1/devices \
-      -H "Authorization: Bearer YOUR_API_KEY"
-    ```
-  </Step>
-  <Step title="Admin removes the device">
-    ```bash
-    curl -X DELETE https://app.alfred.black/api/v1/devices/dev_xyz789 \
-      -H "Authorization: Bearer YOUR_API_KEY"
-    ```
-  </Step>
-  <Step title="Confirm revocation">
-    Check that the device no longer appears in the paired list
-  </Step>
-</Steps>
-
-### Security Audit
-
-Periodic token rotation for all devices:
-
-```bash
-# List all devices
-curl -X GET https://app.alfred.black/api/v1/devices \
-  -H "Authorization: Bearer YOUR_API_KEY"
-
-# Rotate each device token
-curl -X POST https://app.alfred.black/api/v1/devices/dev_abc123/rotate \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"role": "user"}'
-
-curl -X POST https://app.alfred.black/api/v1/devices/dev_def456/rotate \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"role": "user"}'
-```
-
-<Tip>
-Automate token rotation with a cron job. Notify users via email when their token is rotated.
-</Tip>
-
-### Cleanup After Testing
-
-Clear all test devices:
-
-```bash
-# Clear pending requests only
-curl -X POST https://app.alfred.black/api/v1/devices/clear \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"pending_only": true}'
-
-# Or clear all devices
-curl -X POST https://app.alfred.black/api/v1/devices/clear \
-  -H "Authorization: Bearer YOUR_API_KEY"
-```
-
-## Troubleshooting
-
-### Device Can't Pair
-
-List devices and check if the request arrived:
-
-```bash
-curl -X GET https://app.alfred.black/api/v1/devices \
-  -H "Authorization: Bearer YOUR_API_KEY"
-```
-
-If no request appears:
-- Ensure OpenClaw gateway is running (check `openclaw` container status)
-- Check OpenClaw logs for pairing errors
-
-### Token Not Working
-
-Verify the device is still paired:
-
-```bash
-curl -X GET https://app.alfred.black/api/v1/devices \
-  -H "Authorization: Bearer YOUR_API_KEY"
-```
-
-If missing, the device was removed. Re-pair required.
-
-If present, rotate the token:
-
-```bash
-curl -X POST https://app.alfred.black/api/v1/devices/dev_xyz789/rotate \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"role": "user"}'
-```
-
-### Multiple Pending Requests from Same Device
-
-This happens if the device retries pairing. Reject duplicates:
-
-```bash
-curl -X POST https://app.alfred.black/api/v1/devices/req_old123/reject \
-  -H "Authorization: Bearer YOUR_API_KEY"
-```
-
-Then approve the most recent request.
-
-## Next Steps
-
-<CardGroup cols={2}>
-  <Card title="Vault Management" icon="vault" href="/guides/vault-management">
-    Learn CRUD operations on vault records
-  </Card>
-  <Card title="Worker Operations" icon="gears" href="/guides/worker-operations">
-    Manage Curator, Janitor, and Distiller
-  </Card>
-</CardGroup>
+<Card title="Devices API Reference" icon="code" href="/api-reference/devices/list">
+  Full device endpoint documentation
+</Card>

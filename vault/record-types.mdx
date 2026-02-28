@@ -1,0 +1,281 @@
+---
+title: "Record Types"
+description: "Detailed reference for all 19 vault record types."
+icon: "shapes"
+---
+
+## Overview
+
+Alfred manages 19 distinct record types organized into three categories: **Standing Entities** (7) for the stable elements of your world, **Activity Records** (7) for what happens, and **Learning Types** (5) for extracted knowledge.
+
+## Standing Entities
+
+Records representing the people, organizations, and resources in your world.
+
+<AccordionGroup>
+
+<Accordion title="person — People and Contacts" icon="user">
+**What it represents:** Individuals, contacts, team members, or stakeholders.
+
+**When it's created:** The Curator creates person records when people are mentioned in your inbox content — meeting attendees, email contacts, team members referenced in notes.
+
+**Example scenario:** You drop in standup notes mentioning "Alice reviewed Bob's PR." Alfred creates person records for Alice and Bob (or updates them if they already exist) and links both to the conversation.
+
+**Status values:** `active`, `inactive`
+
+**Key fields:** name, status, org (link to organization), email, tags
+</Accordion>
+
+<Accordion title="org — Organizations" icon="building">
+**What it represents:** Companies, teams, departments, or organizational entities.
+
+**When it's created:** The Curator creates org records when companies or teams are mentioned in your content.
+
+**Example scenario:** Meeting notes reference "the Acme Corp partnership." Alfred creates an org record for Acme Corp and links it to relevant people and projects.
+
+**Status values:** `active`, `inactive`
+
+**Key fields:** name, status, website, location, tags
+</Accordion>
+
+<Accordion title="project — Projects and Initiatives" icon="diagram-project">
+**What it represents:** Projects, initiatives, or multi-task efforts.
+
+**When it's created:** The Curator creates project records when initiatives or efforts are discussed in your content.
+
+**Example scenario:** Standup notes mention "Platform v2 migration is on track." Alfred creates a project record linked to the people working on it and any related tasks.
+
+**Status values:** `active`, `paused`, `completed`, `abandoned`, `proposed`
+
+**Key fields:** name, status, owner (link to person), tags
+</Accordion>
+
+<Accordion title="location — Locations" icon="location-dot">
+**What it represents:** Physical or virtual locations.
+
+**When it's created:** The Curator creates location records when places are mentioned in meetings, events, or notes.
+
+**Example scenario:** "The offsite will be at the SF Conference Center." Alfred creates a location record and links it to the event.
+
+**Status values:** `active`, `inactive`
+
+**Key fields:** name, status, tags
+</Accordion>
+
+<Accordion title="account — Accounts" icon="key">
+**What it represents:** Accounts, subscriptions, or service credentials.
+
+**When it's created:** The Curator creates account records when services or subscriptions are discussed.
+
+**Example scenario:** Notes mention "our AWS Production account needs a billing review." Alfred creates an account record linked to the relevant people and tasks.
+
+**Status values:** `active`, `suspended`, `closed`, `pending`
+
+**Key fields:** name, status, owner (link to person), tags
+</Accordion>
+
+<Accordion title="asset — Assets and Resources" icon="box">
+**What it represents:** Physical or digital assets and resources.
+
+**When it's created:** The Curator creates asset records when specific resources are discussed.
+
+**Example scenario:** "The production database server needs a memory upgrade." Alfred creates an asset record linked to the task and owner.
+
+**Status values:** `active`, `retired`, `maintenance`, `disposed`
+
+**Key fields:** name, status, owner (link to person), tags
+</Accordion>
+
+<Accordion title="process — Processes and Workflows" icon="diagram-next">
+**What it represents:** Defined processes, procedures, or workflows.
+
+**When it's created:** The Curator creates process records when operational procedures are described.
+
+**Example scenario:** "We need to update the deployment pipeline to include staging." Alfred creates a process record and links it to the project and people involved.
+
+**Status values:** `active`, `proposed`, `design`, `deprecated`
+
+**Key fields:** name, status, owner (link to person), tags
+</Accordion>
+
+</AccordionGroup>
+
+## Activity Records
+
+Records capturing events, work, and interactions.
+
+<AccordionGroup>
+
+<Accordion title="conversation — Conversations and Discussions" icon="comments">
+**What it represents:** Meetings, discussions, or dialogue threads.
+
+**When it's created:** The Curator creates conversation records from meeting notes, email threads, or chat exports you submit.
+
+**Example scenario:** You paste in standup notes. Alfred creates a conversation record for the meeting, links it to all participants, and creates separate records for tasks and decisions mentioned.
+
+**Status values:** `active`, `waiting`, `resolved`, `closed`, `archived`
+
+**Key fields:** subject, status, participants (links to people), tags
+
+<Note>
+  Conversations use `subject` instead of `name` as their title field.
+</Note>
+</Accordion>
+
+<Accordion title="note — General Notes" icon="note-sticky">
+**What it represents:** Observations, research, or freeform content.
+
+**When it's created:** The Curator creates note records for general content that doesn't fit neatly into a more specific type.
+
+**Example scenario:** You submit a brainstorm document. Alfred creates a note record and links it to the relevant projects and people mentioned.
+
+**Status values:** `draft`, `active`, `review`, `final`
+
+**Key fields:** name, status, tags
+</Accordion>
+
+<Accordion title="task — Tasks and Action Items" icon="check">
+**What it represents:** Individual tasks, action items, or todos.
+
+**When it's created:** The Curator creates task records when action items are identified in your content.
+
+**Example scenario:** Meeting notes say "Bob will start the database indexing task." Alfred creates a task record, assigns Bob as owner, and links it to the project.
+
+**Status values:** `todo`, `active`, `blocked`, `done`, `cancelled`
+
+**Key fields:** name, status, owner (link to person), project (link to project), depends_on, blocked_by, tags
+</Accordion>
+
+<Accordion title="event — Events" icon="calendar">
+**What it represents:** One-time events, conferences, launches, or occurrences.
+
+**When it's created:** The Curator creates event records when specific scheduled occurrences are mentioned.
+
+**Example scenario:** "The annual team offsite is April 10th." Alfred creates an event record with the date, location, and participants linked.
+
+**Status values:** _(no status constraint)_
+
+**Key fields:** name, date, location, participants (links to people), tags
+</Accordion>
+
+<Accordion title="session — Working Sessions" icon="clock">
+**What it represents:** Time-bounded activity periods or work blocks.
+
+**When it's created:** The Curator creates session records when focused work periods are described.
+
+**Example scenario:** "Morning focus block — spent 3 hours on the migration." Alfred creates a session record linked to the project and tasks.
+
+**Status values:** `active`, `completed`
+
+**Key fields:** name, status, tags
+</Accordion>
+
+<Accordion title="input — Incoming Items" icon="inbox">
+**What it represents:** Raw items in the inbox that need processing.
+
+**When it's created:** Created when content is submitted to the inbox, before the Curator processes it.
+
+**Example scenario:** You upload a document via the API. An input record tracks it until the Curator processes it into structured records.
+
+**Status values:** `unprocessed`, `processed`, `deferred`
+
+**Key fields:** subject, status, tags
+
+<Note>
+  Inputs use `subject` instead of `name` as their title field.
+</Note>
+</Accordion>
+
+<Accordion title="run — Execution Runs" icon="play">
+**What it represents:** Execution runs, operations, or batch processes.
+
+**When it's created:** Created to track operational runs and batch processing.
+
+**Status values:** `active`, `completed`, `blocked`, `cancelled`
+
+**Key fields:** name, status, outputs (links to results), tags
+</Accordion>
+
+</AccordionGroup>
+
+## Learning Types
+
+Meta-records created by the Distiller that capture deeper knowledge extracted from your operational records.
+
+<AccordionGroup>
+
+<Accordion title="assumption — Implicit Assumptions" icon="thought-bubble">
+**What it represents:** Assumptions found lurking in your records that haven't been explicitly validated.
+
+**When it's created:** The Distiller identifies implicit assumptions when analyzing your conversations, decisions, and project records.
+
+**Example scenario:** From project discussions, the Distiller surfaces: "We're assuming users prefer mobile-first design — this hasn't been validated with data."
+
+**Status values:** `active`, `challenged`, `invalidated`, `confirmed`
+
+**Key fields:** name, status, based_on (source records), challenged_by, confirmed_by, invalidated_by, tags
+</Accordion>
+
+<Accordion title="decision — Decisions and Rationale" icon="scale-balanced">
+**What it represents:** Choices that were made, along with the reasoning behind them.
+
+**When it's created:** Both the Curator (from explicit mentions) and the Distiller (from implicit context) create decision records.
+
+**Example scenario:** Meeting notes mention "Decision: use token bucket algorithm for rate limiting." Alfred captures the decision, who approved it, and what it was based on.
+
+**Status values:** `draft`, `final`, `superseded`, `reversed`
+
+**Key fields:** name, status, based_on (source records), approved_by, tags
+</Accordion>
+
+<Accordion title="constraint — Constraints and Limitations" icon="triangle-exclamation">
+**What it represents:** Boundaries, limitations, or constraints you're operating under.
+
+**When it's created:** The Distiller identifies constraints from project plans, conversations, and decisions.
+
+**Example scenario:** The Distiller surfaces: "Must support legacy API until Q3 due to existing client contracts."
+
+**Status values:** `active`, `expired`, `waived`, `superseded`
+
+**Key fields:** name, status, based_on (source records), governed_by, tags
+</Accordion>
+
+<Accordion title="contradiction — Contradictions and Conflicts" icon="circle-exclamation">
+**What it represents:** Conflicts or contradictions found across different records.
+
+**When it's created:** The Distiller identifies contradictions when analyzing records that contain conflicting information.
+
+**Example scenario:** The Distiller finds: "The Q2 launch goal conflicts with the security audit requirement, which needs 6 weeks and hasn't started."
+
+**Status values:** `unresolved`, `resolved`, `accepted`
+
+**Key fields:** name, status, based_on (conflicting records), tags
+</Accordion>
+
+<Accordion title="synthesis — Insights and Connections" icon="diagram-venn">
+**What it represents:** Synthesized insights that connect patterns across multiple records.
+
+**When it's created:** The Distiller creates synthesis records when it finds meaningful patterns across your vault.
+
+**Example scenario:** The Distiller connects dots: "Both the Q1 Launch and Platform Redesign projects identified onboarding as a user retention blocker — suggesting a shared improvement opportunity."
+
+**Status values:** `draft`, `active`, `superseded`
+
+**Key fields:** name, status, based_on (source records), supports, tags
+</Accordion>
+
+</AccordionGroup>
+
+<Note>
+  Learning types are automatically extracted by the Distiller agent. While you can create them via the API, they're typically generated automatically from your existing records.
+</Note>
+
+## Naming conventions
+
+- Type identifiers use lowercase, singular form (e.g., `person`, not `Person` or `people`)
+- Record names use title case with spaces (e.g., "Alice Smith")
+- Two types (`conversation`, `input`) use `subject` as their title field instead of `name`
+
+<Tip>
+  Use the `GET /api/v1/vault/schema` endpoint to retrieve the complete, up-to-date schema programmatically.
+</Tip>

@@ -1,10 +1,10 @@
 ---
 title: "Scan for Learnings"
-description: "Scan vault records for learning extraction candidates"
+description: "Scan for extractable knowledge"
 api: "POST /api/v1/workers/distiller/scan"
 ---
 
-Performs a one-time scan of vault records to identify extraction candidates without actually extracting learnings. Returns a list of records that contain latent knowledge (assumptions, decisions, constraints, contradictions, synthesis).
+Scans your vault records to identify candidates for knowledge extraction. The Distiller looks for latent assumptions, decisions, constraints, contradictions, and synthesis opportunities. This is a read-only operation that reports candidates without extracting anything.
 
 <ParamField body="project" type="string" optional>
   Filter candidates to a specific project. If omitted, scans all vault records.
@@ -15,14 +15,14 @@ Performs a one-time scan of vault records to identify extraction candidates with
 <RequestExample>
 
 ```bash Scan All Records
-curl -X POST https://app.alfred.black/api/v1/workers/distiller/scan \
-  -H "Authorization: Bearer YOUR_API_KEY" \
+curl -X POST /api/v1/workers/distiller/scan \
+  -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json"
 ```
 
 ```bash Scan Specific Project
-curl -X POST https://app.alfred.black/api/v1/workers/distiller/scan \
-  -H "Authorization: Bearer YOUR_API_KEY" \
+curl -X POST /api/v1/workers/distiller/scan \
+  -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
   -d '{
     "project": "acme-redesign"
@@ -33,13 +33,14 @@ curl -X POST https://app.alfred.black/api/v1/workers/distiller/scan \
 
 <ResponseExample>
 
-```json Structured Response (if alfred outputs JSON)
+```json Structured Response
 {
-  "...": "Structure depends on alfred distiller scan output"
+  "records_scanned": 423,
+  "candidates_found": 8
 }
 ```
 
-```json Raw Response (if alfred outputs text)
+```json Raw Response
 {
   "raw": "Scanned 423 records, found 8 candidates"
 }
@@ -48,9 +49,9 @@ curl -X POST https://app.alfred.black/api/v1/workers/distiller/scan \
 </ResponseExample>
 
 <Note>
-  The response format depends on the `alfred distiller scan` command output. If the command outputs valid JSON, it is returned as-is. Otherwise, the raw text output is returned in a `raw` field.
+  If the response contains structured JSON, it is returned directly. Otherwise, the output is returned in a `raw` field.
 </Note>
 
 <ResponseField name="raw" type="string">
-  Raw text output from `alfred distiller scan` when the output is not valid JSON. Only present when structured JSON parsing fails.
+  Human-readable output when structured JSON is not available.
 </ResponseField>

@@ -1,47 +1,41 @@
 ---
 title: "Edit Record"
-description: "Edit an existing vault record"
+description: "Update an existing vault record's metadata or content."
 api: "PATCH /api/v1/vault/records/{path}"
 ---
 
 ## Overview
 
-Modifies an existing vault record. You can set or replace frontmatter fields, append to list fields, append to the markdown body, or replace the body entirely. The endpoint runs `alfred vault edit <path>` and returns the CLI output.
+Updates an existing record's metadata fields and/or content body. You can set or replace fields, append to list fields, or update the content body.
 
 ## Path Parameters
 
 <ParamField path="path" type="string" required>
-  Relative path to the record (e.g., `person/Alice.md`). URL-encode if the path contains spaces or special characters.
+  Relative path to the record (e.g., `person/Alice Chen.md`). URL-encode spaces and special characters.
 </ParamField>
 
 ## Body Parameters
 
 <ParamField body="set" type="object" optional>
-  Key-value pairs to set in frontmatter. Replaces existing values for these fields.
+  Key-value pairs to set in the record metadata. Replaces existing values for these fields.
 </ParamField>
 
 <ParamField body="append" type="object" optional>
-  Key-value pairs to append to list fields in frontmatter.
+  Key-value pairs to append to list fields in metadata (e.g., adding a tag or project link).
 </ParamField>
 
 <ParamField body="body_append" type="string" optional>
-  Text to append to the markdown body.
+  Text to append to the content body.
 </ParamField>
 
 <ParamField body="body_stdin" type="string" optional>
-  Replace the markdown body with this text.
-</ParamField>
-
-<ParamField body="scope" type="string" optional>
-  Operation scope for authorization (`curator`, `janitor`, `distiller`). Defaults to no scope restrictions.
+  Replace the content body entirely with this text.
 </ParamField>
 
 ## Response
 
-The response structure depends on the `alfred vault edit` CLI output. If the CLI returns valid JSON, it is passed through directly. Otherwise, the raw text output is wrapped in a `{ "raw": "..." }` object.
-
 <ResponseField name="raw" type="string">
-  If the CLI output is not valid JSON, the raw text output is returned in this field.
+  Confirmation message. If the output is structured JSON, it is returned directly instead.
 </ResponseField>
 
 ## Request Example
@@ -50,8 +44,8 @@ The response structure depends on the `alfred vault edit` CLI output. If the CLI
 
 ```bash cURL
 curl -X PATCH \
-  https://app.alfred.black/api/v1/vault/records/person/Alice%20Chen.md \
-  -H "Authorization: Bearer YOUR_API_KEY" \
+  "/api/v1/vault/records/person/Alice%20Chen.md" \
+  -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
   -d '{
     "set": {
@@ -69,10 +63,10 @@ curl -X PATCH \
 const recordPath = 'person/Alice Chen.md';
 const encodedPath = encodeURIComponent(recordPath);
 
-const response = await fetch(`https://app.alfred.black/api/v1/vault/records/${encodedPath}`, {
+const response = await fetch(`/api/v1/vault/records/${encodedPath}`, {
   method: 'PATCH',
   headers: {
-    'Authorization': 'Bearer YOUR_API_KEY',
+    'Authorization': 'Bearer alf_your_key_here',
     'Content-Type': 'application/json'
   },
   body: JSON.stringify({
@@ -97,7 +91,7 @@ console.log(result);
 
 <ResponseExample>
 
-```json 200 OK (raw text fallback)
+```json 200 OK
 {
   "raw": "Edited person/Alice Chen.md"
 }
@@ -108,15 +102,6 @@ console.log(result);
   "error": {
     "code": "VALIDATION_ERROR",
     "message": "Request body required"
-  }
-}
-```
-
-```json 401 Unauthorized
-{
-  "error": {
-    "code": "UNAUTHORIZED",
-    "message": "Unauthorized"
   }
 }
 ```

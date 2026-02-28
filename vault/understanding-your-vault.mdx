@@ -1,0 +1,93 @@
+---
+title: "Understanding Your Vault"
+description: "Your vault is a living knowledge graph of interconnected records."
+icon: "vault"
+---
+
+## What is your vault?
+
+Your vault is where Alfred stores everything it knows. It's a living knowledge graph — a collection of structured records that are all connected to each other through links. Every person, project, task, decision, and insight lives in your vault as a record.
+
+Unlike a folder of notes, your vault is **structured** (every record has a type and metadata), **connected** (records link to each other), and **growing** (Alfred continuously adds and refines records as you feed it content).
+
+## How records work
+
+Each record in your vault has three parts:
+
+1. **Type and metadata** — What kind of record it is (person, task, decision, etc.) along with properties like status, dates, tags, and owners
+2. **Content** — The main body text with details, context, and notes
+3. **Connections** — Links to other records in your vault
+
+Here's what a person record looks like:
+
+<Accordion title="Example: Person record">
+**Alice Smith** (type: person)
+
+- **Status:** active
+- **Organization:** linked to Acme Corp
+- **Email:** alice@acme.com
+- **Tags:** engineering, backend
+
+**Content:**
+> Alice is a senior backend engineer who joined Acme in 2025. She leads the Platform v2 migration effort.
+
+**Connected to:**
+- Acme Corp (org)
+- Platform v2 (project)
+- Deploy staging environment (task)
+- Architecture Review (conversation)
+</Accordion>
+
+## How connections work
+
+When Alfred processes a meeting note that mentions "Alice from Acme discussed the Q1 launch," it creates or updates multiple records and links them together:
+
+- The **conversation** record links to Alice (person) and Q1 Launch (project)
+- Alice's **person** record links back to the conversation and to Acme Corp (org)
+- The **project** record links to Alice and the conversation
+
+These bidirectional connections mean you can start from any record and navigate to everything related.
+
+## The three layers
+
+Your vault organizes knowledge into three layers:
+
+### Who and what — Standing entities
+
+Records for the stable elements of your world: people, organizations, projects, locations, accounts, assets, and processes. These persist and accumulate connections over time.
+
+### What happened — Activity records
+
+Records for events, conversations, tasks, notes, and sessions. These capture what occurred and link to the entities involved.
+
+### What we know — Learning records
+
+Records created by the Distiller that surface hidden knowledge: assumptions being made, decisions taken, constraints in play, contradictions between sources, and synthesized insights.
+
+## How your vault grows
+
+Every time you feed content to Alfred:
+
+1. The Curator identifies entities and creates or updates records
+2. New records are linked to existing ones where relevant
+3. The Janitor ensures all connections are valid
+4. The Distiller periodically extracts higher-order knowledge
+5. The Surveyor clusters records semantically and discovers cross-record relationships
+
+A single meeting note might create 5-10 new records and dozens of connections. Over weeks and months, your vault becomes an increasingly valuable knowledge base.
+
+## Accessing your vault
+
+You can browse and search your vault in two ways:
+
+- **Dashboard** — Use the vault browser to filter by type, search by keyword, and click through connections
+- **API** — Use endpoints like `GET /api/v1/vault/context`, `GET /api/v1/vault/search`, and `GET /api/v1/vault/list/{type}` for programmatic access
+
+<Columns cols={2}>
+  <Card title="Record Types" icon="shapes" href="/vault/record-types">
+    See all 19 record types in detail
+  </Card>
+  <Card title="Record Format" icon="database" href="/vault/vault-schema">
+    Understand the structure of records
+  </Card>
+</Columns>

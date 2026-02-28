@@ -4,25 +4,25 @@ description: "Resume a paused workflow schedule"
 api: "POST /api/v1/schedules/{schId}/unpause"
 ---
 
-Resumes a paused workflow schedule. The schedule will begin executing according to its cron expression.
+Resume a paused workflow schedule. Once unpaused, the schedule will begin executing again according to its configured cron expression.
 
 <ParamField path="schId" type="string" required>
   The schedule ID to unpause
 </ParamField>
 
 <ParamField body="reason" type="string" optional>
-  Human-readable reason for unpausing. Passed to the Temporal CLI.
+  Human-readable reason for unpausing. Recorded on the schedule for reference.
 </ParamField>
 
 <RequestExample>
 ```bash cURL
 curl -X POST \
-  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
   -d '{
     "reason": "Vault migration complete"
   }' \
-  https://app.alfred.black/api/v1/schedules/curator-hourly/unpause
+  /api/v1/schedules/curator-hourly/unpause
 ```
 </RequestExample>
 

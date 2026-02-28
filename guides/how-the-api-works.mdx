@@ -1,0 +1,149 @@
+---
+title: "How the API Works"
+description: "Understand the proxy architecture that connects your API calls to your Alfred instance."
+icon: "route"
+---
+
+## Overview
+
+When you make an API call with your `alf_` key, the request travels through a secure proxy layer before reaching your Alfred instance. This guide explains the full request lifecycle and the security model behind it.
+
+## The request path
+
+```mermaid
+sequenceDiagram
+    participant Script as Your Script
+    participant SaaS as SaaS Proxy<br/>(app.alfred.black)
+    participant TS as Tailscale Network
+    participant Tenant as Tenant API<br/>(alfred-ctrl)
+    participant Docker as Docker Containers
+
+    Script->>SaaS: POST /api/v1/vault/inbox<br/>Authorization: Bearer alf_xxx
+    SaaS->>SaaS: Hash key (SHA-256)<br/>Look up ApiKey row<br/>Find user's Instance
+    SaaS->>SaaS: Decrypt tenant API key<br/>(AES-256-GCM)
+    SaaS->>TS: Forward request via Tailscale<br/>https://{hostname}:3100/api/v1/vault/inbox<br/>Authorization: Bearer {tenant_key}
+    TS->>Tenant: Deliver to tenant API
+    Tenant->>Tenant: Authenticate with AAS_API_KEY
+    Tenant->>Docker: Execute operation
+    Docker-->>Tenant: Result
+    Tenant-->>TS: Response
+    TS-->>SaaS: Response
+    SaaS-->>Script: Response (same status + body)
+```
+
+In plain terms:
+
+```
+Your Script (alf_xxx) --> SaaS Proxy --> Tailscale --> Tenant API --> Docker Containers
+```
+
+## Step-by-step breakdown
+
+### 1. You send a request with your API key
+
+You create API keys in your [dashboard](https://app.alfred.black) under **Settings > API Keys**. Each key starts with `alf_` followed by 32 hex characters:
+
+```bash
+curl -X GET /api/v1/vault/context \
+  -H "Authorization: Bearer alf_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"
+```
+
+Your request hits the SaaS server at `app.alfred.black`.
+
+### 2. The SaaS proxy authenticates your key
+
+The proxy extracts the Bearer token from the `Authorization` header and validates the `alf_` prefix. It then computes a SHA-256 hash of the full key and looks it up in the `ApiKey` database table.
+
+The raw key is never stored -- only its hash. This means even if the database were compromised, your API keys could not be recovered.
+
+```
+alf_a1b2c3d4... --> SHA-256 --> keyHash --> ApiKey table lookup
+```
+
+If the key is valid, the proxy loads the associated user and their `Instance` record. The `lastUsedAt` timestamp on the key is updated asynchronously.
+
+### 3. The proxy validates instance readiness
+
+Before forwarding, the proxy checks three conditions on your instance:
+
+| Check | Error if failed |
+|-------|----------------|
+| Instance exists | `404` — No instance found |
+| Tailscale hostname and tenant API key are set | `503` — Instance is not ready yet |
+| Instance status is `running` | `503` — Instance is not running |
+
+### 4. The tenant API key is decrypted
+
+Your instance's internal API key (used for communication between the SaaS and the tenant) is stored encrypted in the database using AES-256-GCM. The proxy decrypts it at request time using a server-side encryption key (`COLUMN_ENCRYPTION_KEY`).
+
+The encrypted format is `iv:authTag:ciphertext`, providing both confidentiality and integrity verification.
+
+### 5. The request is forwarded via Tailscale
+
+The proxy constructs a URL using your instance's Tailscale hostname and forwards the request:
+
+```
+https://{tailscaleHostname}:3100/api/v1/vault/context
+```
+
+The forwarded request includes:
+- The decrypted tenant API key as a Bearer token
+- The original request method (GET, POST, PATCH, DELETE)
+- The original request body (for non-GET requests)
+- Query parameters from the original request
+
+A 15-second timeout is enforced on the forwarded request.
+
+### 6. The tenant API authenticates and executes
+
+The tenant API (alfred-ctrl's standalone server running on port 3100) receives the request and authenticates it against its own `AAS_API_KEY` environment variable. If valid, it executes the operation -- which may involve running CLI commands, querying Docker containers, or reading/writing vault files.
+
+### 7. The response flows back
+
+The tenant API's response (status code, headers, and body) flows back through Tailscale to the SaaS proxy, which forwards it to your script unchanged. JSON responses are parsed and re-serialized; non-JSON responses are passed through as-is.
+
+## Two proxy paths
+
+The SaaS server exposes two URL patterns that both route through the same proxy logic:
+
+| Path pattern | Description |
+|-------------|-------------|
+| `/api/v1/...` | Primary API path. The URL is forwarded as-is to the tenant. |
+| `/user-api/...` | Legacy path. The prefix is stripped and rewritten to `/api/v1/...` before forwarding. |
+
+Both paths use the same authentication and proxy logic. Use `/api/v1/...` for all new integrations.
+
+## Error handling
+
+The proxy translates errors at each stage:
+
+| Scenario | HTTP Status | Error message |
+|----------|-------------|---------------|
+| Missing `Authorization` header | `401` | Missing or invalid Authorization header |
+| Key doesn't start with `alf_` | `401` | Invalid API key format |
+| Key hash not found in database | `401` | Invalid API key |
+| No instance provisioned | `404` | No instance found |
+| Instance not ready or not running | `503` | Instance is not ready / not running |
+| Tenant request timed out (15s) | `504` | Tenant API request timed out |
+| Tenant unreachable | `502` | Failed to reach tenant |
+
+Errors from the tenant API itself (400, 404, 500, etc.) are passed through with their original status codes.
+
+## Security model
+
+The proxy layer provides several security guarantees:
+
+- **No raw key storage** — API keys are hashed with SHA-256 before storage. The full key is shown only once at creation time.
+- **Encrypted tenant credentials** — The tenant API key is encrypted at rest with AES-256-GCM. It is decrypted only in memory during request forwarding.
+- **Network isolation** — Tenant instances are accessible only via Tailscale, a WireGuard-based mesh VPN. They are not exposed to the public internet.
+- **Scoped authentication** — Your `alf_` key authenticates you to the SaaS. The SaaS uses a separate, per-instance key to authenticate to the tenant. These credentials are independent.
+- **Key limits** — Each account can have at most 10 API keys, reducing the attack surface.
+
+<Columns cols={2}>
+  <Card title="API Keys Guide" icon="key" href="/guides/api-keys">
+    Creating and managing your API keys
+  </Card>
+  <Card title="Authentication Reference" icon="lock" href="/api-reference/authentication">
+    API authentication details
+  </Card>
+</Columns>

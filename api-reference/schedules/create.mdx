@@ -4,7 +4,7 @@ description: "Create a new workflow schedule"
 api: "POST /api/v1/schedules"
 ---
 
-Creates a new workflow schedule via `temporal schedule create`. Returns 201 with a confirmation message.
+Create a new schedule that automatically starts workflow executions on a cron-based cadence. You can configure the workflow type, task queue, input data, and overlap behavior.
 
 <ParamField body="schedule_id" type="string" required>
   Unique identifier for this schedule. Must not conflict with existing schedules.
@@ -47,7 +47,7 @@ Creates a new workflow schedule via `temporal schedule create`. Returns 201 with
 <RequestExample>
 ```bash cURL
 curl -X POST \
-  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
   -d '{
     "schedule_id": "my-daily-schedule",
@@ -56,7 +56,7 @@ curl -X POST \
     "cron": "0 4 * * *",
     "overlap_policy": "Skip"
   }' \
-  https://app.alfred.black/api/v1/schedules
+  /api/v1/schedules
 ```
 </RequestExample>
 
@@ -67,7 +67,3 @@ curl -X POST \
 }
 ```
 </ResponseExample>
-
-<Note>
-  The response may include a `raw` field containing the Temporal CLI's stdout if there was any output from the create command.
-</Note>

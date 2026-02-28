@@ -1,17 +1,17 @@
 ---
 title: "List Inbox Files"
-description: "List all files currently in the vault inbox"
+description: "List all files currently waiting in your inbox."
 api: "GET /api/v1/vault/inbox"
 ---
 
 ## Overview
 
-Returns a list of all files currently in the vault's inbox directory. These are files waiting to be processed by Alfred's Curator daemon. Hidden files (starting with `.`) are excluded. If the inbox directory does not exist yet, an empty array is returned.
+Returns a list of all files currently in your inbox waiting to be processed by the Curator agent. Once the Curator processes a file, it is removed from this list.
 
 ## Response
 
 <ResponseField name="files" type="array">
-  Array of filenames in the inbox (e.g., `["meeting-notes-2026-02-26.md", "project-idea.md"]`)
+  Array of filenames in the inbox.
 </ResponseField>
 
 ## Request Example
@@ -19,16 +19,15 @@ Returns a list of all files currently in the vault's inbox directory. These are 
 <RequestExample>
 
 ```bash cURL
-curl -X GET \
-  https://app.alfred.black/api/v1/vault/inbox \
-  -H "Authorization: Bearer YOUR_API_KEY"
+curl -X GET /api/v1/vault/inbox \
+  -H "Authorization: Bearer alf_your_key_here"
 ```
 
 ```javascript JavaScript
-const response = await fetch('https://app.alfred.black/api/v1/vault/inbox', {
+const response = await fetch('/api/v1/vault/inbox', {
   method: 'GET',
   headers: {
-    'Authorization': 'Bearer YOUR_API_KEY'
+    'Authorization': 'Bearer alf_your_key_here'
   }
 });
 
@@ -47,9 +46,7 @@ console.log(inbox);
   "files": [
     "meeting-notes-2026-02-26.md",
     "project-idea.md",
-    "contact-info.txt",
-    "resume-alice-chen.pdf",
-    "slack-export-2026-02.json"
+    "contact-info.txt"
   ]
 }
 ```
@@ -57,15 +54,6 @@ console.log(inbox);
 ```json 200 OK (Empty Inbox)
 {
   "files": []
-}
-```
-
-```json 401 Unauthorized
-{
-  "error": {
-    "code": "UNAUTHORIZED",
-    "message": "Unauthorized"
-  }
 }
 ```
 

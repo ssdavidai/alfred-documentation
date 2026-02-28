@@ -4,7 +4,7 @@ description: "Send a signal to a running workflow"
 api: "POST /api/v1/workflows/{wfId}/signal"
 ---
 
-Sends a signal to a running workflow. Signals allow external systems to communicate with workflows, triggering actions or passing data.
+Send a signal to a running workflow. Signals allow you to communicate with a workflow while it is executing, triggering actions or passing updated data to it.
 
 <ParamField path="wfId" type="string" required>
   The workflow ID to signal
@@ -25,7 +25,7 @@ Sends a signal to a running workflow. Signals allow external systems to communic
 <RequestExample>
 ```bash cURL
 curl -X POST \
-  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
   -d '{
     "signal_name": "update_config",
@@ -34,7 +34,7 @@ curl -X POST \
       "batch_size": 10
     }
   }' \
-  https://app.alfred.black/api/v1/workflows/curator-sweep-20260226-143022/signal
+  /api/v1/workflows/curator-sweep-20260226-143022/signal
 ```
 </RequestExample>
 

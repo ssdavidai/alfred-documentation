@@ -1,0 +1,47 @@
+---
+title: "Agent Memory"
+description: "Get agent memory usage and statistics"
+api: "GET /api/v1/openclaw/memory"
+---
+
+Query your instance's agent memory and conversation history. You can search for specific topics or list all memory entries. This is useful for understanding what your agents have learned and retained across sessions.
+
+The response is returned as structured JSON when available, or as raw text in a `raw` field.
+
+<ParamField query="query" type="string" optional>
+  Search query text. If provided, filters memory entries matching the query. If omitted, returns all memory entries.
+</ParamField>
+
+<RequestExample>
+
+```bash With Query
+curl -X GET "/api/v1/openclaw/memory?query=vault%20organization" \
+  -H "Authorization: Bearer alf_your_key_here"
+```
+
+```bash Without Query
+curl -X GET /api/v1/openclaw/memory \
+  -H "Authorization: Bearer alf_your_key_here"
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Structured Response
+{
+  "...": "Structure depends on gateway memory output"
+}
+```
+
+```json Raw Response
+{
+  "raw": "No memory entries found"
+}
+```
+
+</ResponseExample>
+
+<Note>
+  The response format depends on the gateway's output. If the gateway returns valid JSON, it is passed through as-is. Otherwise, the raw text is returned in a `raw` field.
+</Note>

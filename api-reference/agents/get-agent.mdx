@@ -1,0 +1,119 @@
+---
+title: "Get Agent"
+description: "Get model status and configuration for a single agent."
+api: "GET /api/v1/admin/agents/{agentId}"
+---
+
+Returns the full model status for a single agent, including the resolved model, fallbacks, and provider credential status.
+
+For OpenClaw agents (`main`, `vault-curator`, `vault-janitor`, `vault-distiller`), this runs `openclaw models status` inside the container. For `surveyor`, it reads the `config.yaml` file directly.
+
+<ParamField path="agentId" type="string" required>
+  Agent identifier. One of `main`, `vault-curator`, `vault-janitor`, `vault-distiller`, `surveyor`.
+</ParamField>
+
+## Response (OpenClaw agent)
+
+<ResponseField name="defaultModel" type="string | null">
+  The model explicitly set for this agent, or `null` if using the global default.
+</ResponseField>
+
+<ResponseField name="resolvedDefault" type="string | null">
+  The model that will actually be used, after resolving defaults and fallbacks.
+</ResponseField>
+
+<ResponseField name="fallbacks" type="string[]">
+  Ordered list of fallback models if the default is unavailable.
+</ResponseField>
+
+<ResponseField name="providers" type="array">
+  Status of each credential provider relevant to this agent.
+  <Expandable title="Provider object properties">
+    <ResponseField name="provider" type="string">
+      Provider name (e.g., "openrouter", "anthropic").
+    </ResponseField>
+    <ResponseField name="status" type="string">
+      Whether the provider credential is configured (e.g., "configured", "missing").
+    </ResponseField>
+    <ResponseField name="source" type="string">
+      Where the credential was found (e.g., "env", "config").
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="missingProviders" type="string[]">
+  Providers required by the current model configuration but not yet configured.
+</ResponseField>
+
+## Response (Surveyor)
+
+<ResponseField name="labeler_model" type="string">
+  Model used for cluster labeling.
+</ResponseField>
+
+<ResponseField name="embedder_model" type="string">
+  Model used for embedding vault records.
+</ResponseField>
+
+<ResponseField name="embedder_source" type="string">
+  Where embeddings are generated. Either `ollama` (local) or `openrouter` (remote).
+</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X GET /api/v1/admin/agents/vault-curator \
+  -H "Authorization: Bearer alf_your_key_here"
+```
+
+```javascript JavaScript
+const response = await fetch('/api/v1/admin/agents/vault-curator', {
+  method: 'GET',
+  headers: {
+    'Authorization': 'Bearer alf_your_key_here'
+  }
+});
+
+const data = await response.json();
+console.log(data);
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK (OpenClaw agent)
+{
+  "defaultModel": "anthropic/claude-sonnet-4",
+  "resolvedDefault": "anthropic/claude-sonnet-4",
+  "fallbacks": ["openai/gpt-4o"],
+  "providers": [
+    { "provider": "openrouter", "status": "configured", "source": "env" },
+    { "provider": "anthropic", "status": "missing", "source": null }
+  ],
+  "missingProviders": []
+}
+```
+
+```json 200 OK (Surveyor)
+{
+  "labeler_model": "x-ai/grok-4.1-fast",
+  "embedder_model": "nomic-embed-text",
+  "embedder_source": "ollama"
+}
+```
+
+```json 400 Unknown agent
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Unknown agent: foo. Known agents: main, vault-curator, vault-janitor, vault-distiller, surveyor"
+  }
+}
+```
+
+</ResponseExample>

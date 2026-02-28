@@ -1,20 +1,20 @@
 ---
-title: "Restart Container"
-description: "Restart the Alfred Docker container"
+title: "Restart Workers"
+description: "Restart all AI agents"
 api: "POST /api/v1/workers/restart"
 ---
 
-Performs a hard restart of the Alfred worker process. This stops all workers and starts them fresh. Use this for applying configuration changes or recovering from severe errors.
+Performs a full restart of all AI agents. Use this to apply configuration changes or recover from errors.
 
 <Info>
-  This operation will cause brief downtime (typically 10-30 seconds) while the container restarts.
+  This operation will cause brief downtime (typically 10-30 seconds) while the agents restart.
 </Info>
 
 <RequestExample>
 
 ```bash cURL
-curl -X POST https://app.alfred.black/api/v1/workers/restart \
-  -H "Authorization: Bearer YOUR_API_KEY" \
+curl -X POST /api/v1/workers/restart \
+  -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json"
 ```
 
@@ -31,5 +31,5 @@ curl -X POST https://app.alfred.black/api/v1/workers/restart \
 </ResponseExample>
 
 <ResponseField name="message" type="string">
-  Confirmation message. Always returns `"Alfred container restarted"` on success.
+  Confirmation that the restart completed successfully.
 </ResponseField>

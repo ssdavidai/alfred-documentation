@@ -1,0 +1,127 @@
+---
+title: "Monitoring Your Instance"
+description: "Keep an eye on your Alfred instance health, agents, and services."
+icon: "chart-line"
+---
+
+## Overview
+
+Alfred Black gives you visibility into your instance's health, agent status, and service operations — from your dashboard and via the API.
+
+## Dashboard Command Center
+
+Your [Alfred Black dashboard](https://app.alfred.black) Command Center shows at a glance:
+
+- **Health badge** — Overall instance status (healthy, degraded, or down)
+- **Vault stats** — Record counts and recent activity
+- **Agent status** — Whether the Curator, Janitor, Distiller, and Surveyor are running
+
+## Health check
+
+### From the API
+
+```bash
+curl -s /api/v1/admin/health \
+  -H "Authorization: Bearer alf_your_key_here" | jq .
+```
+
+Example response:
+
+```json
+{
+  "status": "ok",
+  "containers": 5,
+  "unhealthy": 0,
+  "disk_percent": 45,
+  "memory_percent": 62
+}
+```
+
+### What health statuses mean
+
+| Status | Meaning |
+|--------|---------|
+| **healthy** | All services running normally |
+| **degraded** | Some services have issues but core functionality works |
+| **down** | Critical services are unavailable |
+
+## System information
+
+Get detailed system metrics:
+
+```bash
+curl -s /api/v1/admin/system/info \
+  -H "Authorization: Bearer alf_your_key_here" | jq .
+```
+
+## Service status
+
+List all services running on your instance:
+
+```bash
+curl -s /api/v1/admin/containers \
+  -H "Authorization: Bearer alf_your_key_here" | jq .
+```
+
+## Viewing logs
+
+### From the dashboard
+
+Navigate to the **Logs** page to view real-time logs from your instance services.
+
+### Via the API
+
+Stream logs in real-time using Server-Sent Events:
+
+```bash
+# Stream all logs
+curl -N /api/v1/logs \
+  -H "Authorization: Bearer alf_your_key_here"
+
+# Stream logs from a specific service
+curl -N "/api/v1/logs?service=alfred" \
+  -H "Authorization: Bearer alf_your_key_here"
+```
+
+Get logs from a specific service:
+
+```bash
+curl -s /api/v1/admin/containers/alfred/logs \
+  -H "Authorization: Bearer alf_your_key_here"
+```
+
+## Restarting services
+
+If a service is misbehaving, you can restart it from the dashboard or via the API:
+
+```bash
+curl -X POST /api/v1/admin/containers/alfred/restart \
+  -H "Authorization: Bearer alf_your_key_here"
+```
+
+## Agent monitoring
+
+Check what your AI agents are up to:
+
+```bash
+# Overall worker status
+curl -s /api/v1/workers/status \
+  -H "Authorization: Bearer alf_your_key_here"
+
+# Janitor scan history
+curl -s /api/v1/workers/janitor/history \
+  -H "Authorization: Bearer alf_your_key_here"
+
+# Distiller extraction history
+curl -s /api/v1/workers/distiller/history \
+  -H "Authorization: Bearer alf_your_key_here"
+```
+
+<Columns cols={2}>
+  <Card title="Your AI Agents" icon="gears" href="/guides/your-ai-agents">
+    Control your agents
+  </Card>
+  <Card title="Instance API" icon="code" href="/api-reference/admin/health">
+    Full instance management endpoints
+  </Card>
+</Columns>

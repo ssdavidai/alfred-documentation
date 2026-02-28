@@ -1,17 +1,17 @@
 ---
 title: "Get Vault Schema"
-description: "Returns the API's hardcoded vault schema definition"
+description: "Returns the complete vault schema definition."
 api: "GET /api/v1/vault/schema"
 ---
 
 ## Overview
 
-Returns the vault schema as hardcoded in the API server. This includes all 19 known record types, status values by type, list fields, required fields, name fields, and directory mappings. This endpoint does not call the Alfred CLI -- it returns the API's own static schema data.
+Returns the complete vault schema including all record types, valid status values, list fields, required fields, and name field overrides. Use this to understand what record types are available and how they're structured.
 
 ## Response
 
 <ResponseField name="known_types" type="array">
-  List of all 19 valid record types (14 entity types + 5 learning types)
+  All 19 valid record types.
 </ResponseField>
 
 <ResponseField name="status_by_type" type="object">
@@ -19,19 +19,19 @@ Returns the vault schema as hardcoded in the API server. This includes all 19 kn
 </ResponseField>
 
 <ResponseField name="list_fields" type="array">
-  Array of field names that are treated as multi-value lists (arrays) across all record types.
+  Field names that accept multiple values as arrays.
 </ResponseField>
 
 <ResponseField name="required_fields" type="array">
-  Array of globally required frontmatter fields (applies to all types).
+  Globally required fields (applies to all types).
 </ResponseField>
 
 <ResponseField name="name_field_by_type" type="object">
-  Map of record type to the field used as the display name. Only types that override the default (`name`) are included.
+  Types that use a different title field instead of `name`. Only `conversation` and `input` (which use `subject`) are listed.
 </ResponseField>
 
 <ResponseField name="type_directory" type="object">
-  Map of record type to its subdirectory in the vault. Types not listed here (e.g., `session`, `input`) can be stored flexibly.
+  Map of record type to its directory in the vault.
 </ResponseField>
 
 ## Request Example
@@ -39,16 +39,15 @@ Returns the vault schema as hardcoded in the API server. This includes all 19 kn
 <RequestExample>
 
 ```bash cURL
-curl -X GET \
-  https://app.alfred.black/api/v1/vault/schema \
-  -H "Authorization: Bearer YOUR_API_KEY"
+curl -X GET /api/v1/vault/schema \
+  -H "Authorization: Bearer alf_your_key_here"
 ```
 
 ```javascript JavaScript
-const response = await fetch('https://app.alfred.black/api/v1/vault/schema', {
+const response = await fetch('/api/v1/vault/schema', {
   method: 'GET',
   headers: {
-    'Authorization': 'Bearer YOUR_API_KEY'
+    'Authorization': 'Bearer alf_your_key_here'
   }
 });
 

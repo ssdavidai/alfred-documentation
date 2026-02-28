@@ -4,7 +4,7 @@ description: "Bulk clear pending or all devices"
 api: "POST /api/v1/devices/clear"
 ---
 
-Clears multiple devices at once. Can be used to clear only pending requests or all devices (both pending and paired).
+Clears multiple devices at once. You can clear only pending pairing requests or remove all devices (both pending and paired).
 
 <ParamField body="pending_only" type="boolean" optional>
   If true, only clears pending device requests. If omitted or false, clears all devices.
@@ -13,8 +13,8 @@ Clears multiple devices at once. Can be used to clear only pending requests or a
 <RequestExample>
 
 ```bash Clear Pending Only
-curl -X POST https://app.alfred.black/api/v1/devices/clear \
-  -H "Authorization: Bearer YOUR_API_KEY" \
+curl -X POST /api/v1/devices/clear \
+  -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
   -d '{
     "pending_only": true
@@ -22,8 +22,8 @@ curl -X POST https://app.alfred.black/api/v1/devices/clear \
 ```
 
 ```bash Clear All
-curl -X POST https://app.alfred.black/api/v1/devices/clear \
-  -H "Authorization: Bearer YOUR_API_KEY" \
+curl -X POST /api/v1/devices/clear \
+  -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json"
 ```
 
@@ -40,5 +40,5 @@ curl -X POST https://app.alfred.black/api/v1/devices/clear \
 </ResponseExample>
 
 <ResponseField name="message" type="string">
-  Human-readable status message confirming devices have been cleared.
+  A status message confirming the devices were cleared.
 </ResponseField>

@@ -1,0 +1,192 @@
+---
+title: "Your Dashboard"
+description: "A tour of the Alfred Black dashboard and what each section does."
+icon: "layout-dashboard"
+---
+
+## Overview
+
+The [Alfred Black dashboard](https://app.alfred.black) is your control center for managing your vault, AI agents, devices, and instance. This guide walks through each section.
+
+## Navigation
+
+The sidebar provides access to all dashboard sections:
+
+- **Home** -- Command Center with stats and activity overview
+- **Vault** -- Browse and search vault records
+- **Services** -- Manage containers and AI model configuration
+- **Credentials** -- Set API keys for LLM providers
+- **Logs** -- Real-time container log viewer
+- **Settings** -- Account info, subscription management, API keys
+
+Additional pages are accessible from the Home page:
+
+- **Inbox** -- Submit content to your vault via file upload
+- **Devices** -- Approve or reject OpenClaw device pairing requests
+
+Admin users also see an **Admin** section with analytics, user management, instance management, and provisioning tools.
+
+## Home (Command Center)
+
+The Home page gives you a snapshot of your entire instance.
+
+### Stat cards
+
+Four cards across the top show key metrics at a glance:
+
+| Card | What it shows |
+|------|---------------|
+| **Health** | Overall instance status (ok, degraded, or down) |
+| **Vault** | Total record count, plus inbox items waiting to be processed |
+| **Services** | Running containers out of total (e.g., "3/3 up") |
+| **Devices** | Number of paired OpenClaw devices, plus pending pairing requests |
+
+Stats refresh automatically every 30 seconds.
+
+### Worker activity charts
+
+Below the stat cards, activity charts show recent processing trends for Curator, Janitor, and Distiller -- giving you visibility into how actively your agents are working.
+
+### Quick actions
+
+A set of shortcut buttons for common tasks:
+
+- **Upload to Vault** -- Opens a file upload dialog to drop content into the inbox
+- **OpenClaw UI** -- Opens the OpenClaw web interface on your instance (if available)
+
+The Quick Actions card also includes a **Devices** section showing pending pairing requests (with approve/reject buttons) and currently paired devices.
+
+### Knowledge graph
+
+An interactive visualization of your vault's structure. It shows record types as nodes, sized by count, with AI agent nodes showing their operational status. Toggle the graph on or off with the switch in the card header.
+
+The graph refreshes every 15 seconds when visible.
+
+### Activity feed
+
+A chronological feed of recent vault mutations -- records created, edited, moved, or deleted by your agents.
+
+### Vault composition
+
+A chart at the bottom of the page showing the distribution of record types in your vault. Useful for understanding the shape of your knowledge base.
+
+## Inbox
+
+The Inbox page lets you submit content to your vault through the web UI. Enter a title and paste your content, then click Submit. The Curator agent picks it up within seconds and creates structured vault records.
+
+You can also submit content via the API. See the [Using the Inbox](/guides/using-the-inbox) guide for details.
+
+## Vault
+
+The Vault page lets you browse and search all records in your vault.
+
+- **Filter by type** -- Select a record type (person, project, task, decision, etc.) to see only records of that type
+- **Search** -- Find records by keyword across your entire vault
+- **View records** -- Click any record to see its full content, frontmatter, and relationships
+
+For more details, see [Browsing Your Vault](/guides/browsing-your-vault).
+
+## Services
+
+The Services page has two sections: container management and agent model configuration.
+
+### Container status
+
+Each service running on your instance is shown as a card with:
+
+- **Status indicator** -- Green (running), red (exited), or yellow (other)
+- **Service name and description** -- What the service does
+- **Control buttons** -- Start, Stop, and Restart
+
+The three core services are:
+
+| Service | Description |
+|---------|-------------|
+| **Alfred Worker** | Runs vault maintenance including Curator, Janitor, Distiller, and Surveyor |
+| **OpenClaw Gateway** | AI agent gateway for device connectivity and skill execution |
+| **Temporal Engine** | Workflow orchestration for scheduled and triggered tasks |
+
+### Agent models
+
+Below the containers, you can configure which LLM model each agent uses. Tabs let you switch between agents:
+
+- **Alfred** -- The main worker agent
+- **Curator** -- Processes inbox content into structured records
+- **Janitor** -- Scans and fixes vault structural issues
+- **Distiller** -- Extracts latent knowledge from records
+- **Surveyor** -- Embeds and clusters vault content (uses a labeler model and an embedder model)
+
+For each agent, you can pick a model from the dropdown grouped by provider:
+
+| Provider | Key required | Example models |
+|----------|-------------|----------------|
+| **Anthropic** | `ANTHROPIC_API_KEY` | Claude Sonnet 4.5, Claude Haiku 4.5 |
+| **OpenAI** | `OPENAI_API_KEY` | GPT-4.1, GPT-4.1 Mini, o3, o4-mini |
+| **Google** | `GOOGLE_API_KEY` | Gemini 2.5 Pro, Gemini 2.5 Flash |
+| **xAI** | `XAI_API_KEY` | Grok 3, Grok 3 Fast, Grok 3 Mini |
+| **Meta** | via OpenRouter | Llama 4 Maverick, Llama 4 Scout |
+| **DeepSeek** | via OpenRouter | DeepSeek R1, DeepSeek V3 |
+| **Mistral** | via OpenRouter | Mistral Large, Mistral Small |
+
+If you select a model and the required API key is not configured, a dialog prompts you to enter it. You can also enter a custom model ID if your preferred model is not listed.
+
+<Tip>
+  Models from Meta, DeepSeek, and Mistral are accessed through OpenRouter. Set an `OPENROUTER_API_KEY` in Credentials to use them. An OpenRouter key also works as a fallback for Anthropic, OpenAI, Google, and xAI models.
+</Tip>
+
+## Devices
+
+The Devices section (accessible from the Home page Quick Actions area) manages OpenClaw device pairing. When a device (phone, tablet, or other client) requests to pair with your instance:
+
+1. The request appears as **pending** in the Devices section
+2. You can **approve** or **reject** it
+3. Approved devices appear in the paired devices list
+4. You can **remove** a paired device at any time
+
+For more details, see the [Device Pairing](/guides/device-pairing) guide.
+
+## Credentials
+
+The Credentials page manages API keys for LLM providers used by your AI agents. Each credential shows:
+
+- **Status** -- Whether the key is set (green check) or missing (gray X)
+- **Description** -- What the key is used for
+- **Masked value** -- A preview of the configured key
+- **Used by** -- Which agents or services depend on this key
+
+You can set, update, or remove credentials at any time. Changes restart the Alfred worker automatically so the new keys take effect.
+
+For more details, see the [API Keys](/guides/api-keys) guide (for Alfred API keys) and the [Your AI Agents](/guides/your-ai-agents) guide (for provider credentials).
+
+## Logs
+
+The Logs page streams real-time logs from all services running on your instance. Use this for debugging, monitoring agent activity, or verifying that processing is working correctly.
+
+You can also access logs via the API. See the [Monitoring](/guides/monitoring) guide.
+
+## Settings
+
+The Settings page contains three sections:
+
+### Account
+
+Displays your email, current plan, and subscription status.
+
+### Subscription
+
+Links to the Polar customer portal where you can manage your subscription, update payment methods, view invoices, or cancel. See the [Billing & Subscriptions](/guides/billing) guide for the full lifecycle.
+
+### API Keys
+
+Create and manage API keys for accessing the Alfred API. Each key provides full access to your instance's API endpoints. Keys use the `alf_` prefix format and are shown only once at creation time.
+
+See the [API Keys](/guides/api-keys) guide for usage examples and best practices.
+
+<Columns cols={2}>
+  <Card title="Using the Inbox" icon="inbox" href="/guides/using-the-inbox">
+    How to feed content to Alfred
+  </Card>
+  <Card title="Your AI Agents" icon="gears" href="/guides/your-ai-agents">
+    Understand what each agent does
+  </Card>
+</Columns>

@@ -1,0 +1,38 @@
+---
+title: "Gateway Health"
+description: "Check agent gateway health"
+api: "GET /api/v1/openclaw/health"
+---
+
+Check whether your instance's agent gateway is running and responsive. Use this endpoint for uptime monitoring or automated health checks.
+
+The response is returned as structured JSON when available, or as raw text in a `raw` field.
+
+<RequestExample>
+
+```bash cURL
+curl -X GET /api/v1/openclaw/health \
+  -H "Authorization: Bearer alf_your_key_here"
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Structured Response
+{
+  "...": "Structure depends on gateway health output"
+}
+```
+
+```json Raw Response
+{
+  "raw": "Gateway is healthy"
+}
+```
+
+</ResponseExample>
+
+<Note>
+  The response format depends on the gateway's output. If the gateway returns valid JSON, it is passed through as-is. Otherwise, the raw text is returned in a `raw` field.
+</Note>

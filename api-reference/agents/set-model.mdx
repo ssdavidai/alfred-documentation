@@ -1,0 +1,148 @@
+---
+title: "Set Agent Model"
+description: "Change the LLM model used by a specific agent."
+api: "PATCH /api/v1/admin/agents/{agentId}/model"
+---
+
+Updates the default model for a specific agent. For OpenClaw agents (main, vault-curator, vault-janitor, vault-distiller), this sets the model via the OpenClaw CLI. For the surveyor, this updates `config.yaml` directly.
+
+## Path Parameters
+
+<ParamField path="agentId" type="string" required>
+  The agent to update. One of: `main`, `vault-curator`, `vault-janitor`, `vault-distiller`, `surveyor`.
+</ParamField>
+
+## Request Body
+
+<ParamField body="model" type="string" required>
+  The model identifier to set (e.g., `anthropic/claude-sonnet-4`, `openai/gpt-4o`, `x-ai/grok-4.1-fast`).
+</ParamField>
+
+<ParamField body="field" type="string">
+  Only used when `agentId` is `surveyor`. Specifies which surveyor model to update. Set to `embedder_model` to change the embedding model, or omit to change the labeler model.
+</ParamField>
+
+## Response
+
+### For OpenClaw agents
+
+<ResponseField name="message" type="string">
+  Confirmation message including the agent name and new model.
+</ResponseField>
+
+<ResponseField name="agent" type="object">
+  The updated agent status object (same shape as in the [List Agents](/api-reference/agents/list) response).
+</ResponseField>
+
+### For Surveyor
+
+<ResponseField name="message" type="string">
+  Confirmation message indicating which surveyor model was updated.
+</ResponseField>
+
+<ResponseField name="surveyor" type="object">
+  The updated surveyor configuration with `labeler_model`, `embedder_model`, and `embedder_source`.
+</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL — Set Curator model
+curl -X PATCH /api/v1/admin/agents/vault-curator/model \
+  -H "Authorization: Bearer alf_your_key_here" \
+  -H "Content-Type: application/json" \
+  -d '{"model": "anthropic/claude-sonnet-4"}'
+```
+
+```bash cURL — Set Surveyor labeler model
+curl -X PATCH /api/v1/admin/agents/surveyor/model \
+  -H "Authorization: Bearer alf_your_key_here" \
+  -H "Content-Type: application/json" \
+  -d '{"model": "x-ai/grok-4.1-fast"}'
+```
+
+```bash cURL — Set Surveyor embedder model
+curl -X PATCH /api/v1/admin/agents/surveyor/model \
+  -H "Authorization: Bearer alf_your_key_here" \
+  -H "Content-Type: application/json" \
+  -d '{"model": "nomic-embed-text", "field": "embedder_model"}'
+```
+
+```javascript JavaScript
+const response = await fetch('/api/v1/admin/agents/vault-curator/model', {
+  method: 'PATCH',
+  headers: {
+    'Authorization': 'Bearer alf_your_key_here',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({ model: 'anthropic/claude-sonnet-4' })
+});
+
+const data = await response.json();
+console.log(data.message);
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK — OpenClaw agent
+{
+  "message": "Model for Curator updated to anthropic/claude-sonnet-4",
+  "agent": {
+    "id": "vault-curator",
+    "label": "Curator",
+    "description": "Processes inbox into structured vault records",
+    "defaultModel": "anthropic/claude-sonnet-4",
+    "resolvedDefault": "anthropic/claude-sonnet-4",
+    "fallbacks": [],
+    "providers": [
+      { "provider": "openrouter", "status": "configured", "source": "env" }
+    ],
+    "missingProviders": []
+  }
+}
+```
+
+```json 200 OK — Surveyor
+{
+  "message": "Surveyor labeler model updated to x-ai/grok-4.1-fast",
+  "surveyor": {
+    "labeler_model": "x-ai/grok-4.1-fast",
+    "embedder_model": "nomic-embed-text",
+    "embedder_source": "ollama"
+  }
+}
+```
+
+```json 400 Bad Request — Missing model
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Request body must include a non-empty 'model' string"
+  }
+}
+```
+
+```json 400 Bad Request — Unknown agent
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Unknown agent: foo. Known agents: main, vault-curator, vault-janitor, vault-distiller, surveyor"
+  }
+}
+```
+
+```json 401 Unauthorized
+{
+  "error": {
+    "code": "UNAUTHORIZED",
+    "message": "Unauthorized"
+  }
+}
+```
+
+</ResponseExample>

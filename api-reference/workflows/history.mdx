@@ -4,7 +4,7 @@ description: "Retrieve the complete event history for a workflow execution"
 api: "GET /api/v1/workflows/{wfId}/history"
 ---
 
-Returns the complete event history for a workflow execution. Runs `temporal workflow show --output json` and parses the JSONL output into an array.
+Retrieve the complete event history for a workflow execution. Returns an ordered array of events showing every state transition, scheduled task, and completion. Useful for debugging workflow behavior and understanding execution flow.
 
 <ParamField path="wfId" type="string" required>
   The workflow ID to retrieve history for
@@ -17,8 +17,8 @@ Returns the complete event history for a workflow execution. Runs `temporal work
 <RequestExample>
 ```bash cURL
 curl -X GET \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  https://app.alfred.black/api/v1/workflows/curator-sweep-20260226-143022/history
+  -H "Authorization: Bearer alf_your_key_here" \
+  /api/v1/workflows/curator-sweep-20260226-143022/history
 ```
 </RequestExample>
 
@@ -46,7 +46,3 @@ curl -X GET \
 ]
 ```
 </ResponseExample>
-
-<Note>
-  The response is a JSON array of history events parsed from the Temporal CLI's JSONL output. The exact event types and attribute structures are determined by the Temporal CLI version.
-</Note>

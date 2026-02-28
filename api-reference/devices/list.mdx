@@ -1,20 +1,16 @@
 ---
 title: "List Devices"
-description: "Retrieve all pending and paired devices in the OpenClaw gateway"
+description: "Retrieve all pending and paired devices"
 api: "GET /api/v1/devices"
 ---
 
-Returns a list of all pending and paired devices associated with the OpenClaw gateway. The response is structured JSON.
-
-<Note>
-  Unlike most other endpoints, this endpoint always returns structured JSON. If the underlying operation fails, the API will return a 500 error.
-</Note>
+Returns a list of all devices associated with your Alfred instance, including both pending pairing requests and already-paired devices.
 
 <RequestExample>
 
 ```bash cURL
-curl -X GET https://app.alfred.black/api/v1/devices \
-  -H "Authorization: Bearer YOUR_API_KEY"
+curl -X GET /api/v1/devices \
+  -H "Authorization: Bearer alf_your_key_here"
 ```
 
 </RequestExample>
@@ -23,13 +19,8 @@ curl -X GET https://app.alfred.black/api/v1/devices \
 
 ```json Response
 {
-  "pending": [],
-  "paired": []
+  "devices": []
 }
 ```
 
 </ResponseExample>
-
-<Note>
-  The response typically includes `pending` and `paired` arrays. The exact fields within each device object depend on the OpenClaw version.
-</Note>

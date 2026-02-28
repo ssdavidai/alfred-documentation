@@ -1,0 +1,47 @@
+---
+title: "Service Logs"
+description: "Get logs from a specific service"
+api: "GET /api/v1/admin/containers/{service}/logs"
+---
+
+Retrieve recent logs from a specific service. This endpoint returns a snapshot of log history and does not stream updates.
+
+## Path Parameters
+
+<ParamField path="service" type="string" required>
+  The service name to get logs from (e.g., "worker", "openclaw", "temporal"). Must contain only alphanumeric characters, hyphens, or underscores.
+</ParamField>
+
+## Query Parameters
+
+<ParamField query="tail" type="string" optional default="100">
+  Number of log lines to retrieve from the end of the log. Must be a numeric string.
+</ParamField>
+
+<RequestExample>
+
+```bash curl
+# Get last 100 lines from worker logs (default)
+curl -H "Authorization: Bearer alf_your_key_here" \
+  /api/v1/admin/containers/worker/logs
+
+# Get last 500 lines from OpenClaw logs
+curl -H "Authorization: Bearer alf_your_key_here" \
+  "/api/v1/admin/containers/openclaw/logs?tail=500"
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json
+{
+  "logs": "2026-02-26T10:15:20Z INFO - Alfred orchestrator starting\n2026-02-26T10:15:21Z INFO - Starting curator daemon\n2026-02-26T10:15:22Z INFO - Starting janitor daemon\n2026-02-26T10:15:23Z INFO - Starting distiller daemon\n2026-02-26T10:15:24Z INFO - All daemons running\n"
+}
+```
+
+</ResponseExample>
+
+<Note>
+  For real-time log streaming, use the `/api/v1/logs` SSE endpoint instead. This endpoint is designed for quick log inspection and debugging.
+</Note>

@@ -1,0 +1,140 @@
+---
+title: "Billing & Subscriptions"
+description: "How billing, subscription lifecycle, and instance provisioning work in Alfred Black."
+icon: "credit-card"
+---
+
+## Overview
+
+Alfred Black is a managed service. When you subscribe, a dedicated cloud instance is provisioned for you automatically. Your subscription controls the lifecycle of that instance -- from creation through suspension and eventual destruction if you cancel.
+
+## Plans
+
+| Plan | Price | Infrastructure |
+|------|-------|---------------|
+| **Alfred Premium** | $249/mo | Dedicated cx53 instance (8 CPU, 32GB RAM) |
+| **Alfred Black** | Custom pricing | White-glove concierge service, same cx53 infrastructure |
+
+Both plans include the full Alfred stack: Curator, Janitor, Distiller, Surveyor, OpenClaw gateway, and Temporal workflow engine.
+
+## Subscription lifecycle
+
+Your subscription moves through a series of states that control your instance:
+
+```
+Signup -> Payment -> Provisioning -> Running -> (Cancel) -> Suspended -> Destroyed
+```
+
+### 1. Signup and payment
+
+When you subscribe through [Alfred Black](https://alfred.black), payment is processed via Polar. Once the first payment succeeds, provisioning begins automatically.
+
+### 2. Provisioning
+
+After payment, Alfred creates a dedicated cloud instance for you. This takes a few minutes. You can watch the progress from your dashboard -- the provisioning screen shows each step as it completes:
+
+- Server creation
+- DNS configuration
+- Software installation
+- Service startup
+- Health verification
+
+### 3. Running
+
+Once provisioning finishes, your instance is live. You have full access to:
+
+- The dashboard at [app.alfred.black](https://app.alfred.black)
+- The Alfred API via your API keys
+- All four AI agents (Curator, Janitor, Distiller, Surveyor)
+- OpenClaw device pairing
+- Temporal workflows and schedules
+
+### 4. Cancellation
+
+If you cancel your subscription, two things happen:
+
+- Your subscription status changes to **cancel at period end**, meaning you retain access until the end of your current billing period.
+- Once the billing period ends, the subscription status moves to **deleted**.
+
+### 5. Suspension
+
+When a subscription is deleted and the instance is still running, Alfred suspends the instance. Suspension stops all containers on the instance but preserves your data.
+
+<Warning>
+  A suspended instance has a **30-day grace period**. During this time, your data remains intact and you can reactivate by resubscribing.
+</Warning>
+
+### 6. Destruction
+
+After the 30-day grace period, suspended instances are marked for destruction. The instance and its resources are permanently removed.
+
+### 7. Reprovisioning
+
+If you resubscribe after your instance was destroyed, Alfred provisions a brand new instance for you. The previous instance's data is not recoverable after destruction, so resubscribe within the grace period if you want to keep your data.
+
+## Managing your subscription
+
+1. Go to your [Alfred Black dashboard](https://app.alfred.black)
+2. Navigate to **Settings**
+3. Under the **Subscription** card, click **Manage Subscription**
+
+This opens the Polar customer portal where you can:
+
+- Update your payment method
+- View billing history and invoices
+- Cancel or reactivate your subscription
+
+Your current plan and subscription status are displayed on the Settings page under the **Account** card.
+
+## API key management
+
+API keys let you access the Alfred API from scripts, automations, and integrations. Manage them from **Settings** in your dashboard.
+
+1. Navigate to **Settings**
+2. Scroll to the **API Keys** section
+3. Click **Create Key** and give it a descriptive name
+4. Copy the key immediately -- it is only shown once
+
+You can view all your keys, see when each was last used, and revoke keys you no longer need.
+
+<Tip>
+  For detailed API key usage including code examples, see the [API Keys guide](/guides/api-keys).
+</Tip>
+
+## Subscription statuses
+
+| Status | Meaning |
+|--------|---------|
+| **Active** | Subscription is current, instance is running |
+| **Cancel at period end** | Cancellation requested, access continues until billing period ends |
+| **Past due** | Payment failed, will retry |
+| **Deleted** | Subscription ended, instance will be suspended |
+
+## Frequently asked questions
+
+<AccordionGroup>
+  <Accordion title="Can I switch plans?">
+    Contact support to switch between Alfred Premium and Alfred Black. Plan changes are handled through the Polar customer portal.
+  </Accordion>
+
+  <Accordion title="What happens to my data when I cancel?">
+    Your data is preserved for 30 days after your subscription ends. During this grace period, resubscribing will restore access to your existing instance. After 30 days, the instance is permanently destroyed.
+  </Accordion>
+
+  <Accordion title="Can I get my data back after destruction?">
+    No. Once an instance is destroyed after the 30-day grace period, the data cannot be recovered. If you resubscribe, a fresh instance is provisioned.
+  </Accordion>
+
+  <Accordion title="What if my payment fails?">
+    Your subscription moves to a **past due** state. Polar will retry the payment. If it continues to fail, the subscription will eventually be canceled.
+  </Accordion>
+</AccordionGroup>
+
+<Columns cols={2}>
+  <Card title="API Keys" icon="key" href="/guides/api-keys">
+    Create and manage API keys for your instance
+  </Card>
+  <Card title="Your Dashboard" icon="layout-dashboard" href="/guides/your-dashboard">
+    Tour of dashboard features
+  </Card>
+</Columns>

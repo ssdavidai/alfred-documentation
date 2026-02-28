@@ -4,7 +4,7 @@ description: "Get detailed information about a specific workflow execution"
 api: "GET /api/v1/workflows/{wfId}"
 ---
 
-Returns detailed information about a workflow execution from `temporal workflow describe --output json`. If the output is a single JSON object, it is returned parsed. Otherwise, JSONL lines are parsed into an array.
+Retrieve detailed information about a specific workflow execution, including its configuration, current status, and timing. If no `run_id` is specified, the most recent run is returned.
 
 <ParamField path="wfId" type="string" required>
   The workflow ID to describe
@@ -18,13 +18,13 @@ Returns detailed information about a workflow execution from `temporal workflow 
 ```bash cURL
 # Describe latest run
 curl -X GET \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  https://app.alfred.black/api/v1/workflows/curator-sweep-20260226-143022
+  -H "Authorization: Bearer alf_your_key_here" \
+  /api/v1/workflows/curator-sweep-20260226-143022
 
 # Describe specific run
 curl -X GET \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  "https://app.alfred.black/api/v1/workflows/curator-sweep-20260226-143022?run_id=f47ac10b-58cc-4372-a567-0e02b2c3d479"
+  -H "Authorization: Bearer alf_your_key_here" \
+  "/api/v1/workflows/curator-sweep-20260226-143022?run_id=f47ac10b-58cc-4372-a567-0e02b2c3d479"
 ```
 </RequestExample>
 
@@ -50,7 +50,3 @@ curl -X GET \
 }
 ```
 </ResponseExample>
-
-<Note>
-  The response structure is determined by the Temporal CLI's output. The exact fields may vary across Temporal versions.
-</Note>

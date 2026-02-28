@@ -15,14 +15,14 @@ Revokes specific role-based access for a paired device without fully removing it
 </ParamField>
 
 <ParamField body="role" type="string" required>
-  The role to revoke from the device. Valid values: `agent`, `user`, `admin`. This field is required and will return a validation error if omitted.
+  The role to revoke from the device. Valid values: `agent`, `user`, `admin`.
 </ParamField>
 
 <RequestExample>
 
 ```bash cURL
-curl -X POST https://app.alfred.black/api/v1/devices/dev_x9y8z7w6v5/revoke \
-  -H "Authorization: Bearer YOUR_API_KEY" \
+curl -X POST /api/v1/devices/dev_x9y8z7w6v5/revoke \
+  -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
   -d '{
     "role": "admin"
@@ -51,5 +51,5 @@ curl -X POST https://app.alfred.black/api/v1/devices/dev_x9y8z7w6v5/revoke \
 </ResponseExample>
 
 <ResponseField name="message" type="string">
-  Human-readable status message confirming access has been revoked.
+  A status message confirming the role access was revoked.
 </ResponseField>

@@ -1,0 +1,84 @@
+---
+title: "FAQ"
+description: "Common questions and troubleshooting for Alfred Black."
+icon: "circle-question"
+---
+
+## General
+
+<AccordionGroup>
+
+<Accordion title="How long until inbox items are processed?">
+Usually 10-60 seconds. The Curator agent watches for new inbox items and processes them automatically. If processing seems delayed, check that the Curator is running via your dashboard or `GET /api/v1/workers/status`.
+</Accordion>
+
+<Accordion title="Can I edit records Alfred created?">
+Yes. You can create, edit, move, and delete records via the API. Use `PATCH /api/v1/vault/records/{path}` to edit a record's metadata or content, or `POST /api/v1/vault/records/{path}/move` to rename or retype it. See the [Vault API Reference](/api-reference/vault/create-record) for details.
+</Accordion>
+
+<Accordion title="What happens if I delete a record?">
+The record is permanently removed from your vault. Any connections from other records that pointed to the deleted record will become broken links. The Janitor will flag these during its next scan and can fix them automatically.
+</Accordion>
+
+<Accordion title="How do I see what Alfred did?">
+Check agent history via the API:
+- **Janitor history:** `GET /api/v1/workers/janitor/history`
+- **Distiller history:** `GET /api/v1/workers/distiller/history`
+
+You can also browse recently created or updated records in your dashboard vault browser.
+</Accordion>
+
+<Accordion title="What AI models does Alfred use?">
+Alfred uses state-of-the-art AI models optimized for knowledge extraction. The models are selected and managed automatically — you don't need to configure anything.
+</Accordion>
+
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+
+<Accordion title="Why isn't my inbox processing?">
+1. **Check Curator status** — Go to your dashboard Command Center or call `GET /api/v1/workers/status`
+2. **Restart the Curator** — Try `POST /api/v1/workers/restart`
+3. **Manual processing** — Trigger manual processing with `POST /api/v1/workers/process`
+
+If the issue persists, check your instance health at `GET /api/v1/admin/health`.
+</Accordion>
+
+<Accordion title="How many API keys can I create?">
+Up to 10 per account. You can manage your keys in **Settings → API Keys** in your dashboard. Revoke keys you no longer need to free up slots.
+</Accordion>
+
+<Accordion title="Is my data backed up?">
+Yes. Your instance runs daily automatic encrypted backups. You don't need to manage backups yourself.
+</Accordion>
+
+<Accordion title="Can I use Obsidian to view my vault?">
+Yes! Your vault is fully Obsidian-compatible. Pair your device to access it directly. See the [Device Pairing guide](/guides/device-pairing) for instructions on connecting Obsidian to your instance.
+</Accordion>
+
+<Accordion title="My vault has broken links or structural issues">
+Run a Janitor scan and fix:
+1. Scan for issues: `POST /api/v1/workers/janitor/scan`
+2. Fix found issues: `POST /api/v1/workers/janitor/fix`
+
+The Janitor also runs periodic scans automatically to catch issues early.
+</Accordion>
+
+<Accordion title="How do I extract knowledge from existing records?">
+Use the Distiller:
+1. Scan for extractable knowledge: `POST /api/v1/workers/distiller/scan`
+2. Run extraction: `POST /api/v1/workers/distiller/run`
+
+The Distiller will create learning records (assumptions, decisions, constraints, contradictions, syntheses) from your existing vault content.
+</Accordion>
+
+</AccordionGroup>
+
+## Getting help
+
+If you can't find the answer here, check:
+- [API Reference](/api-reference/introduction) — Full endpoint documentation
+- [Your AI Agents guide](/guides/your-ai-agents) — Agent troubleshooting
+- [Monitoring guide](/guides/monitoring) — Instance health and diagnostics

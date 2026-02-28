@@ -1,0 +1,38 @@
+---
+title: "List Sessions"
+description: "List agent sessions"
+api: "GET /api/v1/openclaw/sessions"
+---
+
+List all agent sessions on your instance. Sessions represent active or recent conversations between your Alfred tools and the AI agent backend.
+
+The response is returned as structured JSON when available, or as raw text in a `raw` field.
+
+<RequestExample>
+
+```bash cURL
+curl -X GET /api/v1/openclaw/sessions \
+  -H "Authorization: Bearer alf_your_key_here"
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Structured Response
+{
+  "...": "Structure depends on gateway sessions output"
+}
+```
+
+```json Raw Response
+{
+  "raw": "No active sessions"
+}
+```
+
+</ResponseExample>
+
+<Note>
+  The response format depends on the gateway's output. If the gateway returns valid JSON, it is passed through as-is. Otherwise, the raw text is returned in a `raw` field.
+</Note>

@@ -1,19 +1,17 @@
 ---
 title: "Get Vault Context"
-description: "Returns the output of the alfred vault context CLI command"
+description: "Get an overview of your vault — record counts, recent activity, and statistics."
 api: "GET /api/v1/vault/context"
 ---
 
 ## Overview
 
-Returns the output of `alfred vault context`. If the CLI returns valid JSON, it is passed through directly. Otherwise, the raw text output is wrapped in a `{ "raw": "..." }` object.
+Returns a summary of your vault including record counts by type, recent activity, and overall statistics. Use this to get a quick snapshot of your vault's current state.
 
 ## Response
 
-The response structure depends on the `alfred vault context` CLI output.
-
 <ResponseField name="raw" type="string">
-  If the CLI output is not valid JSON, the raw text output is returned in this field. If the CLI does return valid JSON, the parsed JSON is returned directly instead (structure varies).
+  Summary of your vault as human-readable text. If the response is structured JSON, it is returned directly instead.
 </ResponseField>
 
 ## Request Example
@@ -21,16 +19,15 @@ The response structure depends on the `alfred vault context` CLI output.
 <RequestExample>
 
 ```bash cURL
-curl -X GET \
-  https://app.alfred.black/api/v1/vault/context \
-  -H "Authorization: Bearer YOUR_API_KEY"
+curl -X GET /api/v1/vault/context \
+  -H "Authorization: Bearer alf_your_key_here"
 ```
 
 ```javascript JavaScript
-const response = await fetch('https://app.alfred.black/api/v1/vault/context', {
+const response = await fetch('/api/v1/vault/context', {
   method: 'GET',
   headers: {
-    'Authorization': 'Bearer YOUR_API_KEY'
+    'Authorization': 'Bearer alf_your_key_here'
   }
 });
 
@@ -44,7 +41,7 @@ console.log(context);
 
 <ResponseExample>
 
-```json 200 OK (raw text fallback)
+```json 200 OK
 {
   "raw": "127 records across 18 types.\n\nMost recent activity: 3 tasks updated today, 2 people added this week."
 }

@@ -1,0 +1,117 @@
+---
+title: "List Agents"
+description: "Get the model configuration and status for all agents."
+api: "GET /api/v1/admin/agents"
+---
+
+Returns a summary of every agent on your instance. This includes the four OpenClaw agents (Alfred, Curator, Janitor, Distiller) and the Surveyor pipeline configuration.
+
+Use [Get Agent](/api-reference/agents/get-agent) to retrieve the full model status for a single agent.
+
+## Response
+
+<ResponseField name="agents" type="array">
+  List of agent summary objects, one per OpenClaw agent.
+
+  <Expandable title="Agent object properties">
+    <ResponseField name="id" type="string">
+      Agent identifier. One of `main`, `vault-curator`, `vault-janitor`, `vault-distiller`.
+    </ResponseField>
+
+    <ResponseField name="label" type="string">
+      Human-readable agent name (e.g., "Alfred", "Curator").
+    </ResponseField>
+
+    <ResponseField name="description" type="string">
+      Brief description of what the agent does.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="surveyor" type="object">
+  Surveyor pipeline model configuration (configured via `config.yaml`, not OpenClaw).
+
+  <Expandable title="Surveyor object properties">
+    <ResponseField name="labeler_model" type="string">
+      Model used for cluster labeling. Defaults to `x-ai/grok-4.1-fast`.
+    </ResponseField>
+
+    <ResponseField name="embedder_model" type="string">
+      Model used for embedding vault records. Defaults to `nomic-embed-text`.
+    </ResponseField>
+
+    <ResponseField name="embedder_source" type="string">
+      Where embeddings are generated. Either `ollama` (local) or `openrouter` (remote).
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X GET /api/v1/admin/agents \
+  -H "Authorization: Bearer alf_your_key_here"
+```
+
+```javascript JavaScript
+const response = await fetch('/api/v1/admin/agents', {
+  method: 'GET',
+  headers: {
+    'Authorization': 'Bearer alf_your_key_here'
+  }
+});
+
+const data = await response.json();
+console.log(data.agents);
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "agents": [
+    {
+      "id": "main",
+      "label": "Alfred",
+      "description": "Default agent for device interactions"
+    },
+    {
+      "id": "vault-curator",
+      "label": "Curator",
+      "description": "Processes inbox into structured vault records"
+    },
+    {
+      "id": "vault-janitor",
+      "label": "Janitor",
+      "description": "Scans vault for structural issues and fixes them"
+    },
+    {
+      "id": "vault-distiller",
+      "label": "Distiller",
+      "description": "Extracts latent knowledge from operational records"
+    }
+  ],
+  "surveyor": {
+    "labeler_model": "x-ai/grok-4.1-fast",
+    "embedder_model": "nomic-embed-text",
+    "embedder_source": "ollama"
+  }
+}
+```
+
+```json 401 Unauthorized
+{
+  "error": {
+    "code": "UNAUTHORIZED",
+    "message": "Unauthorized"
+  }
+}
+```
+
+</ResponseExample>

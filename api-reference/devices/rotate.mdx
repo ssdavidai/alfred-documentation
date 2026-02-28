@@ -4,7 +4,7 @@ description: "Rotate authentication token for a paired device"
 api: "POST /api/v1/devices/{deviceId}/rotate"
 ---
 
-Rotates the authentication token for a paired device. The device will need to re-authenticate with the new token. Optionally update the device scope during rotation.
+Rotates the authentication token for a paired device. After rotation, the device will need to re-authenticate with the new token. You can optionally update the device scope during rotation.
 
 <Note>
   This endpoint uses `deviceId` in the URL path (not `requestId`). This is the identifier of an already-paired device.
@@ -15,7 +15,7 @@ Rotates the authentication token for a paired device. The device will need to re
 </ParamField>
 
 <ParamField body="role" type="string" required>
-  The role to assign to the device. Valid values: `agent`, `user`, `admin`. This field is required and will return a validation error if omitted.
+  The role to assign to the device. Valid values: `agent`, `user`, `admin`.
 </ParamField>
 
 <ParamField body="scope" type="string" optional>
@@ -25,8 +25,8 @@ Rotates the authentication token for a paired device. The device will need to re
 <RequestExample>
 
 ```bash With Scope
-curl -X POST https://app.alfred.black/api/v1/devices/dev_a1b2c3d4e5/rotate \
-  -H "Authorization: Bearer YOUR_API_KEY" \
+curl -X POST /api/v1/devices/dev_a1b2c3d4e5/rotate \
+  -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
   -d '{
     "role": "agent",
@@ -35,8 +35,8 @@ curl -X POST https://app.alfred.black/api/v1/devices/dev_a1b2c3d4e5/rotate \
 ```
 
 ```bash Role Only
-curl -X POST https://app.alfred.black/api/v1/devices/dev_a1b2c3d4e5/rotate \
-  -H "Authorization: Bearer YOUR_API_KEY" \
+curl -X POST /api/v1/devices/dev_a1b2c3d4e5/rotate \
+  -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
   -d '{
     "role": "agent"
@@ -65,5 +65,5 @@ curl -X POST https://app.alfred.black/api/v1/devices/dev_a1b2c3d4e5/rotate \
 </ResponseExample>
 
 <ResponseField name="message" type="string">
-  Human-readable status message confirming the token has been rotated.
+  A status message confirming the token was rotated.
 </ResponseField>

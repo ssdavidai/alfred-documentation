@@ -1,0 +1,121 @@
+---
+title: "Record Format"
+description: "How vault records are structured — metadata, content, and connections."
+icon: "database"
+---
+
+## Overview
+
+Every record in your vault is a structured document with metadata, content, and connections to other records. This page explains the format so you can work with records via the API.
+
+## Record structure
+
+Each record has three parts:
+
+1. **Metadata** — Type, status, dates, tags, and other properties
+2. **Content** — The main body text with details and context
+3. **Connections** — Links to other records using the `[[type/Record Name]]` format
+
+Here's an annotated example:
+
+```markdown
+---
+type: person                          # What kind of record
+created: 2026-02-26                   # When it was created
+name: Alice Smith                     # Display name
+status: active                        # Current status
+org: "[[org/Acme Corp]]"              # Connection to an org record
+email: alice@acme.com                 # Custom field
+tags: [engineering, backend]          # Tags for categorization
+---
+
+# Alice Smith
+
+Senior backend engineer who joined Acme in 2025.
+Leads the [[project/Platform v2]] migration effort.
+```
+
+## Common fields
+
+These fields are shared across all record types:
+
+| Field | Description | Required |
+|-------|-------------|----------|
+| `type` | Record type identifier (e.g., `person`, `task`) | Yes |
+| `created` | Creation date | Yes |
+| `name` | Display name (most types) | No |
+| `subject` | Display name for `conversation` and `input` types | No |
+| `status` | Current status (valid values depend on type) | No |
+| `owner` | Who is responsible (connection to a person) | No |
+| `tags` | Array of categorization tags | No |
+| `related` | Array of connections to other records | No |
+
+<Note>
+  Only `type` and `created` are strictly required. All other fields are optional.
+</Note>
+
+## Connections
+
+Records connect to each other using this format:
+
+```
+[[type/Record Name]]
+```
+
+For example:
+- `[[person/Alice Smith]]` — links to a person record
+- `[[project/Q1 Launch]]` — links to a project record
+- `[[org/Acme Corp]]` — links to an organization record
+
+<Warning>
+  The type prefix is required. `[[Alice Smith]]` won't work — it must be `[[person/Alice Smith]]`.
+</Warning>
+
+Connections can appear in metadata fields (like `org`, `owner`, `participants`) or in the content body.
+
+## Status values by type
+
+Each record type has its own set of valid status values:
+
+| Type | Valid Statuses |
+|------|---------------|
+| `person` | `active`, `inactive` |
+| `org` | `active`, `inactive` |
+| `project` | `active`, `paused`, `completed`, `abandoned`, `proposed` |
+| `task` | `todo`, `active`, `blocked`, `done`, `cancelled` |
+| `event` | _(no status constraint)_ |
+| `note` | `draft`, `active`, `review`, `final` |
+| `location` | `active`, `inactive` |
+| `process` | `active`, `proposed`, `design`, `deprecated` |
+| `account` | `active`, `suspended`, `closed`, `pending` |
+| `asset` | `active`, `retired`, `maintenance`, `disposed` |
+| `conversation` | `active`, `waiting`, `resolved`, `closed`, `archived` |
+| `input` | `unprocessed`, `processed`, `deferred` |
+| `run` | `active`, `completed`, `blocked`, `cancelled` |
+| `session` | `active`, `completed` |
+| `assumption` | `active`, `challenged`, `invalidated`, `confirmed` |
+| `decision` | `draft`, `final`, `superseded`, `reversed` |
+| `constraint` | `active`, `expired`, `waived`, `superseded` |
+| `contradiction` | `unresolved`, `resolved`, `accepted` |
+| `synthesis` | `draft`, `active`, `superseded` |
+
+## List fields
+
+Some fields accept multiple values as arrays:
+
+`tags`, `aliases`, `related`, `relationships`, `participants`, `outputs`, `depends_on`, `blocked_by`, `based_on`, `supports`, `challenged_by`, `approved_by`, `confirmed_by`, `invalidated_by`, `governed_by`, `references`, `project`
+
+## Schema API endpoint
+
+You can retrieve the complete, up-to-date schema programmatically:
+
+```bash
+curl -H "Authorization: Bearer alf_your_key_here" \
+  /api/v1/vault/schema
+```
+
+This returns all record types, valid status values, and field definitions as JSON.
+
+<Tip>
+  The schema endpoint is always the authoritative source for record format details. If anything on this page seems outdated, trust the API response.
+</Tip>

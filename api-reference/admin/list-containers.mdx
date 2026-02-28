@@ -1,0 +1,64 @@
+---
+title: "List Services"
+description: "List all services running on your instance"
+api: "GET /api/v1/admin/containers"
+---
+
+Retrieve the status of all services running on your Alfred instance. Returns an array of service objects with their current state.
+
+<RequestExample>
+
+```bash curl
+curl -H "Authorization: Bearer alf_your_key_here" \
+  /api/v1/admin/containers
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json
+[
+  {
+    "Name": "alfred-init-1",
+    "Service": "init",
+    "State": "exited",
+    "Health": "",
+    "ExitCode": 0
+  },
+  {
+    "Name": "alfred-worker-1",
+    "Service": "worker",
+    "State": "running",
+    "Health": "healthy",
+    "ExitCode": 0
+  },
+  {
+    "Name": "alfred-openclaw-1",
+    "Service": "openclaw",
+    "State": "running",
+    "Health": "",
+    "ExitCode": 0
+  },
+  {
+    "Name": "alfred-temporal-1",
+    "Service": "temporal",
+    "State": "running",
+    "Health": "healthy",
+    "ExitCode": 0
+  },
+  {
+    "Name": "alfred-temporal-ui-1",
+    "Service": "temporal-ui",
+    "State": "running",
+    "Health": "",
+    "ExitCode": 0
+  }
+]
+```
+
+</ResponseExample>
+
+<Note>
+  Field names use PascalCase. The init service typically shows `State: "exited"` with `ExitCode: 0` after successful vault initialization.
+</Note>

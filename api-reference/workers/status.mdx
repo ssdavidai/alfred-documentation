@@ -1,20 +1,16 @@
 ---
 title: "Get Worker Status"
-description: "Retrieve the overall status of all Alfred daemon workers"
+description: "Get the status of all your AI agents"
 api: "GET /api/v1/workers/status"
 ---
 
-Returns the current operational status of all Alfred workers (curator, janitor, distiller, surveyor). This endpoint returns the raw text output from `alfred status`.
-
-<Note>
-  This endpoint always returns raw text output from `alfred status`, not structured JSON. The response contains a single `raw` field with the status text.
-</Note>
+Returns the current operational status of all AI agents (Curator, Janitor, Distiller, Surveyor). Use this to check which agents are running and their current state.
 
 <RequestExample>
 
 ```bash cURL
-curl -X GET https://app.alfred.black/api/v1/workers/status \
-  -H "Authorization: Bearer YOUR_API_KEY"
+curl -X GET /api/v1/workers/status \
+  -H "Authorization: Bearer alf_your_key_here"
 ```
 
 </RequestExample>
@@ -23,12 +19,12 @@ curl -X GET https://app.alfred.black/api/v1/workers/status \
 
 ```json Response
 {
-  "raw": "curator: running\njanitor: running\ndistiller: stopped\nsurveyor: not configured"
+  "raw": "curator: running\njanitor: running\ndistiller: stopped"
 }
 ```
 
 </ResponseExample>
 
 <ResponseField name="raw" type="string">
-  Raw text output from `alfred status`. Contains per-worker status information as human-readable text.
+  Per-agent status information as human-readable text.
 </ResponseField>

@@ -1,16 +1,16 @@
 ---
 title: "Stop Workers"
-description: "Stop all Alfred daemon workers"
+description: "Stop all AI agents"
 api: "POST /api/v1/workers/down"
 ---
 
-Gracefully stops all running Alfred daemon workers.
+Gracefully stops all running AI agents. Any in-progress work will be completed before the agents shut down.
 
 <RequestExample>
 
 ```bash cURL
-curl -X POST https://app.alfred.black/api/v1/workers/down \
-  -H "Authorization: Bearer YOUR_API_KEY" \
+curl -X POST /api/v1/workers/down \
+  -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json"
 ```
 
@@ -27,5 +27,5 @@ curl -X POST https://app.alfred.black/api/v1/workers/down \
 </ResponseExample>
 
 <ResponseField name="message" type="string">
-  Human-readable status message confirming workers have been stopped.
+  Confirmation that all agents have been stopped.
 </ResponseField>

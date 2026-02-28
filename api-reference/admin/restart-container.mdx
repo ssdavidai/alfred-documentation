@@ -1,0 +1,41 @@
+---
+title: "Restart Service"
+description: "Restart a specific service on your instance"
+api: "POST /api/v1/admin/containers/{service}/restart"
+---
+
+Restart a specific service on your Alfred instance. The service will be stopped and then started again.
+
+## Path Parameters
+
+<ParamField path="service" type="string" required>
+  The service name to restart (e.g., "worker", "openclaw", "temporal"). Must contain only alphanumeric characters, hyphens, or underscores.
+</ParamField>
+
+<RequestExample>
+
+```bash curl
+# Restart the Alfred worker
+curl -X POST -H "Authorization: Bearer alf_your_key_here" \
+  /api/v1/admin/containers/worker/restart
+
+# Restart OpenClaw gateway
+curl -X POST -H "Authorization: Bearer alf_your_key_here" \
+  /api/v1/admin/containers/openclaw/restart
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json
+{
+  "message": "Container \"worker\" restarted"
+}
+```
+
+</ResponseExample>
+
+<Warning>
+  Restarting the worker service will interrupt any active agent operations. Restarting temporal may briefly disrupt workflow execution.
+</Warning>

@@ -1,12 +1,12 @@
 ---
 title: "List Records by Type"
-description: "List all records of a specific type"
+description: "List all vault records of a specific type."
 api: "GET /api/v1/vault/list/{type}"
 ---
 
 ## Overview
 
-Returns a list of all records for a given type. The type must be one of the 19 types hardcoded in the API. The endpoint runs `alfred vault list <type>` and returns the CLI output.
+Returns a list of all records of a given type (e.g., `person`, `task`, `decision`). Use this to browse records by category.
 
 ## Path Parameters
 
@@ -18,10 +18,8 @@ Returns a list of all records for a given type. The type must be one of the 19 t
 
 ## Response
 
-The response structure depends on the `alfred vault list` CLI output. If the CLI returns valid JSON, it is passed through directly. Otherwise, the raw text output is wrapped in a `{ "raw": "..." }` object.
-
 <ResponseField name="raw" type="string">
-  If the CLI output is not valid JSON, the raw text output is returned in this field.
+  List of records as text. If the output is structured JSON, it is returned directly instead.
 </ResponseField>
 
 ## Request Example
@@ -29,18 +27,17 @@ The response structure depends on the `alfred vault list` CLI output. If the CLI
 <RequestExample>
 
 ```bash cURL
-curl -X GET \
-  https://app.alfred.black/api/v1/vault/list/person \
-  -H "Authorization: Bearer YOUR_API_KEY"
+curl -X GET /api/v1/vault/list/person \
+  -H "Authorization: Bearer alf_your_key_here"
 ```
 
 ```javascript JavaScript
 const type = 'person';
 
-const response = await fetch(`https://app.alfred.black/api/v1/vault/list/${type}`, {
+const response = await fetch(`/api/v1/vault/list/${type}`, {
   method: 'GET',
   headers: {
-    'Authorization': 'Bearer YOUR_API_KEY'
+    'Authorization': 'Bearer alf_your_key_here'
   }
 });
 
@@ -54,7 +51,7 @@ console.log(data);
 
 <ResponseExample>
 
-```json 200 OK (raw text fallback)
+```json 200 OK
 {
   "raw": "person/Alice Chen.md\nperson/Bob Martinez.md\nperson/Carol Zhang.md"
 }

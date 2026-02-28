@@ -1,0 +1,34 @@
+---
+title: "Instance Health"
+description: "Check the overall health of your Alfred instance"
+api: "GET /api/v1/admin/health"
+---
+
+Check the health of your Alfred instance. Returns key metrics including service status, disk usage, and memory usage.
+
+<RequestExample>
+
+```bash curl
+curl -H "Authorization: Bearer alf_your_key_here" \
+  /api/v1/admin/health
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json
+{
+  "status": "ok",
+  "containers": 5,
+  "unhealthy": 0,
+  "disk_percent": 45,
+  "memory_percent": 62
+}
+```
+
+</ResponseExample>
+
+<Note>
+  The response structure may vary depending on your instance configuration. The example above is representative but may differ. If the health check produces non-JSON output, the response will be `{ "raw": "..." }` instead.
+</Note>

@@ -1,0 +1,38 @@
+---
+title: "Security Audit"
+description: "Get agent gateway security configuration"
+api: "GET /api/v1/openclaw/security"
+---
+
+Run a security audit on your instance's agent gateway. This reviews the current security configuration and reports any findings or recommendations.
+
+The response is returned as structured JSON when available, or as raw text in a `raw` field.
+
+<RequestExample>
+
+```bash cURL
+curl -X GET /api/v1/openclaw/security \
+  -H "Authorization: Bearer alf_your_key_here"
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Structured Response
+{
+  "...": "Structure depends on gateway security output"
+}
+```
+
+```json Raw Response
+{
+  "raw": "Security audit complete: no issues found"
+}
+```
+
+</ResponseExample>
+
+<Note>
+  The response format depends on the gateway's output. If the gateway returns valid JSON, it is passed through as-is. Otherwise, the raw text is returned in a `raw` field.
+</Note>

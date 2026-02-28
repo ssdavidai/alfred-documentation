@@ -1,12 +1,12 @@
 ---
 title: "Create Record"
-description: "Create a new vault record"
+description: "Create a new vault record."
 api: "POST /api/v1/vault/records"
 ---
 
 ## Overview
 
-Creates a new record in the vault with the specified type, name, frontmatter fields, and markdown body. The endpoint runs `alfred vault create` and returns the CLI output.
+Creates a new record in your vault with the specified type, name, metadata fields, and content body.
 
 ## Body Parameters
 
@@ -15,27 +15,23 @@ Creates a new record in the vault with the specified type, name, frontmatter fie
 </ParamField>
 
 <ParamField body="name" type="string" required>
-  Display name for the record. This becomes the filename (e.g., `Alice Chen` becomes `person/Alice Chen.md`).
+  Display name for the record. This becomes the filename (e.g., `Alice Chen` creates `person/Alice Chen.md`).
 </ParamField>
 
 <ParamField body="fields" type="object" optional>
-  Key-value pairs for frontmatter metadata.
+  Key-value pairs for record metadata. For example: `{"status": "active", "org": "[[org/Acme Corp]]"}`.
 </ParamField>
 
 <ParamField body="body" type="string" optional>
-  Markdown body content (everything after frontmatter).
-</ParamField>
-
-<ParamField body="scope" type="string" optional>
-  Operation scope for authorization (`curator`, `janitor`, `distiller`). Defaults to no scope restrictions.
+  Content body for the record (everything after the metadata).
 </ParamField>
 
 ## Response
 
-Returns status `201 Created`. The response structure depends on the `alfred vault create` CLI output. If the CLI returns valid JSON, it is passed through directly. Otherwise, the raw text output is wrapped in a `{ "raw": "..." }` object.
+Returns status `201 Created`.
 
 <ResponseField name="raw" type="string">
-  If the CLI output is not valid JSON, the raw text output is returned in this field.
+  Confirmation message. If the output is structured JSON, it is returned directly instead.
 </ResponseField>
 
 ## Request Example
@@ -43,9 +39,8 @@ Returns status `201 Created`. The response structure depends on the `alfred vaul
 <RequestExample>
 
 ```bash cURL
-curl -X POST \
-  https://app.alfred.black/api/v1/vault/records \
-  -H "Authorization: Bearer YOUR_API_KEY" \
+curl -X POST /api/v1/vault/records \
+  -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
   -d '{
     "type": "person",
@@ -60,10 +55,10 @@ curl -X POST \
 ```
 
 ```javascript JavaScript
-const response = await fetch('https://app.alfred.black/api/v1/vault/records', {
+const response = await fetch('/api/v1/vault/records', {
   method: 'POST',
   headers: {
-    'Authorization': 'Bearer YOUR_API_KEY',
+    'Authorization': 'Bearer alf_your_key_here',
     'Content-Type': 'application/json'
   },
   body: JSON.stringify({
@@ -88,7 +83,7 @@ console.log(result);
 
 <ResponseExample>
 
-```json 201 Created (raw text fallback)
+```json 201 Created
 {
   "raw": "Created person/Alice Chen.md"
 }
@@ -103,11 +98,11 @@ console.log(result);
 }
 ```
 
-```json 401 Unauthorized
+```json 409 Conflict
 {
   "error": {
-    "code": "UNAUTHORIZED",
-    "message": "Unauthorized"
+    "code": "CONFLICT",
+    "message": "Record already exists: person/Alice Chen.md"
   }
 }
 ```

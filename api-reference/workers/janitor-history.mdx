@@ -1,10 +1,10 @@
 ---
 title: "Get Sweep History"
-description: "Retrieve janitor sweep history"
+description: "View Janitor scan history"
 api: "GET /api/v1/workers/janitor/history"
 ---
 
-Returns a chronological history of janitor sweeps.
+Returns a chronological history of Janitor vault health scans, including how many issues were found and fixed in each sweep.
 
 <ParamField query="limit" type="number" default={10}>
   Maximum number of sweep records to return.
@@ -13,26 +13,32 @@ Returns a chronological history of janitor sweeps.
 <RequestExample>
 
 ```bash Default Limit
-curl -X GET https://app.alfred.black/api/v1/workers/janitor/history \
-  -H "Authorization: Bearer YOUR_API_KEY"
+curl -X GET /api/v1/workers/janitor/history \
+  -H "Authorization: Bearer alf_your_key_here"
 ```
 
 ```bash Custom Limit
-curl -X GET "https://app.alfred.black/api/v1/workers/janitor/history?limit=25" \
-  -H "Authorization: Bearer YOUR_API_KEY"
+curl -X GET "/api/v1/workers/janitor/history?limit=25" \
+  -H "Authorization: Bearer alf_your_key_here"
 ```
 
 </RequestExample>
 
 <ResponseExample>
 
-```json Structured Response (if alfred outputs JSON)
+```json Structured Response
 {
-  "...": "Structure depends on alfred janitor history output"
+  "history": [
+    {
+      "timestamp": "2026-02-26T10:15:00Z",
+      "issues_found": 12,
+      "issues_fixed": 10
+    }
+  ]
 }
 ```
 
-```json Raw Response (if alfred outputs text)
+```json Raw Response
 {
   "raw": "Sweep history (last 10):\n..."
 }
@@ -41,9 +47,9 @@ curl -X GET "https://app.alfred.black/api/v1/workers/janitor/history?limit=25" \
 </ResponseExample>
 
 <Note>
-  The response format depends on the `alfred janitor history` command output. If the command outputs valid JSON, it is returned as-is. Otherwise, the raw text output is returned in a `raw` field.
+  If the response contains structured JSON, it is returned directly. Otherwise, the output is returned in a `raw` field.
 </Note>
 
 <ResponseField name="raw" type="string">
-  Raw text output from `alfred janitor history` when the output is not valid JSON. Only present when structured JSON parsing fails.
+  Human-readable output when structured JSON is not available.
 </ResponseField>

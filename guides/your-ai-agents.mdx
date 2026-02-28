@@ -1,0 +1,191 @@
+---
+title: "Your AI Agents"
+description: "How to monitor and control the Curator, Janitor, Distiller, and Surveyor."
+icon: "gears"
+---
+
+## Overview
+
+Alfred runs four AI agents that work continuously on your vault:
+
+| Agent | Role | Runs |
+|-------|------|------|
+| **Curator** | Processes inbox content into structured records | Automatically on new content |
+| **Janitor** | Scans for and fixes structural issues | Periodic sweeps |
+| **Distiller** | Extracts deeper knowledge from records | On-demand or scheduled |
+| **Surveyor** | Embeds records, clusters semantically, discovers relationships | On-demand or scheduled |
+
+## Checking agent status
+
+### From the dashboard
+
+Go to your [Alfred Black dashboard](https://app.alfred.black) and check the **Command Center** — it shows the current status of each agent at a glance.
+
+### Via the API
+
+```bash
+curl -s /api/v1/workers/status \
+  -H "Authorization: Bearer alf_your_key_here"
+```
+
+## Starting, stopping, and restarting
+
+### From the dashboard
+
+Use the agent controls on the **Command Center** or **Assistants** page to start, stop, or restart individual agents.
+
+### Via the API
+
+<CodeGroup>
+```bash Start all agents
+curl -X POST /api/v1/workers/up \
+  -H "Authorization: Bearer alf_your_key_here"
+```
+
+```bash Stop all agents
+curl -X POST /api/v1/workers/down \
+  -H "Authorization: Bearer alf_your_key_here"
+```
+
+```bash Restart all agents
+curl -X POST /api/v1/workers/restart \
+  -H "Authorization: Bearer alf_your_key_here"
+```
+</CodeGroup>
+
+## Curator — inbox processing
+
+The Curator watches your inbox and turns raw content into structured vault records.
+
+### Manual processing
+
+If you want the Curator to immediately process inbox items:
+
+```bash
+curl -X POST /api/v1/workers/process \
+  -H "Authorization: Bearer alf_your_key_here"
+```
+
+### Conversation import
+
+Import a conversation directly (bypasses the inbox):
+
+```bash
+curl -X POST /api/v1/workers/ingest \
+  -H "Authorization: Bearer alf_your_key_here" \
+  -H "Content-Type: application/json" \
+  -d '{"content": "Meeting with Alice about the Q1 launch..."}'
+```
+
+## Janitor — vault health
+
+The Janitor scans your vault for structural issues like broken links, missing metadata, and orphaned records.
+
+### Run a scan
+
+```bash
+curl -X POST /api/v1/workers/janitor/scan \
+  -H "Authorization: Bearer alf_your_key_here"
+```
+
+### Fix found issues
+
+After scanning, fix any issues the Janitor identified:
+
+```bash
+curl -X POST /api/v1/workers/janitor/fix \
+  -H "Authorization: Bearer alf_your_key_here"
+```
+
+### Check Janitor status
+
+```bash
+curl -s /api/v1/workers/janitor/status \
+  -H "Authorization: Bearer alf_your_key_here"
+```
+
+### View scan history
+
+```bash
+curl -s /api/v1/workers/janitor/history \
+  -H "Authorization: Bearer alf_your_key_here"
+```
+
+### Ignore specific files
+
+Tell the Janitor to skip certain files during scans:
+
+```bash
+curl -X POST /api/v1/workers/janitor/ignore \
+  -H "Authorization: Bearer alf_your_key_here" \
+  -H "Content-Type: application/json" \
+  -d '{"path": "note/Personal Notes.md"}'
+```
+
+## Distiller — knowledge extraction
+
+The Distiller analyzes your vault records and extracts latent knowledge: assumptions, decisions, constraints, contradictions, and synthesized insights.
+
+### Run a scan
+
+Identify records that could yield learning records:
+
+```bash
+curl -X POST /api/v1/workers/distiller/scan \
+  -H "Authorization: Bearer alf_your_key_here"
+```
+
+### Run extraction
+
+Execute the knowledge extraction process:
+
+```bash
+curl -X POST /api/v1/workers/distiller/run \
+  -H "Authorization: Bearer alf_your_key_here"
+```
+
+### Check Distiller status
+
+```bash
+curl -s /api/v1/workers/distiller/status \
+  -H "Authorization: Bearer alf_your_key_here"
+```
+
+### View extraction history
+
+```bash
+curl -s /api/v1/workers/distiller/history \
+  -H "Authorization: Bearer alf_your_key_here"
+```
+
+## Surveyor — knowledge mapping
+
+The Surveyor takes a different approach from the other agents. Instead of using the AI agent backend, it runs its own 4-stage pipeline: **Embed** (vectorize vault records), **Cluster** (group semantically similar records), **Label** (name the clusters using an LLM), and **Write** (add cluster tags and relationship links back to your vault).
+
+<Note>
+  The Surveyor does not use the same agent backend as the Curator, Janitor, and Distiller. It has its own dedicated pipeline and is configured separately via the Surveyor settings in your dashboard or config.
+</Note>
+
+## Troubleshooting
+
+**Inbox not processing?**
+1. Check the Curator status — is it running?
+2. Try restarting: `POST /api/v1/workers/restart`
+3. Try manual processing: `POST /api/v1/workers/process`
+
+**Vault has structural issues?**
+1. Run a Janitor scan: `POST /api/v1/workers/janitor/scan`
+2. Then fix: `POST /api/v1/workers/janitor/fix`
+
+**Want to extract knowledge?**
+1. Run a Distiller scan: `POST /api/v1/workers/distiller/scan`
+2. Then run extraction: `POST /api/v1/workers/distiller/run`
+
+<Columns cols={2}>
+  <Card title="Worker API Reference" icon="code" href="/api-reference/workers/status">
+    Full worker endpoint documentation
+  </Card>
+  <Card title="Monitoring" icon="chart-line" href="/guides/monitoring">
+    Monitor your instance health
+  </Card>
+</Columns>

@@ -1,32 +1,41 @@
 ---
 title: "Quickstart"
-description: "Go from zero to structured knowledge in 5 minutes"
+description: "Get up and running with Alfred Black in 5 minutes."
 icon: "rocket"
 ---
 
-In this quickstart, you'll upload a raw document, watch Alfred automatically extract people, decisions, and action items, and see your vault come to life.
+import AuthHeader from "/snippets/auth-header.mdx";
+import BaseUrl from "/snippets/base-url.mdx";
 
 ## Prerequisites
 
 Before you begin, make sure you have:
 
-- An Alfred account at [app.alfred.black](https://app.alfred.black)
-- An **API key** from **Settings > API Keys**
+- An **Alfred Black account** with an active subscription at [app.alfred.black](https://app.alfred.black)
+- An **API key** (we'll create one in Step 1)
 - `curl` or any HTTP client
 
-## Step 1: Verify your API key
+## Step 1: Create an API key
 
-Confirm your credentials work by pinging the vault schema endpoint:
+Go to your [Alfred Black dashboard](https://app.alfred.black), navigate to **Settings → API Keys**, click **Create**, give it a name, and copy the key. It starts with `alf_` and is shown only once.
+
+<Warning>
+  Copy your API key immediately — you won't be able to see it again. Store it somewhere safe.
+</Warning>
+
+## Step 2: Test connectivity
+
+Confirm your API key works by checking your instance health:
 
 <CodeGroup>
 ```bash cURL
-curl -s https://app.alfred.black/api/v1/vault/schema \
-  -H "Authorization: Bearer alf_YOUR_API_KEY" | jq .
+curl -s https://app.alfred.black/api/v1/admin/health \
+  -H "Authorization: Bearer alf_your_key_here" | jq .
 ```
 
 ```javascript JavaScript
-const res = await fetch('https://app.alfred.black/api/v1/vault/schema', {
-  headers: { 'Authorization': 'Bearer alf_YOUR_API_KEY' }
+const res = await fetch('https://app.alfred.black/api/v1/admin/health', {
+  headers: { 'Authorization': 'Bearer alf_your_key_here' }
 });
 console.log(await res.json());
 ```
@@ -35,378 +44,101 @@ console.log(await res.json());
 import requests
 
 res = requests.get(
-    'https://app.alfred.black/api/v1/vault/schema',
-    headers={'Authorization': 'Bearer alf_YOUR_API_KEY'}
+    'https://app.alfred.black/api/v1/admin/health',
+    headers={'Authorization': 'Bearer alf_your_key_here'}
 )
 print(res.json())
 ```
 </CodeGroup>
 
-You'll see a list of the 19 record types Alfred manages: `person`, `project`, `task`, `decision`, `conversation`, and more.
+You should see a JSON response with health status information.
 
-<Tip>
-If you get a 401 error, double-check your API key — copy it fresh from Settings.
-</Tip>
+## Step 3: Explore your vault schema
 
-## Step 2: Upload your first document
+See what record types Alfred manages:
 
-Upload a realistic meeting notes document to your inbox. The Curator AI will process it automatically:
+```bash
+curl -s https://app.alfred.black/api/v1/vault/schema \
+  -H "Authorization: Bearer alf_your_key_here" | jq .known_types
+```
 
-<CodeGroup>
-```bash cURL
+This returns all 19 record types -- from `person` and `project` to `assumption` and `decision`.
+
+## Step 4: Drop your first item into the inbox
+
+Upload a meeting note to the inbox. You can do this from your dashboard (**Inbox** page) or via the API:
+
+```bash
 curl -X POST https://app.alfred.black/api/v1/vault/inbox \
-  -H "Authorization: Bearer alf_YOUR_API_KEY" \
+  -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
   -d '{
-    "filename": "standup-2026-02-28.md",
-    "content": "# Team Standup 2026-02-28\n\nAttendees: Sarah Chen, Marcus Johnson, Priya Patel\n\n## Updates\n- Sarah: Finished the authentication refactor. Moving to payment integration next week.\n- Marcus: Database migration is 80% complete. Blocked on schema approval from compliance.\n- Priya: Shipped the mobile onboarding flow. Downloads up 23% this week.\n\n## Decisions\n- Moving to Postgres for the analytics pipeline (Marcus will lead)\n- Hiring two senior engineers — posting goes live Monday\n\n## Action Items\n- Sarah: Draft payment integration spec by Friday\n- Marcus: Schedule compliance review meeting\n- Priya: Write post-mortem for the onboarding A/B test"
+    "filename": "standup-2026-02-26.md",
+    "content": "# Daily Standup - Feb 26\n\nAttendees: Alice, Bob, Carol\n\n## Alice\n- Finished the auth migration (project: Platform v2)\n- Blocked on API rate limiting design\n- Decision: use token bucket algorithm\n\n## Bob\n- Reviewed PR #847 for Carol\n- Starting database indexing task\n\n## Carol\n- PR #847 ready for merge\n- Meeting with Design team tomorrow about dashboard redesign"
   }'
 ```
 
-```javascript JavaScript
-const res = await fetch('https://app.alfred.black/api/v1/vault/inbox', {
-  method: 'POST',
-  headers: {
-    'Authorization': 'Bearer alf_YOUR_API_KEY',
-    'Content-Type': 'application/json'
-  },
-  body: JSON.stringify({
-    filename: 'standup-2026-02-28.md',
-    content: `# Team Standup 2026-02-28
+## Step 5: Check what the Curator produced
 
-Attendees: Sarah Chen, Marcus Johnson, Priya Patel
-
-## Updates
-- Sarah: Finished the authentication refactor. Moving to payment integration next week.
-- Marcus: Database migration is 80% complete. Blocked on schema approval from compliance.
-- Priya: Shipped the mobile onboarding flow. Downloads up 23% this week.
-
-## Decisions
-- Moving to Postgres for the analytics pipeline (Marcus will lead)
-- Hiring two senior engineers — posting goes live Monday
-
-## Action Items
-- Sarah: Draft payment integration spec by Friday
-- Marcus: Schedule compliance review meeting
-- Priya: Write post-mortem for the onboarding A/B test`
-  })
-});
-console.log(await res.json());
-```
-
-```python Python
-import requests
-import json
-
-content = """# Team Standup 2026-02-28
-
-Attendees: Sarah Chen, Marcus Johnson, Priya Patel
-
-## Updates
-- Sarah: Finished the authentication refactor. Moving to payment integration next week.
-- Marcus: Database migration is 80% complete. Blocked on schema approval from compliance.
-- Priya: Shipped the mobile onboarding flow. Downloads up 23% this week.
-
-## Decisions
-- Moving to Postgres for the analytics pipeline (Marcus will lead)
-- Hiring two senior engineers — posting goes live Monday
-
-## Action Items
-- Sarah: Draft payment integration spec by Friday
-- Marcus: Schedule compliance review meeting
-- Priya: Write post-mortem for the onboarding A/B test"""
-
-res = requests.post(
-    'https://app.alfred.black/api/v1/vault/inbox',
-    headers={'Authorization': 'Bearer alf_YOUR_API_KEY'},
-    json={
-        'filename': 'standup-2026-02-28.md',
-        'content': content
-    }
-)
-print(res.json())
-```
-</CodeGroup>
-
-The document is now in your inbox. By default, the Curator processes new files once per minute, but we can speed things up.
-
-## Step 3: Trigger immediate processing
-
-Don't wait — process your document right now:
+Wait a few seconds for the Curator to process, then list records:
 
 <CodeGroup>
-```bash cURL
-curl -X POST https://app.alfred.black/api/v1/workers/process \
-  -H "Authorization: Bearer alf_YOUR_API_KEY"
+```bash List people
+curl -s https://app.alfred.black/api/v1/vault/list/person \
+  -H "Authorization: Bearer alf_your_key_here" | jq .
 ```
 
-```javascript JavaScript
-const res = await fetch('https://app.alfred.black/api/v1/workers/process', {
-  method: 'POST',
-  headers: { 'Authorization': 'Bearer alf_YOUR_API_KEY' }
-});
-console.log(await res.json());
+```bash List tasks
+curl -s https://app.alfred.black/api/v1/vault/list/task \
+  -H "Authorization: Bearer alf_your_key_here" | jq .
 ```
 
-```python Python
-import requests
-
-res = requests.post(
-    'https://app.alfred.black/api/v1/workers/process',
-    headers={'Authorization': 'Bearer alf_YOUR_API_KEY'}
-)
-print(res.json())
+```bash List decisions
+curl -s https://app.alfred.black/api/v1/vault/list/decision \
+  -H "Authorization: Bearer alf_your_key_here" | jq .
 ```
 </CodeGroup>
 
-The endpoint returns immediately, but processing runs in the background (typically 2-5 seconds). You'll see a response like:
+The Curator will have created records for the people mentioned, any tasks, decisions, and projects — all linked together.
 
-```json
-{
-  "raw": "Processing initiated. Check /api/v1/vault/list to see extracted records."
-}
+## Step 6: Check worker status
+
+See which agents are running:
+
+```bash
+curl -s https://app.alfred.black/api/v1/workers/status \
+  -H "Authorization: Bearer alf_your_key_here"
 ```
 
-## Step 4: See the magic ✨
+## Step 7: Run a Janitor scan
 
-Now for the moment of truth. Check what Alfred extracted:
+Ask the Janitor to check your vault for structural issues:
 
-<Steps>
-  <Step title="List extracted people">
-    <CodeGroup>
-    ```bash cURL
-    curl -s https://app.alfred.black/api/v1/vault/list/person \
-      -H "Authorization: Bearer alf_YOUR_API_KEY" | jq .
-    ```
-
-    ```javascript JavaScript
-    const res = await fetch('https://app.alfred.black/api/v1/vault/list/person', {
-      headers: { 'Authorization': 'Bearer alf_YOUR_API_KEY' }
-    });
-    console.log(await res.json());
-    ```
-
-    ```python Python
-    import requests
-
-    res = requests.get(
-        'https://app.alfred.black/api/v1/vault/list/person',
-        headers={'Authorization': 'Bearer alf_YOUR_API_KEY'}
-    )
-    print(res.json())
-    ```
-    </CodeGroup>
-
-    You'll see Sarah Chen, Marcus Johnson, and Priya Patel as structured person records:
-
-    ```json
-    {
-      "records": [
-        {
-          "type": "person",
-          "name": "Sarah Chen",
-          "path": "people/Sarah Chen.md",
-          "created_at": "2026-02-28T14:32:15Z",
-          "tags": ["engineering", "authentication"],
-          "status": "active"
-        },
-        {
-          "type": "person",
-          "name": "Marcus Johnson",
-          "path": "people/Marcus Johnson.md",
-          "created_at": "2026-02-28T14:32:16Z",
-          "tags": ["engineering", "database"],
-          "status": "active"
-        },
-        {
-          "type": "person",
-          "name": "Priya Patel",
-          "path": "people/Priya Patel.md",
-          "created_at": "2026-02-28T14:32:17Z",
-          "tags": ["product", "mobile"],
-          "status": "active"
-        }
-      ]
-    }
-    ```
-  </Step>
-
-  <Step title="List extracted action items">
-    <CodeGroup>
-    ```bash cURL
-    curl -s https://app.alfred.black/api/v1/vault/list/task \
-      -H "Authorization: Bearer alf_YOUR_API_KEY" | jq .
-    ```
-
-    ```javascript JavaScript
-    const res = await fetch('https://app.alfred.black/api/v1/vault/list/task', {
-      headers: { 'Authorization': 'Bearer alf_YOUR_API_KEY' }
-    });
-    console.log(await res.json());
-    ```
-
-    ```python Python
-    import requests
-
-    res = requests.get(
-        'https://app.alfred.black/api/v1/vault/list/task',
-        headers={'Authorization': 'Bearer alf_YOUR_API_KEY'}
-    )
-    print(res.json())
-    ```
-    </CodeGroup>
-
-    Alfred extracted your action items as tasks:
-
-    ```json
-    {
-      "records": [
-        {
-          "type": "task",
-          "name": "Draft payment integration spec",
-          "assigned_to": "[[person/Sarah Chen]]",
-          "status": "pending",
-          "due_date": "2026-03-07",
-          "created_at": "2026-02-28T14:32:17Z",
-          "path": "tasks/Draft payment integration spec.md"
-        },
-        {
-          "type": "task",
-          "name": "Schedule compliance review meeting",
-          "assigned_to": "[[person/Marcus Johnson]]",
-          "status": "pending",
-          "created_at": "2026-02-28T14:32:18Z",
-          "path": "tasks/Schedule compliance review meeting.md"
-        },
-        {
-          "type": "task",
-          "name": "Write post-mortem for the onboarding A/B test",
-          "assigned_to": "[[person/Priya Patel]]",
-          "status": "pending",
-          "created_at": "2026-02-28T14:32:19Z",
-          "path": "tasks/Write post-mortem for the onboarding A/B test.md"
-        }
-      ]
-    }
-    ```
-  </Step>
-
-  <Step title="List extracted decisions">
-    <CodeGroup>
-    ```bash cURL
-    curl -s https://app.alfred.black/api/v1/vault/list/decision \
-      -H "Authorization: Bearer alf_YOUR_API_KEY" | jq .
-    ```
-
-    ```javascript JavaScript
-    const res = await fetch('https://app.alfred.black/api/v1/vault/list/decision', {
-      headers: { 'Authorization': 'Bearer alf_YOUR_API_KEY' }
-    });
-    console.log(await res.json());
-    ```
-
-    ```python Python
-    import requests
-
-    res = requests.get(
-        'https://app.alfred.black/api/v1/vault/list/decision',
-        headers={'Authorization': 'Bearer alf_YOUR_API_KEY'}
-    )
-    print(res.json())
-    ```
-    </CodeGroup>
-
-    And your decisions are captured as decision records:
-
-    ```json
-    {
-      "records": [
-        {
-          "type": "decision",
-          "name": "Move to Postgres for analytics pipeline",
-          "status": "approved",
-          "owner": "[[person/Marcus Johnson]]",
-          "rationale": "Improved performance and scalability for analytics workloads",
-          "created_at": "2026-02-28T14:32:19Z",
-          "path": "decisions/Move to Postgres for analytics pipeline.md"
-        },
-        {
-          "type": "decision",
-          "name": "Hire two senior engineers",
-          "status": "approved",
-          "created_at": "2026-02-28T14:32:20Z",
-          "path": "decisions/Hire two senior engineers.md"
-        }
-      ]
-    }
-    ```
-  </Step>
-</Steps>
-
-<Note>
-In just a few seconds, Alfred transformed unstructured meeting notes into a living knowledge base with linked people, tasks, and decisions. This is the power of structured knowledge.
-</Note>
-
-## Step 5: Explore your vault overview
-
-Get a high-level view of everything in your vault:
-
-<CodeGroup>
-```bash cURL
-curl -s https://app.alfred.black/api/v1/vault/context \
-  -H "Authorization: Bearer alf_YOUR_API_KEY" | jq .
+```bash
+curl -X POST https://app.alfred.black/api/v1/workers/janitor/scan \
+  -H "Authorization: Bearer alf_your_key_here" | jq .
 ```
 
-```javascript JavaScript
-const res = await fetch('https://app.alfred.black/api/v1/vault/context', {
-  headers: { 'Authorization': 'Bearer alf_YOUR_API_KEY' }
-});
-console.log(await res.json());
-```
+If issues are found, fix them:
 
-```python Python
-import requests
-
-res = requests.get(
-    'https://app.alfred.black/api/v1/vault/context',
-    headers={'Authorization': 'Bearer alf_YOUR_API_KEY'}
-)
-print(res.json())
-```
-</CodeGroup>
-
-You'll see a complete inventory of your vault:
-
-```json
-{
-  "vault": {
-    "total_records": 8,
-    "total_size_bytes": 12543,
-    "by_type": {
-      "person": 3,
-      "task": 3,
-      "decision": 2
-    },
-    "last_modified": "2026-02-28T14:32:20Z",
-    "inbox_count": 0,
-    "health_status": "healthy"
-  }
-}
+```bash
+curl -X POST https://app.alfred.black/api/v1/workers/janitor/fix \
+  -H "Authorization: Bearer alf_your_key_here" | jq .
 ```
 
 ## What's next?
 
-<CardGroup cols={2}>
-  <Card title="Inbox Workflow" icon="inbox" href="/guides/inbox-workflow">
-    Master the continuous flow of turning raw inputs into vault records
+<Columns cols={2}>
+  <Card title="Using the Inbox" icon="inbox" href="/guides/using-the-inbox">
+    Learn the full inbox-to-record pipeline
   </Card>
-  <Card title="Vault Management" icon="folder-open" href="/guides/vault-management">
-    Learn to read, update, and organize your records
+  <Card title="Browsing Your Vault" icon="vault" href="/guides/browsing-your-vault">
+    Explore and search your vault records
   </Card>
-  <Card title="Worker Operations" icon="gears" href="/guides/worker-operations">
-    Control the Curator, Janitor, and Distiller workers
+  <Card title="Your AI Agents" icon="gears" href="/guides/your-ai-agents">
+    Control the Curator, Janitor, Distiller, and Surveyor
   </Card>
   <Card title="API Reference" icon="code" href="/api-reference/introduction">
-    Full endpoint documentation and examples
+    Full endpoint documentation
   </Card>
-</CardGroup>
+</Columns>

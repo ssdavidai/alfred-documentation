@@ -1,32 +1,38 @@
 ---
 title: "API Reference"
-description: "Complete reference for the Alfred API — ~48 endpoints across 5 domains."
+description: "The Alfred Black API — programmatic access to your vault, agents, and instance."
 icon: "code"
 ---
 
 ## Overview
 
-The Alfred API provides programmatic access to all Alfred functionality. The REST API is secured by Bearer token authentication using `alf_` API keys created in the dashboard.
+The Alfred Black API gives you full programmatic access to your vault, AI agents, workflows, and instance management. Everything you can do in the dashboard, you can do via the API.
 
 <Note>
-  The base URL for all API requests is `https://app.alfred.black`. All endpoints are prefixed with `/api/v1/`.
+  The base path for all API endpoints is `/api/v1`. Authenticate every request with your API key.
 </Note>
-
-## Request format
-
-All requests that send data must use `application/json` as the `Content-Type`.
-
-```bash
-curl https://app.alfred.black/api/v1/vault/context \
-  -H "Authorization: Bearer alf_your_api_key_here" \
-  -H "Content-Type: application/json"
-```
 
 ## Authentication
 
-<Warning>
-  Every request (except OPTIONS for CORS preflight) requires a Bearer token in the `Authorization` header. See the [Authentication](/api-reference/authentication) page for details.
-</Warning>
+Every request requires a Bearer token in the `Authorization` header:
+
+```bash
+curl /api/v1/vault/context \
+  -H "Authorization: Bearer alf_your_key_here"
+```
+
+Create API keys in your [dashboard](https://app.alfred.black) under **Settings → API Keys**. See the [Authentication](/api-reference/authentication) page for details.
+
+## Request format
+
+All requests that send data must use `application/json` as the `Content-Type`:
+
+```bash
+curl -X POST /api/v1/vault/inbox \
+  -H "Authorization: Bearer alf_your_key_here" \
+  -H "Content-Type: application/json" \
+  -d '{"filename": "notes.md", "content": "..."}'
+```
 
 ## Response format
 
@@ -52,46 +58,39 @@ All responses return JSON. Successful responses have a structure specific to eac
 | `VALIDATION_ERROR` | 400 | Request body failed validation (missing required fields, invalid types) |
 | `NOT_FOUND` | 404 | Requested resource does not exist |
 | `CONFLICT` | 409 | Operation conflicts with current state (e.g., record already exists) |
-| `EXEC_ERROR` | 500 | Command execution failed (stderr included in details) |
+| `EXEC_ERROR` | 500 | Operation execution failed |
 | `INTERNAL_ERROR` | 500 | Unexpected server error |
-
-## CORS
-
-All origins are allowed (`Access-Control-Allow-Origin: *`). The API responds to OPTIONS requests for CORS preflight without requiring authentication.
 
 ## Endpoint groups
 
-The API is organized into 5 functional groups:
+The API is organized into 8 functional groups with 86 endpoints:
 
 <Columns cols={2}>
   <Card title="Vault (12 endpoints)" icon="vault" href="/api-reference/vault/get-context">
-    Record CRUD, search, inbox management, schema inspection. Core vault operations.
+    Record CRUD, search, inbox management, schema inspection.
   </Card>
   <Card title="Workers (15 endpoints)" icon="gears" href="/api-reference/workers/status">
-    Daemon control, curator/janitor/distiller operations. Start, stop, scan, process.
+    Curator, Janitor, Distiller, and Surveyor control. Start, stop, scan, process.
   </Card>
   <Card title="Workflows (7 endpoints)" icon="diagram-project" href="/api-reference/workflows/list">
-    Temporal workflow management. List, start, terminate, signal, cancel, view history.
+    Workflow management. List, start, terminate, signal, cancel, view history.
   </Card>
   <Card title="Schedules (7 endpoints)" icon="calendar" href="/api-reference/schedules/list">
-    Cron-style recurring workflows. Create, pause, unpause, trigger, delete schedules.
+    Recurring workflows. Create, pause, unpause, trigger, delete schedules.
   </Card>
   <Card title="Devices (7 endpoints)" icon="mobile" href="/api-reference/devices/list">
-    OpenClaw device pairing. Approve, reject, remove, rotate keys, revoke access.
+    Device pairing. Approve, reject, remove, rotate keys, revoke access.
+  </Card>
+  <Card title="OpenClaw (13 endpoints)" icon="claw-marks" href="/api-reference/openclaw/health">
+    Agent gateway management. Health, skills, sessions, agents, plugins, hooks, secrets.
+  </Card>
+  <Card title="Logs (1 endpoint)" icon="scroll" href="/api-reference/logs/stream">
+    Real-time SSE log streaming from your instance services.
+  </Card>
+  <Card title="Instance (24 endpoints)" icon="server" href="/api-reference/admin/health">
+    Health checks, system info, service management, credentials, agent config.
   </Card>
 </Columns>
-
-## Rate limits
-
-There are no rate limits. The API is designed for single-user or small-team use.
-
-## Versioning
-
-All endpoints are prefixed with `/api/v1/`. Breaking changes will be introduced under a new version prefix.
-
-## SDK & tooling
-
-No official SDK is provided. The API follows REST conventions and can be consumed from any HTTP client.
 
 ## Next steps
 

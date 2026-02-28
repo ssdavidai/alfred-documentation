@@ -1,10 +1,10 @@
 ---
 title: "Ignore File"
-description: "Add a file to the janitor ignore list"
+description: "Tell Janitor to ignore a file"
 api: "POST /api/v1/workers/janitor/ignore"
 ---
 
-Adds a file to the janitor's ignore list, preventing it from being scanned or fixed in future sweeps. Useful for archived files, intentionally broken links, or legacy records.
+Adds a file to the Janitor's ignore list, preventing it from being flagged in future scans. Useful for archived files, intentionally broken links, or legacy records you do not want the Janitor to touch.
 
 <ParamField body="file" type="string" required>
   Vault-relative path to the file to ignore. Must be an existing vault file.
@@ -21,8 +21,8 @@ Adds a file to the janitor's ignore list, preventing it from being scanned or fi
 <RequestExample>
 
 ```bash With Reason
-curl -X POST https://app.alfred.black/api/v1/workers/janitor/ignore \
-  -H "Authorization: Bearer YOUR_API_KEY" \
+curl -X POST /api/v1/workers/janitor/ignore \
+  -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
   -d '{
     "file": "projects/archive/legacy-integration.md",
@@ -31,8 +31,8 @@ curl -X POST https://app.alfred.black/api/v1/workers/janitor/ignore \
 ```
 
 ```bash Without Reason
-curl -X POST https://app.alfred.black/api/v1/workers/janitor/ignore \
-  -H "Authorization: Bearer YOUR_API_KEY" \
+curl -X POST /api/v1/workers/janitor/ignore \
+  -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
   -d '{
     "file": "notes/scratch-pad.md"
@@ -52,5 +52,5 @@ curl -X POST https://app.alfred.black/api/v1/workers/janitor/ignore \
 </ResponseExample>
 
 <ResponseField name="message" type="string">
-  Human-readable status message confirming the file has been added to the ignore list.
+  Confirmation that the file has been added to the ignore list.
 </ResponseField>

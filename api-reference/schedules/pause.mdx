@@ -4,25 +4,25 @@ description: "Pause a workflow schedule"
 api: "POST /api/v1/schedules/{schId}/pause"
 ---
 
-Pauses a workflow schedule. No new workflow executions will be started until the schedule is unpaused. Currently running workflows are not affected.
+Pause a workflow schedule to temporarily stop new executions from being started. Currently running workflows are not affected. Use [unpause](/api-reference/schedules/unpause) to resume the schedule.
 
 <ParamField path="schId" type="string" required>
   The schedule ID to pause
 </ParamField>
 
 <ParamField body="reason" type="string" optional>
-  Human-readable reason for pausing. Passed to the Temporal CLI.
+  Human-readable reason for pausing. Recorded on the schedule for reference.
 </ParamField>
 
 <RequestExample>
 ```bash cURL
 curl -X POST \
-  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
   -d '{
     "reason": "Paused during vault migration"
   }' \
-  https://app.alfred.black/api/v1/schedules/curator-hourly/pause
+  /api/v1/schedules/curator-hourly/pause
 ```
 </RequestExample>
 

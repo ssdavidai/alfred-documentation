@@ -1,20 +1,20 @@
 ---
 title: "Scan for Issues"
-description: "Run a janitor structural scan"
+description: "Run a Janitor vault health scan"
 api: "POST /api/v1/workers/janitor/scan"
 ---
 
-Performs a one-time structural scan of the vault without attempting to fix any issues. Returns a report of all detected problems.
+Runs a one-time structural health scan of your vault. The Janitor checks for broken links, invalid frontmatter, orphaned records, and other structural issues. This is a read-only operation that reports problems without modifying any files.
 
 <Info>
-  This is a scan-only operation. To scan and fix issues, use the [fix endpoint](/api-reference/workers/janitor-fix) instead.
+  This is a scan-only operation. To scan and fix issues automatically, use the [fix endpoint](/api-reference/workers/janitor-fix) instead.
 </Info>
 
 <RequestExample>
 
 ```bash cURL
-curl -X POST https://app.alfred.black/api/v1/workers/janitor/scan \
-  -H "Authorization: Bearer YOUR_API_KEY" \
+curl -X POST /api/v1/workers/janitor/scan \
+  -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json"
 ```
 
@@ -22,13 +22,14 @@ curl -X POST https://app.alfred.black/api/v1/workers/janitor/scan \
 
 <ResponseExample>
 
-```json Structured Response (if alfred outputs JSON)
+```json Structured Response
 {
-  "...": "Structure depends on alfred janitor scan output"
+  "files_scanned": 423,
+  "issues_found": 12
 }
 ```
 
-```json Raw Response (if alfred outputs text)
+```json Raw Response
 {
   "raw": "Scanned 423 files, found 12 issues"
 }
@@ -37,9 +38,9 @@ curl -X POST https://app.alfred.black/api/v1/workers/janitor/scan \
 </ResponseExample>
 
 <Note>
-  The response format depends on the `alfred janitor scan` command output. If the command outputs valid JSON, it is returned as-is. Otherwise, the raw text output is returned in a `raw` field.
+  If the response contains structured JSON, it is returned directly. Otherwise, the output is returned in a `raw` field.
 </Note>
 
 <ResponseField name="raw" type="string">
-  Raw text output from `alfred janitor scan` when the output is not valid JSON. Only present when structured JSON parsing fails.
+  Human-readable output when structured JSON is not available.
 </ResponseField>

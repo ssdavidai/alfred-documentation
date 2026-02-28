@@ -1,0 +1,41 @@
+---
+title: "Start Service"
+description: "Start a specific service on your instance"
+api: "POST /api/v1/admin/containers/{service}/start"
+---
+
+Start a stopped service on your Alfred instance. Use this to bring back services that were previously stopped or failed to start.
+
+## Path Parameters
+
+<ParamField path="service" type="string" required>
+  The service name to start (e.g., "worker", "openclaw", "temporal"). Must contain only alphanumeric characters, hyphens, or underscores.
+</ParamField>
+
+<RequestExample>
+
+```bash curl
+# Start the Alfred worker
+curl -X POST -H "Authorization: Bearer alf_your_key_here" \
+  /api/v1/admin/containers/worker/start
+
+# Start OpenClaw gateway
+curl -X POST -H "Authorization: Bearer alf_your_key_here" \
+  /api/v1/admin/containers/openclaw/start
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json
+{
+  "message": "Container \"worker\" started"
+}
+```
+
+</ResponseExample>
+
+<Note>
+  Starting a service that is already running has no effect and will return success. Check service status with the list services endpoint first if needed.
+</Note>

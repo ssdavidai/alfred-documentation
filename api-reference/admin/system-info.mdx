@@ -1,0 +1,32 @@
+---
+title: "System Info"
+description: "Get system information and resource usage for your instance"
+api: "GET /api/v1/admin/system/info"
+---
+
+Get system information for your Alfred instance including uptime, disk usage, and memory statistics. If any metric is unavailable, the corresponding field will contain `"unknown"`.
+
+<RequestExample>
+
+```bash curl
+curl -H "Authorization: Bearer alf_your_key_here" \
+  /api/v1/admin/system/info
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json
+{
+  "uptime": "up 5 days, 3 hours, 42 minutes",
+  "disk": "Filesystem      Size  Used Avail Use% Mounted on\n/dev/sda1  200G   85G  115G  43% /data",
+  "memory": "              total        used        free      shared  buff/cache   available\nMem:           7982        4915        1228         256        1838        2810\nSwap:          2047         512        1535"
+}
+```
+
+</ResponseExample>
+
+<Note>
+  All three fields contain raw text output from system commands. If any command fails, its field will contain `"unknown"`.
+</Note>

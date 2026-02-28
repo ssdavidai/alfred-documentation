@@ -1,0 +1,38 @@
+---
+title: "List Hooks"
+description: "List configured hooks"
+api: "GET /api/v1/openclaw/hooks"
+---
+
+List all event hooks configured on your instance's agent gateway. Hooks let you trigger custom actions in response to agent events, such as sending notifications when a vault operation completes.
+
+The response is returned as structured JSON when available, or as raw text in a `raw` field.
+
+<RequestExample>
+
+```bash cURL
+curl -X GET /api/v1/openclaw/hooks \
+  -H "Authorization: Bearer alf_your_key_here"
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Structured Response
+{
+  "...": "Structure depends on gateway hooks output"
+}
+```
+
+```json Raw Response
+{
+  "raw": "No hooks registered"
+}
+```
+
+</ResponseExample>
+
+<Note>
+  The response format depends on the gateway's output. If the gateway returns valid JSON, it is passed through as-is. Otherwise, the raw text is returned in a `raw` field.
+</Note>

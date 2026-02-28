@@ -4,7 +4,7 @@ description: "Request graceful cancellation of a workflow"
 api: "POST /api/v1/workflows/{wfId}/cancel"
 ---
 
-Requests graceful cancellation of a workflow. Unlike terminate, this allows the workflow to execute cleanup logic before stopping.
+Request graceful cancellation of a running workflow. Unlike [terminate](/api-reference/workflows/terminate), cancellation allows the workflow to execute cleanup logic before stopping.
 
 <ParamField path="wfId" type="string" required>
   The workflow ID to cancel
@@ -17,10 +17,10 @@ Requests graceful cancellation of a workflow. Unlike terminate, this allows the 
 <RequestExample>
 ```bash cURL
 curl -X POST \
-  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
   -d '{}' \
-  https://app.alfred.black/api/v1/workflows/curator-sweep-20260226-143022/cancel
+  /api/v1/workflows/curator-sweep-20260226-143022/cancel
 ```
 </RequestExample>
 

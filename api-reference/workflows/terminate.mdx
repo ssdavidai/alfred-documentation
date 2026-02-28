@@ -4,7 +4,7 @@ description: "Forcefully terminate a running workflow"
 api: "POST /api/v1/workflows/{wfId}/terminate"
 ---
 
-Immediately terminates a workflow execution. This is a hard stop -- the workflow cannot be resumed and will not execute cleanup logic.
+Immediately terminate a running workflow execution. This is a hard stop -- the workflow will not execute cleanup logic and cannot be resumed. Use [cancel](/api-reference/workflows/cancel) instead if you need graceful shutdown.
 
 <ParamField path="wfId" type="string" required>
   The workflow ID to terminate
@@ -21,12 +21,12 @@ Immediately terminates a workflow execution. This is a hard stop -- the workflow
 <RequestExample>
 ```bash cURL
 curl -X POST \
-  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
   -d '{
     "reason": "Manual termination - inbox processing stuck"
   }' \
-  https://app.alfred.black/api/v1/workflows/curator-sweep-20260226-143022/terminate
+  /api/v1/workflows/curator-sweep-20260226-143022/terminate
 ```
 </RequestExample>
 

@@ -1,10 +1,10 @@
 ---
 title: "Extract Learnings"
-description: "Scan vault and extract learnings using the agent"
+description: "Run Distiller knowledge extraction"
 api: "POST /api/v1/workers/distiller/run"
 ---
 
-Performs a scan for extraction candidates followed by agent-based learning extraction. The distiller agent will analyze candidate records and create new learning records (assumptions, decisions, constraints, contradictions, synthesis) for each piece of latent knowledge discovered.
+Scans your vault for extraction candidates and then runs the Distiller agent to extract knowledge. The Distiller analyzes candidate records and creates new learning records -- assumptions, decisions, constraints, contradictions, and synthesis -- for each piece of latent knowledge discovered.
 
 <ParamField body="project" type="string" optional>
   Filter extraction to a specific project. If omitted, extracts from all candidates.
@@ -15,14 +15,14 @@ Performs a scan for extraction candidates followed by agent-based learning extra
 <RequestExample>
 
 ```bash Extract All Candidates
-curl -X POST https://app.alfred.black/api/v1/workers/distiller/run \
-  -H "Authorization: Bearer YOUR_API_KEY" \
+curl -X POST /api/v1/workers/distiller/run \
+  -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json"
 ```
 
 ```bash Extract from Specific Project
-curl -X POST https://app.alfred.black/api/v1/workers/distiller/run \
-  -H "Authorization: Bearer YOUR_API_KEY" \
+curl -X POST /api/v1/workers/distiller/run \
+  -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
   -d '{
     "project": "acme-redesign"
@@ -33,13 +33,15 @@ curl -X POST https://app.alfred.black/api/v1/workers/distiller/run \
 
 <ResponseExample>
 
-```json Structured Response (if alfred outputs JSON)
+```json Structured Response
 {
-  "...": "Structure depends on alfred distiller run output"
+  "records_scanned": 423,
+  "candidates_found": 8,
+  "learnings_extracted": 18
 }
 ```
 
-```json Raw Response (if alfred outputs text)
+```json Raw Response
 {
   "raw": "Scanned 423 records, found 8 candidates, extracted 18 learnings"
 }
@@ -48,9 +50,9 @@ curl -X POST https://app.alfred.black/api/v1/workers/distiller/run \
 </ResponseExample>
 
 <Note>
-  The response format depends on the `alfred distiller run` command output. If the command outputs valid JSON, it is returned as-is. Otherwise, the raw text output is returned in a `raw` field.
+  If the response contains structured JSON, it is returned directly. Otherwise, the output is returned in a `raw` field.
 </Note>
 
 <ResponseField name="raw" type="string">
-  Raw text output from `alfred distiller run` when the output is not valid JSON. Only present when structured JSON parsing fails.
+  Human-readable output when structured JSON is not available.
 </ResponseField>

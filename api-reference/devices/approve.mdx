@@ -4,7 +4,7 @@ description: "Approve a pending device pairing request"
 api: "POST /api/v1/devices/{requestId}/approve"
 ---
 
-Approves a pending device pairing request, allowing the device to connect to the OpenClaw gateway.
+Approves a pending device pairing request, allowing the device to connect to your Alfred instance.
 
 <Warning>
   This endpoint uses `requestId` in the URL path, not `deviceId`. The request ID is the identifier of the pending pairing request, which is different from the device ID assigned after pairing.
@@ -15,14 +15,14 @@ Approves a pending device pairing request, allowing the device to connect to the
 </ParamField>
 
 <ParamField body="latest" type="boolean" optional default={false}>
-  If true, passes `--latest` flag to approve only the most recent request from this device. Prevents approval of stale requests.
+  If true, approves only the most recent request from this device. Prevents approval of stale requests.
 </ParamField>
 
 <RequestExample>
 
 ```bash cURL
-curl -X POST https://app.alfred.black/api/v1/devices/req_7k9m3p2q1/approve \
-  -H "Authorization: Bearer YOUR_API_KEY" \
+curl -X POST /api/v1/devices/req_7k9m3p2q1/approve \
+  -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
   -d '{
     "latest": true
@@ -30,8 +30,8 @@ curl -X POST https://app.alfred.black/api/v1/devices/req_7k9m3p2q1/approve \
 ```
 
 ```bash Without Options
-curl -X POST https://app.alfred.black/api/v1/devices/req_7k9m3p2q1/approve \
-  -H "Authorization: Bearer YOUR_API_KEY"
+curl -X POST /api/v1/devices/req_7k9m3p2q1/approve \
+  -H "Authorization: Bearer alf_your_key_here"
 ```
 
 </RequestExample>
@@ -47,5 +47,5 @@ curl -X POST https://app.alfred.black/api/v1/devices/req_7k9m3p2q1/approve \
 </ResponseExample>
 
 <ResponseField name="message" type="string">
-  Human-readable status message confirming the device has been approved.
+  A status message confirming the device was approved.
 </ResponseField>

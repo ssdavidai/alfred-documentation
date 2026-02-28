@@ -1,28 +1,28 @@
 ---
 title: "Start Workers"
-description: "Start Alfred daemon workers"
+description: "Start all AI agents"
 api: "POST /api/v1/workers/up"
 ---
 
-Starts the Alfred daemon workers in foreground mode. Can optionally start only specific workers by providing a comma-separated list.
+Starts your AI agents. You can optionally start only specific agents by providing a comma-separated list.
 
 <ParamField body="only" type="string" optional>
-  Comma-separated list of workers to start. Valid values: `curator`, `janitor`, `distiller`, `surveyor`. If omitted, all configured workers will start.
+  Comma-separated list of agents to start. Valid values: `curator`, `janitor`, `distiller`. If omitted, all configured agents will start.
 
   Example: `"curator,janitor"`
 </ParamField>
 
 <RequestExample>
 
-```bash Start All Workers
-curl -X POST https://app.alfred.black/api/v1/workers/up \
-  -H "Authorization: Bearer YOUR_API_KEY" \
+```bash Start All Agents
+curl -X POST /api/v1/workers/up \
+  -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json"
 ```
 
-```bash Start Specific Workers
-curl -X POST https://app.alfred.black/api/v1/workers/up \
-  -H "Authorization: Bearer YOUR_API_KEY" \
+```bash Start Specific Agents
+curl -X POST /api/v1/workers/up \
+  -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
   -d '{
     "only": "curator,janitor"
@@ -42,5 +42,5 @@ curl -X POST https://app.alfred.black/api/v1/workers/up \
 </ResponseExample>
 
 <ResponseField name="message" type="string">
-  Human-readable status message confirming workers have been started.
+  Confirmation that agents have been started.
 </ResponseField>

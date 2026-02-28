@@ -1,0 +1,41 @@
+---
+title: "Stop Service"
+description: "Stop a specific service on your instance"
+api: "POST /api/v1/admin/containers/{service}/stop"
+---
+
+Stop a running service on your Alfred instance. The service will remain stopped until you start it again.
+
+## Path Parameters
+
+<ParamField path="service" type="string" required>
+  The service name to stop (e.g., "worker", "openclaw", "temporal"). Must contain only alphanumeric characters, hyphens, or underscores.
+</ParamField>
+
+<RequestExample>
+
+```bash curl
+# Stop the Alfred worker
+curl -X POST -H "Authorization: Bearer alf_your_key_here" \
+  /api/v1/admin/containers/worker/stop
+
+# Stop Temporal UI
+curl -X POST -H "Authorization: Bearer alf_your_key_here" \
+  /api/v1/admin/containers/temporal-ui/stop
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json
+{
+  "message": "Container \"worker\" stopped"
+}
+```
+
+</ResponseExample>
+
+<Warning>
+  Stopping the worker service will halt all Alfred daemons (curator, janitor, distiller). Stopping temporal will prevent workflow execution.
+</Warning>
