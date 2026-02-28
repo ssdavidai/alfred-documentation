@@ -4,7 +4,7 @@ description: "Stop all Alfred daemon workers"
 api: "POST /api/v1/workers/down"
 ---
 
-Gracefully stops all running Alfred daemon workers by running `alfred down` inside the container.
+Gracefully stops all running Alfred daemon workers.
 
 <RequestExample>
 
@@ -27,5 +27,5 @@ curl -X POST https://app.alfred.black/api/v1/workers/down \
 </ResponseExample>
 
 <ResponseField name="message" type="string">
-  Human-readable status message. Contains the stdout from `alfred down`, or `"Workers stopped"` if stdout is empty.
+  Human-readable status message confirming workers have been stopped.
 </ResponseField>

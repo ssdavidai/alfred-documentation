@@ -4,7 +4,7 @@ description: "Restart the Alfred Docker container"
 api: "POST /api/v1/workers/restart"
 ---
 
-Restarts the entire Alfred Docker container using `docker compose restart alfred`. This is a hard restart that stops all workers, terminates the container, and starts it fresh. Use this for applying configuration changes or recovering from severe errors.
+Performs a hard restart of the Alfred worker process. This stops all workers and starts them fresh. Use this for applying configuration changes or recovering from severe errors.
 
 <Info>
   This operation will cause brief downtime (typically 10-30 seconds) while the container restarts.

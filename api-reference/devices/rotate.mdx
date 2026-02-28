@@ -19,7 +19,7 @@ Rotates the authentication token for a paired device. The device will need to re
 </ParamField>
 
 <ParamField body="scope" type="string" optional>
-  Optional scope restrictions for the device token. Passed as `--scope` to the underlying command.
+  Optional scope restrictions for the device token.
 </ParamField>
 
 <RequestExample>
@@ -65,5 +65,5 @@ curl -X POST https://app.alfred.black/api/v1/devices/dev_a1b2c3d4e5/rotate \
 </ResponseExample>
 
 <ResponseField name="message" type="string">
-  Human-readable status message. Contains the stdout from `openclaw devices rotate`, or `"Token rotated"` if stdout is empty.
+  Human-readable status message confirming the token has been rotated.
 </ResponseField>

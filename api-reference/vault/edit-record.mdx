@@ -17,19 +17,19 @@ Modifies an existing vault record. You can set or replace frontmatter fields, ap
 ## Body Parameters
 
 <ParamField body="set" type="object" optional>
-  Key-value pairs to set in frontmatter. Each key-value pair is passed as `--set key=value` to the CLI. Replaces existing values for these fields.
+  Key-value pairs to set in frontmatter. Replaces existing values for these fields.
 </ParamField>
 
 <ParamField body="append" type="object" optional>
-  Key-value pairs to append to list fields in frontmatter. Each key-value pair is passed as `--append key=value` to the CLI.
+  Key-value pairs to append to list fields in frontmatter.
 </ParamField>
 
 <ParamField body="body_append" type="string" optional>
-  Text to append to the markdown body. Passed as `--body-append` to the CLI.
+  Text to append to the markdown body.
 </ParamField>
 
 <ParamField body="body_stdin" type="string" optional>
-  Replace the markdown body with this text. Passed as `--body-stdin` to the CLI.
+  Replace the markdown body with this text.
 </ParamField>
 
 <ParamField body="scope" type="string" optional>

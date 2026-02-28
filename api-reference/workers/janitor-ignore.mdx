@@ -13,7 +13,7 @@ Adds a file to the janitor's ignore list, preventing it from being scanned or fi
 </ParamField>
 
 <ParamField body="reason" type="string" optional>
-  Human-readable reason for ignoring this file. Passed as `--reason` to the underlying command.
+  Human-readable reason for ignoring this file.
 
   Example: `"Archived project with intentional broken links"`
 </ParamField>
@@ -52,5 +52,5 @@ curl -X POST https://app.alfred.black/api/v1/workers/janitor/ignore \
 </ResponseExample>
 
 <ResponseField name="message" type="string">
-  Human-readable status message. Contains the stdout from `alfred janitor ignore`, or `"File ignored"` if stdout is empty.
+  Human-readable status message confirming the file has been added to the ignore list.
 </ResponseField>

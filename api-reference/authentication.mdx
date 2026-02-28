@@ -77,7 +77,7 @@ const data = response.data;
 ### How keys are stored
 
 - API keys are **hashed** server-side using SHA-256 before storage — the plaintext key is never persisted
-- Hashes are **encrypted at rest** using AES-256-GCM
+- Only the hash is stored in the database — even a database breach does not reveal your key
 - Each key is associated with your user account and instance
 
 ### Best practices
@@ -89,29 +89,45 @@ const data = response.data;
 
 ## Error responses
 
-Missing or invalid authentication returns a 401 status with the `UNAUTHORIZED` error code:
+Missing or invalid authentication returns a `401` status:
 
 <ResponseExample>
 ```json Missing or malformed header
 {
-  "error": {
-    "code": "UNAUTHORIZED",
-    "message": "Missing or malformed Authorization header"
-  }
+  "error": "Missing or invalid Authorization header. Use: Bearer <api-key>"
 }
 ```
 
-```json Invalid API key
+```json Invalid key format
 {
-  "error": {
-    "code": "UNAUTHORIZED",
-    "message": "Invalid API key"
-  }
+  "error": "Invalid API key format"
+}
+```
+
+```json Key not found
+{
+  "error": "Invalid API key"
 }
 ```
 </ResponseExample>
 
-The first error is returned when the `Authorization` header is absent or does not start with `Bearer `. The second is returned when the token is present but does not match any valid key.
+| Status | Error | When |
+|--------|-------|------|
+| `401` | `Missing or invalid Authorization header...` | `Authorization` header is absent or doesn't start with `Bearer ` |
+| `401` | `Invalid API key format` | Token is present but doesn't match the `alf_` format |
+| `401` | `Invalid API key` | Token format is correct but the key doesn't match any valid key |
+
+## Timeouts
+
+API requests are subject to a **15-second timeout**. If the upstream operation takes longer, you will receive a `504` response:
+
+```json
+{
+  "error": "Request to instance timed out after 15s"
+}
+```
+
+Most endpoints respond well within this limit. Long-running operations like `POST /api/v1/workers/ingest` or `POST /api/v1/workers/distiller/run` trigger background processing and return immediately, so they are not affected.
 
 ## Testing authentication
 

@@ -7,7 +7,7 @@ api: "POST /api/v1/workers/distiller/run"
 Performs a scan for extraction candidates followed by agent-based learning extraction. The distiller agent will analyze candidate records and create new learning records (assumptions, decisions, constraints, contradictions, synthesis) for each piece of latent knowledge discovered.
 
 <ParamField body="project" type="string" optional>
-  Filter extraction to a specific project. Passed as `--project` to the underlying command. If omitted, extracts from all candidates.
+  Filter extraction to a specific project. If omitted, extracts from all candidates.
 
   Example: `"acme-redesign"`
 </ParamField>

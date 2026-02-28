@@ -7,7 +7,7 @@ api: "POST /api/v1/workers/distiller/scan"
 Performs a one-time scan of vault records to identify extraction candidates without actually extracting learnings. Returns a list of records that contain latent knowledge (assumptions, decisions, constraints, contradictions, synthesis).
 
 <ParamField body="project" type="string" optional>
-  Filter candidates to a specific project. Passed as `--project` to the underlying command. If omitted, scans all vault records.
+  Filter candidates to a specific project. If omitted, scans all vault records.
 
   Example: `"acme-redesign"`
 </ParamField>

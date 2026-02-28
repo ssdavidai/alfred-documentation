@@ -4,10 +4,10 @@ description: "Retrieve janitor sweep history"
 api: "GET /api/v1/workers/janitor/history"
 ---
 
-Returns a chronological history of janitor sweeps by running `alfred janitor history` inside the container.
+Returns a chronological history of janitor sweeps.
 
 <ParamField query="limit" type="number" default={10}>
-  Maximum number of sweep records to return. Passed as `--limit` to the underlying command.
+  Maximum number of sweep records to return.
 </ParamField>
 
 <RequestExample>

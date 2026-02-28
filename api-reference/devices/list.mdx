@@ -4,10 +4,10 @@ description: "Retrieve all pending and paired devices in the OpenClaw gateway"
 api: "GET /api/v1/devices"
 ---
 
-Returns a list of all devices associated with the OpenClaw gateway by running `openclaw devices list --json` inside the container. The JSON output is parsed and returned directly.
+Returns a list of all pending and paired devices associated with the OpenClaw gateway. The response is structured JSON.
 
 <Note>
-  Unlike most other endpoints, this endpoint does not have a raw text fallback. The `openclaw devices list --json` output must be valid JSON. If parsing fails, the API will return a 500 error.
+  Unlike most other endpoints, this endpoint always returns structured JSON. If the underlying operation fails, the API will return a 500 error.
 </Note>
 
 <RequestExample>
@@ -23,12 +23,13 @@ curl -X GET https://app.alfred.black/api/v1/devices \
 
 ```json Response
 {
-  "...": "Structure depends on openclaw devices list --json output"
+  "pending": [],
+  "paired": []
 }
 ```
 
 </ResponseExample>
 
 <Note>
-  The response structure is parsed directly from `openclaw devices list --json` output. The exact fields depend on the OpenClaw version.
+  The response typically includes `pending` and `paired` arrays. The exact fields within each device object depend on the OpenClaw version.
 </Note>

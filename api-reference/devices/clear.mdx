@@ -7,7 +7,7 @@ api: "POST /api/v1/devices/clear"
 Clears multiple devices at once. Can be used to clear only pending requests or all devices (both pending and paired).
 
 <ParamField body="pending_only" type="boolean" optional>
-  If true, passes `--pending-only` flag to only clear pending device requests. If omitted or false, clears all devices.
+  If true, only clears pending device requests. If omitted or false, clears all devices.
 </ParamField>
 
 <RequestExample>
@@ -40,5 +40,5 @@ curl -X POST https://app.alfred.black/api/v1/devices/clear \
 </ResponseExample>
 
 <ResponseField name="message" type="string">
-  Human-readable status message. Contains the stdout from `openclaw devices clear`, or `"Devices cleared"` if stdout is empty.
+  Human-readable status message confirming devices have been cleared.
 </ResponseField>

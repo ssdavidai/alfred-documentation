@@ -4,10 +4,10 @@ description: "Retrieve distiller extraction run history"
 api: "GET /api/v1/workers/distiller/history"
 ---
 
-Returns a chronological history of distiller extraction runs by running `alfred distiller history` inside the container.
+Returns a chronological history of distiller extraction runs.
 
 <ParamField query="limit" type="number" default={10}>
-  Maximum number of run records to return. Passed as `--limit` to the underlying command.
+  Maximum number of run records to return.
 </ParamField>
 
 <RequestExample>
