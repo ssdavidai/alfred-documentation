@@ -1,6 +1,6 @@
 ---
 title: "Authentication"
-description: "How to authenticate with the Alfred Black API."
+description: "How to authenticate with the Alfred API."
 icon: "key"
 ---
 
@@ -11,7 +11,7 @@ Every API request must include a Bearer token in the `Authorization` header. You
 ## Getting your API key
 
 1. Go to your [Alfred Black dashboard](https://app.alfred.black)
-2. Navigate to **Settings → API Keys**
+2. Navigate to **Settings > API Keys**
 3. Click **Create** and give it a descriptive name
 4. Copy the key immediately — it's shown only once
 
@@ -106,7 +106,7 @@ curl /api/v1/admin/health \
   -H "Authorization: Bearer alf_your_key_here"
 ```
 
-A successful response confirms your API key is valid and your instance is reachable.
+A successful response confirms your API key is valid and your Alfred is reachable.
 
 ## Next steps
 
@@ -115,6 +115,6 @@ A successful response confirms your API key is valid and your instance is reacha
     Start with vault operations
   </Card>
   <Card title="Workers endpoints" icon="gears" href="/api-reference/workers/status">
-    Control your AI agents
+    Direct your specialists
   </Card>
 </Columns>

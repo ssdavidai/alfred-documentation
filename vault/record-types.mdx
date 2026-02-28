@@ -1,12 +1,12 @@
 ---
 title: "Record Types"
-description: "Detailed reference for all 19 vault record types."
+description: "Detailed reference for all 19 vault record types — the building blocks of your world."
 icon: "shapes"
 ---
 
 ## Overview
 
-Alfred manages 19 distinct record types organized into three categories: **Standing Entities** (7) for the stable elements of your world, **Activity Records** (7) for what happens, and **Learning Types** (5) for extracted knowledge.
+Alfred manages 19 distinct record types organized into three layers: **Standing Entities** (7) for the stable elements of your world, **Activity Records** (7) for what happens, and **Learning Types** (5) for the deeper knowledge the Distiller surfaces.
 
 ## Standing Entities
 
@@ -17,9 +17,9 @@ Records representing the people, organizations, and resources in your world.
 <Accordion title="person — People and Contacts" icon="user">
 **What it represents:** Individuals, contacts, team members, or stakeholders.
 
-**When it's created:** The Curator creates person records when people are mentioned in your inbox content — meeting attendees, email contacts, team members referenced in notes.
+**When it's created:** The Curator creates person records when people are mentioned in your content — meeting attendees, email contacts, team members referenced in notes.
 
-**Example scenario:** You drop in standup notes mentioning "Alice reviewed Bob's PR." Alfred creates person records for Alice and Bob (or updates them if they already exist) and links both to the conversation.
+**Example:** You share standup notes mentioning "Alice reviewed Bob's PR." Alfred creates person records for Alice and Bob (or updates them if they already exist) and links both to the conversation.
 
 **Status values:** `active`, `inactive`
 
@@ -31,7 +31,7 @@ Records representing the people, organizations, and resources in your world.
 
 **When it's created:** The Curator creates org records when companies or teams are mentioned in your content.
 
-**Example scenario:** Meeting notes reference "the Acme Corp partnership." Alfred creates an org record for Acme Corp and links it to relevant people and projects.
+**Example:** Meeting notes reference "the Acme Corp partnership." Alfred creates an org record for Acme Corp and links it to relevant people and projects.
 
 **Status values:** `active`, `inactive`
 
@@ -43,7 +43,7 @@ Records representing the people, organizations, and resources in your world.
 
 **When it's created:** The Curator creates project records when initiatives or efforts are discussed in your content.
 
-**Example scenario:** Standup notes mention "Platform v2 migration is on track." Alfred creates a project record linked to the people working on it and any related tasks.
+**Example:** Standup notes mention "Platform v2 migration is on track." Alfred creates a project record linked to the people working on it and any related tasks.
 
 **Status values:** `active`, `paused`, `completed`, `abandoned`, `proposed`
 
@@ -55,7 +55,7 @@ Records representing the people, organizations, and resources in your world.
 
 **When it's created:** The Curator creates location records when places are mentioned in meetings, events, or notes.
 
-**Example scenario:** "The offsite will be at the SF Conference Center." Alfred creates a location record and links it to the event.
+**Example:** "The offsite will be at the SF Conference Center." Alfred creates a location record and links it to the event.
 
 **Status values:** `active`, `inactive`
 
@@ -67,7 +67,7 @@ Records representing the people, organizations, and resources in your world.
 
 **When it's created:** The Curator creates account records when services or subscriptions are discussed.
 
-**Example scenario:** Notes mention "our AWS Production account needs a billing review." Alfred creates an account record linked to the relevant people and tasks.
+**Example:** Notes mention "our AWS Production account needs a billing review." Alfred creates an account record linked to the relevant people and tasks.
 
 **Status values:** `active`, `suspended`, `closed`, `pending`
 
@@ -79,7 +79,7 @@ Records representing the people, organizations, and resources in your world.
 
 **When it's created:** The Curator creates asset records when specific resources are discussed.
 
-**Example scenario:** "The production database server needs a memory upgrade." Alfred creates an asset record linked to the task and owner.
+**Example:** "The production database server needs a memory upgrade." Alfred creates an asset record linked to the task and owner.
 
 **Status values:** `active`, `retired`, `maintenance`, `disposed`
 
@@ -91,7 +91,7 @@ Records representing the people, organizations, and resources in your world.
 
 **When it's created:** The Curator creates process records when operational procedures are described.
 
-**Example scenario:** "We need to update the deployment pipeline to include staging." Alfred creates a process record and links it to the project and people involved.
+**Example:** "We need to update the deployment pipeline to include staging." Alfred creates a process record and links it to the project and people involved.
 
 **Status values:** `active`, `proposed`, `design`, `deprecated`
 
@@ -109,9 +109,9 @@ Records capturing events, work, and interactions.
 <Accordion title="conversation — Conversations and Discussions" icon="comments">
 **What it represents:** Meetings, discussions, or dialogue threads.
 
-**When it's created:** The Curator creates conversation records from meeting notes, email threads, or chat exports you submit.
+**When it's created:** The Curator creates conversation records from meeting notes, email threads, or chat exports you share.
 
-**Example scenario:** You paste in standup notes. Alfred creates a conversation record for the meeting, links it to all participants, and creates separate records for tasks and decisions mentioned.
+**Example:** You share standup notes. Alfred creates a conversation record for the meeting, links it to all participants, and creates separate records for tasks and decisions mentioned.
 
 **Status values:** `active`, `waiting`, `resolved`, `closed`, `archived`
 
@@ -127,7 +127,7 @@ Records capturing events, work, and interactions.
 
 **When it's created:** The Curator creates note records for general content that doesn't fit neatly into a more specific type.
 
-**Example scenario:** You submit a brainstorm document. Alfred creates a note record and links it to the relevant projects and people mentioned.
+**Example:** You share a brainstorm document. Alfred creates a note record and links it to the relevant projects and people mentioned.
 
 **Status values:** `draft`, `active`, `review`, `final`
 
@@ -139,7 +139,7 @@ Records capturing events, work, and interactions.
 
 **When it's created:** The Curator creates task records when action items are identified in your content.
 
-**Example scenario:** Meeting notes say "Bob will start the database indexing task." Alfred creates a task record, assigns Bob as owner, and links it to the project.
+**Example:** Meeting notes say "Bob will start the database indexing task." Alfred creates a task record, assigns Bob as owner, and links it to the project.
 
 **Status values:** `todo`, `active`, `blocked`, `done`, `cancelled`
 
@@ -151,7 +151,7 @@ Records capturing events, work, and interactions.
 
 **When it's created:** The Curator creates event records when specific scheduled occurrences are mentioned.
 
-**Example scenario:** "The annual team offsite is April 10th." Alfred creates an event record with the date, location, and participants linked.
+**Example:** "The annual team offsite is April 10th." Alfred creates an event record with the date, location, and participants linked.
 
 **Status values:** _(no status constraint)_
 
@@ -163,7 +163,7 @@ Records capturing events, work, and interactions.
 
 **When it's created:** The Curator creates session records when focused work periods are described.
 
-**Example scenario:** "Morning focus block — spent 3 hours on the migration." Alfred creates a session record linked to the project and tasks.
+**Example:** "Morning focus block — spent 3 hours on the migration." Alfred creates a session record linked to the project and tasks.
 
 **Status values:** `active`, `completed`
 
@@ -171,11 +171,11 @@ Records capturing events, work, and interactions.
 </Accordion>
 
 <Accordion title="input — Incoming Items" icon="inbox">
-**What it represents:** Raw items in the inbox that need processing.
+**What it represents:** Raw items in the inbox waiting to be attended to.
 
-**When it's created:** Created when content is submitted to the inbox, before the Curator processes it.
+**When it's created:** Created when content is shared with Alfred, before the Curator attends to it.
 
-**Example scenario:** You upload a document via the API. An input record tracks it until the Curator processes it into structured records.
+**Example:** You upload a document via the API. An input record tracks it until the Curator creates structured records from it.
 
 **Status values:** `unprocessed`, `processed`, `deferred`
 
@@ -187,9 +187,9 @@ Records capturing events, work, and interactions.
 </Accordion>
 
 <Accordion title="run — Execution Runs" icon="play">
-**What it represents:** Execution runs, operations, or batch processes.
+**What it represents:** Execution runs, operations, or batch operations.
 
-**When it's created:** Created to track operational runs and batch processing.
+**When it's created:** Created to track operational runs and batch work.
 
 **Status values:** `active`, `completed`, `blocked`, `cancelled`
 
@@ -200,16 +200,16 @@ Records capturing events, work, and interactions.
 
 ## Learning Types
 
-Meta-records created by the Distiller that capture deeper knowledge extracted from your operational records.
+Records created by the Distiller that capture deeper knowledge surfaced from your vault.
 
 <AccordionGroup>
 
 <Accordion title="assumption — Implicit Assumptions" icon="thought-bubble">
-**What it represents:** Assumptions found lurking in your records that haven't been explicitly validated.
+**What it represents:** Assumptions lurking in your records that haven't been explicitly validated.
 
-**When it's created:** The Distiller identifies implicit assumptions when analyzing your conversations, decisions, and project records.
+**When it's created:** The Distiller surfaces implicit assumptions when analyzing your conversations, decisions, and project records.
 
-**Example scenario:** From project discussions, the Distiller surfaces: "We're assuming users prefer mobile-first design — this hasn't been validated with data."
+**Example:** From project discussions, the Distiller surfaces: "We're assuming users prefer mobile-first design — this hasn't been validated with data."
 
 **Status values:** `active`, `challenged`, `invalidated`, `confirmed`
 
@@ -221,7 +221,7 @@ Meta-records created by the Distiller that capture deeper knowledge extracted fr
 
 **When it's created:** Both the Curator (from explicit mentions) and the Distiller (from implicit context) create decision records.
 
-**Example scenario:** Meeting notes mention "Decision: use token bucket algorithm for rate limiting." Alfred captures the decision, who approved it, and what it was based on.
+**Example:** Meeting notes mention "Decision: use token bucket algorithm for rate limiting." Alfred captures the decision, who approved it, and what it was based on.
 
 **Status values:** `draft`, `final`, `superseded`, `reversed`
 
@@ -233,7 +233,7 @@ Meta-records created by the Distiller that capture deeper knowledge extracted fr
 
 **When it's created:** The Distiller identifies constraints from project plans, conversations, and decisions.
 
-**Example scenario:** The Distiller surfaces: "Must support legacy API until Q3 due to existing client contracts."
+**Example:** The Distiller surfaces: "Must support legacy API until Q3 due to existing client contracts."
 
 **Status values:** `active`, `expired`, `waived`, `superseded`
 
@@ -245,7 +245,7 @@ Meta-records created by the Distiller that capture deeper knowledge extracted fr
 
 **When it's created:** The Distiller identifies contradictions when analyzing records that contain conflicting information.
 
-**Example scenario:** The Distiller finds: "The Q2 launch goal conflicts with the security audit requirement, which needs 6 weeks and hasn't started."
+**Example:** The Distiller finds: "The Q2 launch goal conflicts with the security audit requirement, which needs 6 weeks and hasn't started."
 
 **Status values:** `unresolved`, `resolved`, `accepted`
 
@@ -257,7 +257,7 @@ Meta-records created by the Distiller that capture deeper knowledge extracted fr
 
 **When it's created:** The Distiller creates synthesis records when it finds meaningful patterns across your vault.
 
-**Example scenario:** The Distiller connects dots: "Both the Q1 Launch and Platform Redesign projects identified onboarding as a user retention blocker — suggesting a shared improvement opportunity."
+**Example:** The Distiller connects dots: "Both the Q1 Launch and Platform Redesign projects identified onboarding as a user retention blocker — suggesting a shared improvement opportunity."
 
 **Status values:** `draft`, `active`, `superseded`
 
@@ -267,7 +267,7 @@ Meta-records created by the Distiller that capture deeper knowledge extracted fr
 </AccordionGroup>
 
 <Note>
-  Learning types are automatically extracted by the Distiller agent. While you can create them via the API, they're typically generated automatically from your existing records.
+  Learning types are automatically surfaced by the Distiller. While you can create them via the API, they're typically generated automatically from your existing records.
 </Note>
 
 ## Naming conventions

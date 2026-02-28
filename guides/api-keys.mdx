@@ -1,17 +1,17 @@
 ---
 title: "API Keys"
-description: "Creating and using API keys to access the Alfred Black API."
+description: "Creating and using API keys to access the Alfred API."
 icon: "key"
 ---
 
 ## Overview
 
-API keys let you access the Alfred Black API from scripts, automations, and integrations. Each key provides full access to your instance's API endpoints.
+API keys let you access the Alfred API from scripts, automations, and integrations. Each key provides full access to your API endpoints.
 
 ## Creating an API key
 
 1. Go to your [Alfred Black dashboard](https://app.alfred.black)
-2. Navigate to **Settings → API Keys**
+2. Navigate to **Settings > API Keys**
 3. Click **Create**
 4. Give it a descriptive name (e.g., "CI pipeline", "n8n automation", "shell scripts")
 5. Click **Create** and copy the key immediately
@@ -22,7 +22,7 @@ API keys let you access the Alfred Black API from scripts, automations, and inte
 
 ## Key format
 
-Alfred Black API keys use the format:
+Alfred API keys use the format:
 
 ```
 alf_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4
@@ -64,7 +64,7 @@ All API endpoints use the base path `/api/v1/...`.
 
 ## Managing your keys
 
-From the **Settings → API Keys** page in your dashboard, you can:
+From the **Settings > API Keys** page in your dashboard, you can:
 
 - **View all keys** — See names, creation dates, and last used timestamps
 - **Track usage** — Check when each key was last used
@@ -93,7 +93,7 @@ From the **Settings → API Keys** page in your dashboard, you can:
 #!/bin/bash
 ALFRED_API_KEY="${ALFRED_API_KEY:?Set ALFRED_API_KEY}"
 
-# Drop content into the inbox
+# Share content with Alfred
 curl -X POST /api/v1/vault/inbox \
   -H "Authorization: Bearer $ALFRED_API_KEY" \
   -H "Content-Type: application/json" \
@@ -136,7 +136,7 @@ curl /api/v1/admin/health \
   -H "Authorization: Bearer alf_your_key_here"
 ```
 
-A successful response confirms your key is valid and your instance is reachable.
+A successful response confirms your API key is valid and your Alfred is reachable.
 
 <Columns cols={2}>
   <Card title="API Reference" icon="code" href="/api-reference/introduction">

@@ -1,20 +1,20 @@
 ---
-title: "Monitoring Your Instance"
-description: "Keep an eye on your Alfred instance health, agents, and services."
+title: "Monitoring"
+description: "Keep an eye on your Alfred's health, specialists, and services."
 icon: "chart-line"
 ---
 
 ## Overview
 
-Alfred Black gives you visibility into your instance's health, agent status, and service operations — from your dashboard and via the API.
+Alfred Black gives you visibility into your Alfred's health, specialist status, and service operations — from your dashboard and via the API.
 
 ## Dashboard Command Center
 
 Your [Alfred Black dashboard](https://app.alfred.black) Command Center shows at a glance:
 
-- **Health badge** — Overall instance status (healthy, degraded, or down)
+- **Health badge** — Overall status (healthy, degraded, or down)
 - **Vault stats** — Record counts and recent activity
-- **Agent status** — Whether the Curator, Janitor, Distiller, and Surveyor are running
+- **Specialist status** — Whether the Curator, Janitor, Distiller, and Surveyor are running
 
 ## Health check
 
@@ -56,7 +56,7 @@ curl -s /api/v1/admin/system/info \
 
 ## Service status
 
-List all services running on your instance:
+List all services running on your Alfred:
 
 ```bash
 curl -s /api/v1/admin/containers \
@@ -67,7 +67,7 @@ curl -s /api/v1/admin/containers \
 
 ### From the dashboard
 
-Navigate to the **Logs** page to view real-time logs from your instance services.
+Navigate to the **Logs** page to view real-time logs from your services.
 
 ### Via the API
 
@@ -99,9 +99,9 @@ curl -X POST /api/v1/admin/containers/alfred/restart \
   -H "Authorization: Bearer alf_your_key_here"
 ```
 
-## Agent monitoring
+## Specialist monitoring
 
-Check what your AI agents are up to:
+Check what your specialists are up to:
 
 ```bash
 # Overall worker status
@@ -118,10 +118,10 @@ curl -s /api/v1/workers/distiller/history \
 ```
 
 <Columns cols={2}>
-  <Card title="Your AI Agents" icon="gears" href="/guides/your-ai-agents">
-    Control your agents
+  <Card title="Your Specialists" icon="gears" href="/guides/your-ai-agents">
+    Direct your specialists
   </Card>
   <Card title="Instance API" icon="code" href="/api-reference/admin/health">
-    Full instance management endpoints
+    Full management endpoints
   </Card>
 </Columns>

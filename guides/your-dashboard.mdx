@@ -1,122 +1,122 @@
 ---
 title: "Your Dashboard"
-description: "A tour of the Alfred Black dashboard and what each section does."
+description: "A tour of the Alfred Black dashboard — your window into your vault, specialists, and services."
 icon: "layout-dashboard"
 ---
 
 ## Overview
 
-The [Alfred Black dashboard](https://app.alfred.black) is your control center for managing your vault, AI agents, devices, and instance. This guide walks through each section.
+The [Alfred Black dashboard](https://app.alfred.black) is where you see everything Alfred is doing for you — your vault, your specialists, your devices, and your services. This guide walks through each section.
 
 ## Navigation
 
 The sidebar provides access to all dashboard sections:
 
-- **Home** -- Command Center with stats and activity overview
-- **Vault** -- Browse and search vault records
-- **Services** -- Manage containers and AI model configuration
-- **Credentials** -- Set API keys for LLM providers
-- **Logs** -- Real-time container log viewer
-- **Settings** -- Account info, subscription management, API keys
+- **Home** — Command Center with stats and activity overview
+- **Vault** — Browse and search vault records
+- **Services** — Manage services and specialist model configuration
+- **Credentials** — Set API keys for LLM providers
+- **Logs** — Real-time service log viewer
+- **Settings** — Account info, subscription management, API keys
 
 Additional pages are accessible from the Home page:
 
-- **Inbox** -- Submit content to your vault via file upload
-- **Devices** -- Approve or reject OpenClaw device pairing requests
+- **Inbox** — Share content with Alfred via file upload
+- **Devices** — Approve or reject OpenClaw device pairing requests
 
 Admin users also see an **Admin** section with analytics, user management, instance management, and provisioning tools.
 
 ## Home (Command Center)
 
-The Home page gives you a snapshot of your entire instance.
+The Home page gives you a snapshot of your entire Alfred at a glance.
 
 ### Stat cards
 
-Four cards across the top show key metrics at a glance:
+Four cards across the top show key metrics:
 
 | Card | What it shows |
 |------|---------------|
-| **Health** | Overall instance status (ok, degraded, or down) |
-| **Vault** | Total record count, plus inbox items waiting to be processed |
-| **Services** | Running containers out of total (e.g., "3/3 up") |
+| **Health** | Overall status (ok, degraded, or down) |
+| **Vault** | Total record count, plus inbox items waiting to be attended to |
+| **Services** | Running services out of total (e.g., "3/3 up") |
 | **Devices** | Number of paired OpenClaw devices, plus pending pairing requests |
 
 Stats refresh automatically every 30 seconds.
 
-### Worker activity charts
+### Specialist activity charts
 
-Below the stat cards, activity charts show recent processing trends for Curator, Janitor, and Distiller -- giving you visibility into how actively your agents are working.
+Below the stat cards, activity charts show recent trends for the Curator, Janitor, and Distiller — giving you visibility into how actively your specialists are working.
 
 ### Quick actions
 
 A set of shortcut buttons for common tasks:
 
-- **Upload to Vault** -- Opens a file upload dialog to drop content into the inbox
-- **OpenClaw UI** -- Opens the OpenClaw web interface on your instance (if available)
+- **Upload to Vault** — Opens a file upload dialog to share content via the inbox
+- **OpenClaw UI** — Opens the OpenClaw web interface (if available)
 
 The Quick Actions card also includes a **Devices** section showing pending pairing requests (with approve/reject buttons) and currently paired devices.
 
 ### Knowledge graph
 
-An interactive visualization of your vault's structure. It shows record types as nodes, sized by count, with AI agent nodes showing their operational status. Toggle the graph on or off with the switch in the card header.
+An interactive visualization of your vault's structure. It shows record types as nodes, sized by count, with specialist nodes showing their operational status. Toggle the graph on or off with the switch in the card header.
 
 The graph refreshes every 15 seconds when visible.
 
 ### Activity feed
 
-A chronological feed of recent vault mutations -- records created, edited, moved, or deleted by your agents.
+A chronological feed of recent vault mutations — records created, edited, moved, or deleted by your specialists.
 
 ### Vault composition
 
-A chart at the bottom of the page showing the distribution of record types in your vault. Useful for understanding the shape of your knowledge base.
+A chart at the bottom of the page showing the distribution of record types in your vault. Useful for understanding the shape of your world.
 
 ## Inbox
 
-The Inbox page lets you submit content to your vault through the web UI. Enter a title and paste your content, then click Submit. The Curator agent picks it up within seconds and creates structured vault records.
+The Inbox page lets you share content with Alfred through the web UI. Enter a title and paste your content, then click Submit. The Curator picks it up within seconds and creates structured vault records.
 
-You can also submit content via the API. See the [Using the Inbox](/guides/using-the-inbox) guide for details.
+You can also share content via the API. See the [Using the Inbox](/guides/using-the-inbox) guide for details.
 
 ## Vault
 
-The Vault page lets you browse and search all records in your vault.
+The Vault page lets you browse and search all records.
 
-- **Filter by type** -- Select a record type (person, project, task, decision, etc.) to see only records of that type
-- **Search** -- Find records by keyword across your entire vault
-- **View records** -- Click any record to see its full content, frontmatter, and relationships
+- **Filter by type** — Select a record type (person, project, task, decision, etc.) to see only records of that type
+- **Search** — Find records by keyword across your entire vault
+- **View records** — Click any record to see its full content, frontmatter, and relationships
 
 For more details, see [Browsing Your Vault](/guides/browsing-your-vault).
 
 ## Services
 
-The Services page has two sections: container management and agent model configuration.
+The Services page has two sections: service management and specialist model configuration.
 
-### Container status
+### Service status
 
-Each service running on your instance is shown as a card with:
+Each service running on your Alfred is shown as a card with:
 
-- **Status indicator** -- Green (running), red (exited), or yellow (other)
-- **Service name and description** -- What the service does
-- **Control buttons** -- Start, Stop, and Restart
+- **Status indicator** — Green (running), red (exited), or yellow (other)
+- **Service name and description** — What the service does
+- **Control buttons** — Start, Stop, and Restart
 
 The three core services are:
 
 | Service | Description |
 |---------|-------------|
-| **Alfred Worker** | Runs vault maintenance including Curator, Janitor, Distiller, and Surveyor |
-| **OpenClaw Gateway** | AI agent gateway for device connectivity and skill execution |
+| **Alfred Worker** | Runs vault maintenance including the Curator, Janitor, Distiller, and Surveyor |
+| **OpenClaw Gateway** | Device connectivity and skill execution |
 | **Temporal Engine** | Workflow orchestration for scheduled and triggered tasks |
 
-### Agent models
+### Specialist models
 
-Below the containers, you can configure which LLM model each agent uses. Tabs let you switch between agents:
+Below the services, you can configure which LLM model each specialist uses. Tabs let you switch between them:
 
-- **Alfred** -- The main worker agent
-- **Curator** -- Processes inbox content into structured records
-- **Janitor** -- Scans and fixes vault structural issues
-- **Distiller** -- Extracts latent knowledge from records
-- **Surveyor** -- Embeds and clusters vault content (uses a labeler model and an embedder model)
+- **Alfred** — The main worker
+- **Curator** — Reads inbox content and creates structured records
+- **Janitor** — Scans and repairs vault structural issues
+- **Distiller** — Surfaces latent knowledge from records
+- **Surveyor** — Embeds and clusters vault content (uses a labeler model and an embedder model)
 
-For each agent, you can pick a model from the dropdown grouped by provider:
+For each specialist, you can pick a model from the dropdown grouped by provider:
 
 | Provider | Key required | Example models |
 |----------|-------------|----------------|
@@ -136,7 +136,7 @@ If you select a model and the required API key is not configured, a dialog promp
 
 ## Devices
 
-The Devices section (accessible from the Home page Quick Actions area) manages OpenClaw device pairing. When a device (phone, tablet, or other client) requests to pair with your instance:
+The Devices section (accessible from the Home page Quick Actions area) manages OpenClaw device pairing. When a device (phone, tablet, or other client) requests to pair with your Alfred:
 
 1. The request appears as **pending** in the Devices section
 2. You can **approve** or **reject** it
@@ -147,20 +147,20 @@ For more details, see the [Device Pairing](/guides/device-pairing) guide.
 
 ## Credentials
 
-The Credentials page manages API keys for LLM providers used by your AI agents. Each credential shows:
+The Credentials page manages API keys for LLM providers used by your specialists. Each credential shows:
 
-- **Status** -- Whether the key is set (green check) or missing (gray X)
-- **Description** -- What the key is used for
-- **Masked value** -- A preview of the configured key
-- **Used by** -- Which agents or services depend on this key
+- **Status** — Whether the key is set (green check) or missing (gray X)
+- **Description** — What the key is used for
+- **Masked value** — A preview of the configured key
+- **Used by** — Which specialists or services depend on this key
 
 You can set, update, or remove credentials at any time. Changes restart the Alfred worker automatically so the new keys take effect.
 
-For more details, see the [API Keys](/guides/api-keys) guide (for Alfred API keys) and the [Your AI Agents](/guides/your-ai-agents) guide (for provider credentials).
+For more details, see the [API Keys](/guides/api-keys) guide (for Alfred API keys) and the [Your Specialists](/guides/your-ai-agents) guide (for provider credentials).
 
 ## Logs
 
-The Logs page streams real-time logs from all services running on your instance. Use this for debugging, monitoring agent activity, or verifying that processing is working correctly.
+The Logs page streams real-time logs from all services running on your Alfred. Use this for monitoring specialist activity or verifying that everything is working correctly.
 
 You can also access logs via the API. See the [Monitoring](/guides/monitoring) guide.
 
@@ -178,15 +178,15 @@ Links to the Polar customer portal where you can manage your subscription, updat
 
 ### API Keys
 
-Create and manage API keys for accessing the Alfred API. Each key provides full access to your instance's API endpoints. Keys use the `alf_` prefix format and are shown only once at creation time.
+Create and manage API keys for accessing the Alfred API. Each key provides full access to your API endpoints. Keys use the `alf_` prefix format and are shown only once at creation time.
 
 See the [API Keys](/guides/api-keys) guide for usage examples and best practices.
 
 <Columns cols={2}>
   <Card title="Using the Inbox" icon="inbox" href="/guides/using-the-inbox">
-    How to feed content to Alfred
+    How to share content with Alfred
   </Card>
-  <Card title="Your AI Agents" icon="gears" href="/guides/your-ai-agents">
-    Understand what each agent does
+  <Card title="Your Specialists" icon="gears" href="/guides/your-ai-agents">
+    Understand what each specialist does
   </Card>
 </Columns>

@@ -1,12 +1,12 @@
 ---
 title: "API Reference"
-description: "The Alfred Black API — programmatic access to your vault, agents, and instance."
+description: "The Alfred API — programmatic access to your vault, specialists, and services."
 icon: "code"
 ---
 
 ## Overview
 
-The Alfred Black API gives you full programmatic access to your vault, AI agents, workflows, and instance management. Everything you can do in the dashboard, you can do via the API.
+The Alfred API gives you full programmatic access to your vault, specialists, workflows, and service management. Everything you can do in the dashboard, you can do via the API.
 
 <Note>
   The base path for all API endpoints is `/api/v1`. Authenticate every request with your API key.
@@ -21,7 +21,7 @@ curl /api/v1/vault/context \
   -H "Authorization: Bearer alf_your_key_here"
 ```
 
-Create API keys in your [dashboard](https://app.alfred.black) under **Settings → API Keys**. See the [Authentication](/api-reference/authentication) page for details.
+Create API keys in your [dashboard](https://app.alfred.black) under **Settings > API Keys**. See the [Authentication](/api-reference/authentication) page for details.
 
 ## Request format
 
@@ -70,7 +70,7 @@ The API is organized into 8 functional groups with 86 endpoints:
     Record CRUD, search, inbox management, schema inspection.
   </Card>
   <Card title="Workers (15 endpoints)" icon="gears" href="/api-reference/workers/status">
-    Curator, Janitor, Distiller, and Surveyor control. Start, stop, scan, process.
+    Curator, Janitor, Distiller, and Surveyor control. Start, stop, scan, run.
   </Card>
   <Card title="Workflows (7 endpoints)" icon="diagram-project" href="/api-reference/workflows/list">
     Workflow management. List, start, terminate, signal, cancel, view history.
@@ -82,13 +82,13 @@ The API is organized into 8 functional groups with 86 endpoints:
     Device pairing. Approve, reject, remove, rotate keys, revoke access.
   </Card>
   <Card title="OpenClaw (13 endpoints)" icon="claw-marks" href="/api-reference/openclaw/health">
-    Agent gateway management. Health, skills, sessions, agents, plugins, hooks, secrets.
+    Gateway management. Health, skills, sessions, agents, plugins, hooks, secrets.
   </Card>
   <Card title="Logs (1 endpoint)" icon="scroll" href="/api-reference/logs/stream">
-    Real-time SSE log streaming from your instance services.
+    Real-time SSE log streaming from your services.
   </Card>
   <Card title="Instance (24 endpoints)" icon="server" href="/api-reference/admin/health">
-    Health checks, system info, service management, credentials, agent config.
+    Health checks, system info, service management, credentials, specialist config.
   </Card>
 </Columns>
 

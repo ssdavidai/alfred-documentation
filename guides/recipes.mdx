@@ -1,22 +1,22 @@
 ---
 title: "Recipes"
-description: "Real-world workflows and automation patterns"
+description: "Real-world workflows — hand Alfred your content and watch your vault come alive."
 icon: "book-open"
 ---
 
-This guide walks you through six practical recipes for using Alfred in real-world scenarios. Each recipe shows complete curl commands, expected responses, and the full workflow from start to finish.
+This guide walks you through six practical recipes. Each one shows you how to share something with Alfred and what Alfred prepares for you in return.
 
-## Recipe 1: Meeting Notes Pipeline
+## Recipe 1: Meeting Notes
 
-Extract structured data from meeting notes in seconds. This recipe shows how to upload raw meeting notes and have Alfred automatically extract people, tasks, decisions, and action items.
+Hand Alfred your meeting notes and watch it create people, tasks, decisions, and action items — all connected.
 
 <Steps>
-<Step title="Upload Meeting Notes">
-First, create a plain text file with meeting notes:
+<Step title="Share Meeting Notes">
+Prepare your meeting notes as plain text:
 
 ```
 Meeting: Q1 Planning - Product Team
-Date: 2024-02-28
+Date: 2026-02-28
 Attendees: Alice Chen (PM), Bob Smith (Lead Dev), Carol Lee (Design), David Park (QA)
 
 Agenda Items:
@@ -38,1428 +38,308 @@ Action Items:
 - David: Submit QA test plan by March 1st
 ```
 
-Upload these notes to your inbox:
+Share these notes via the inbox:
 
 ```bash
-curl -X POST "https://app.alfred.black/api/v1/inbox/upload" \
+curl -X POST "https://app.alfred.black/api/v1/vault/inbox" \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "filename": "Q1_Planning_Meeting_2024-02-28.txt",
-    "content": "Meeting: Q1 Planning - Product Team\nDate: 2024-02-28\nAttendees: Alice Chen (PM), Bob Smith (Lead Dev), Carol Lee (Design), David Park (QA)\n\nAgenda Items:\n1. Review Q4 outcomes - Alice presented metrics showing 32% user growth\n2. Q1 roadmap - focus on mobile app redesign and API performance\n3. Technical debt - Bob raised concerns about database migrations\n4. Timeline - Carol needs 3 weeks for design mockups, Bob estimates 6 weeks for dev\n\nDecisions Made:\n- Freeze new feature requests after March 15th\n- Hire 2 additional QA engineers (David to provide job descriptions)\n- Use PostgreSQL 15 for migration (previously debated MySQL)\n- Ship MVP by May 1st\n\nAction Items:\n- Alice: Schedule stakeholder check-in by March 5th\n- Bob: Create migration timeline and risk assessment\n- Carol: Deliver design mockups by March 21st\n- David: Submit QA test plan by March 1st",
-    "context": "meeting-notes"
+    "filename": "Q1_Planning_Meeting_2026-02-28.md",
+    "content": "Meeting: Q1 Planning - Product Team\nDate: 2026-02-28\nAttendees: Alice Chen (PM), Bob Smith (Lead Dev), Carol Lee (Design), David Park (QA)\n\nAgenda Items:\n1. Review Q4 outcomes - Alice presented metrics showing 32% user growth\n2. Q1 roadmap - focus on mobile app redesign and API performance\n3. Technical debt - Bob raised concerns about database migrations\n4. Timeline - Carol needs 3 weeks for design mockups, Bob estimates 6 weeks for dev\n\nDecisions Made:\n- Freeze new feature requests after March 15th\n- Hire 2 additional QA engineers (David to provide job descriptions)\n- Use PostgreSQL 15 for migration (previously debated MySQL)\n- Ship MVP by May 1st\n\nAction Items:\n- Alice: Schedule stakeholder check-in by March 5th\n- Bob: Create migration timeline and risk assessment\n- Carol: Deliver design mockups by March 21st\n- David: Submit QA test plan by March 1st"
   }'
 ```
 
-**Expected Response:**
+</Step>
 
-```json
-{
-  "success": true,
-  "inbox_id": "inbox_28f4d2a1",
-  "filename": "Q1_Planning_Meeting_2024-02-28.txt",
-  "size_bytes": 1247,
-  "processing_status": "queued",
-  "estimated_processing_time_seconds": 8,
-  "message": "File uploaded successfully. Curator will process this during the next sweep."
-}
+<Step title="See What Alfred Created">
+
+Wait a few seconds for the Curator to read your notes, then check what records Alfred prepared:
+
+```bash
+# See all people Alfred identified
+curl -s "https://app.alfred.black/api/v1/vault/list/person" \
+  -H "Authorization: Bearer YOUR_API_KEY" | jq .
+
+# See decisions captured
+curl -s "https://app.alfred.black/api/v1/vault/list/decision" \
+  -H "Authorization: Bearer YOUR_API_KEY" | jq .
+
+# See tasks extracted
+curl -s "https://app.alfred.black/api/v1/vault/list/task" \
+  -H "Authorization: Bearer YOUR_API_KEY" | jq .
 ```
+
+From a single meeting note, Alfred creates records for each person (Alice, Bob, Carol, David), the decisions made (PostgreSQL 15, feature freeze), tasks with owners and due dates, and the conversation record linking everything together.
 
 </Step>
 
-<Step title="Wait for Processing & Check Status">
+<Step title="Explore a Record">
 
-The curator processes uploads asynchronously. Check the status:
-
-```bash
-curl -X GET "https://app.alfred.black/api/v1/inbox/inbox_28f4d2a1/status" \
-  -H "Authorization: Bearer YOUR_API_KEY"
-```
-
-**Response (while processing):**
-
-```json
-{
-  "inbox_id": "inbox_28f4d2a1",
-  "filename": "Q1_Planning_Meeting_2024-02-28.txt",
-  "status": "processing",
-  "created_at": "2024-02-28T14:32:10Z",
-  "started_processing_at": "2024-02-28T14:32:15Z",
-  "progress_percent": 45
-}
-```
-
-**Response (after processing complete):**
-
-```json
-{
-  "inbox_id": "inbox_28f4d2a1",
-  "filename": "Q1_Planning_Meeting_2024-02-28.txt",
-  "status": "completed",
-  "created_at": "2024-02-28T14:32:10Z",
-  "completed_at": "2024-02-28T14:32:22Z",
-  "records_created": 9,
-  "records": [
-    {
-      "type": "person",
-      "name": "Alice Chen",
-      "role": "Product Manager",
-      "relationships": ["Q1_Planning_Meeting"]
-    },
-    {
-      "type": "person",
-      "name": "Bob Smith",
-      "role": "Lead Developer",
-      "relationships": ["Q1_Planning_Meeting", "Database_Migration"]
-    },
-    {
-      "type": "person",
-      "name": "Carol Lee",
-      "role": "Design Lead",
-      "relationships": ["Q1_Planning_Meeting", "Mobile_App_Redesign"]
-    },
-    {
-      "type": "person",
-      "name": "David Park",
-      "role": "QA Lead",
-      "relationships": ["Q1_Planning_Meeting"]
-    },
-    {
-      "type": "decision",
-      "title": "Freeze New Feature Requests",
-      "description": "No new feature requests will be accepted after March 15th",
-      "status": "active",
-      "context": "Q1 Planning"
-    },
-    {
-      "type": "decision",
-      "title": "Adopt PostgreSQL 15",
-      "description": "Use PostgreSQL 15 for database migration instead of MySQL",
-      "status": "active",
-      "context": "Technical Decision"
-    },
-    {
-      "type": "task",
-      "title": "Schedule Stakeholder Check-in",
-      "assigned_to": "Alice Chen",
-      "due_date": "2024-03-05",
-      "status": "pending"
-    },
-    {
-      "type": "task",
-      "title": "Create Database Migration Timeline",
-      "assigned_to": "Bob Smith",
-      "due_date": "2024-03-01",
-      "status": "pending"
-    },
-    {
-      "type": "task",
-      "title": "Deliver Mobile App Design Mockups",
-      "assigned_to": "Carol Lee",
-      "due_date": "2024-03-21",
-      "status": "pending"
-    }
-  ]
-}
-```
-
-</Step>
-
-<Step title="Verify Records in Vault">
-
-Once processing is complete, retrieve the vault records:
+Read the full detail of any record:
 
 ```bash
-curl -X GET "https://app.alfred.black/api/v1/vault/search?query=meeting+2024-02-28" \
-  -H "Authorization: Bearer YOUR_API_KEY"
+curl -s "https://app.alfred.black/api/v1/vault/records/person/Alice%20Chen.md" \
+  -H "Authorization: Bearer YOUR_API_KEY" | jq .
 ```
 
-**Response:**
-
-```json
-{
-  "query": "meeting 2024-02-28",
-  "total_results": 9,
-  "results": [
-    {
-      "id": "person/Alice_Chen",
-      "type": "person",
-      "title": "Alice Chen",
-      "path": "people/Alice_Chen.md",
-      "snippet": "Product Manager. Presented Q4 metrics (32% user growth). Responsible for Q1 roadmap planning.",
-      "updated_at": "2024-02-28T14:32:22Z"
-    },
-    {
-      "id": "decision/Adopt_PostgreSQL_15",
-      "type": "decision",
-      "title": "Adopt PostgreSQL 15",
-      "path": "learning/decisions/Adopt_PostgreSQL_15.md",
-      "snippet": "Use PostgreSQL 15 for database migration instead of MySQL. Decided in Q1 Planning meeting.",
-      "updated_at": "2024-02-28T14:32:22Z"
-    },
-    {
-      "id": "task/Schedule_Stakeholder_Check-in",
-      "type": "task",
-      "title": "Schedule Stakeholder Check-in",
-      "path": "tasks/Schedule_Stakeholder_Check-in.md",
-      "snippet": "Assigned to Alice Chen. Due 2024-03-05. Stakeholder synchronization for Q1 planning.",
-      "updated_at": "2024-02-28T14:32:22Z"
-    }
-  ]
-}
-```
-
-</Step>
-
-<Step title="View Full Record Details">
-
-Click through to see the complete structured record:
-
-```bash
-curl -X GET "https://app.alfred.black/api/v1/vault/person/Alice_Chen" \
-  -H "Authorization: Bearer YOUR_API_KEY"
-```
-
-**Response:**
-
-```json
-{
-  "id": "person/Alice_Chen",
-  "type": "person",
-  "title": "Alice Chen",
-  "path": "people/Alice_Chen.md",
-  "content": "---\ntype: person\ntitle: Alice Chen\nrole: Product Manager\norganization: [[org/Current Company]]\nstatus: active\ntags:\n  - product\n  - leadership\nrelationships:\n  - [[task/Schedule Stakeholder Check-in]]\n  - [[meeting/Q1 Planning]]\n---\n\n# Alice Chen\n\nProduct Manager leading Q1 planning initiatives.\n\n## Role & Responsibilities\n- Product roadmap definition\n- Stakeholder communication\n- Q4 metrics presentation (32% user growth)\n\n## Current Tasks\n- Schedule stakeholder check-in by March 5th\n\n## Related Records\n- [[org/Current Company]]\n- [[meeting/Q1 Planning 2024-02-28]]\n",
-  "metadata": {
-    "created_at": "2024-02-28T14:32:22Z",
-    "updated_at": "2024-02-28T14:32:22Z",
-    "source": "inbox_28f4d2a1",
-    "referenced_by": 5
-  }
-}
-```
+You'll see Alice's record with her role, organization link, connections to the meeting, her tasks, and the decisions she was part of. Every record links back to every other relevant record.
 
 </Step>
 </Steps>
 
 <Tip>
-The curator runs continuously in the background. New inbox uploads are processed automatically during the next sweep cycle (typically within 30 seconds). You can also trigger an immediate sweep with `alfred curator run --immediate`.
+The Curator runs continuously. New content shared via the inbox is attended to automatically — typically within 30 seconds. You can also trigger an immediate run with `POST /api/v1/workers/process`.
 </Tip>
 
 ---
 
 ## Recipe 2: Email Thread Digest
 
-Extract decisions, action items, and participants from a long email thread. This is perfect for catching up on discussions you missed.
+Share a long email thread and Alfred extracts every decision, action item, and participant — so you can catch up in seconds instead of minutes.
 
 <Steps>
-<Step title="Prepare Email Thread">
+<Step title="Share the Email Thread">
 
-Save a representative email thread as plain text:
-
-```
-From: sarah@company.com
-To: eng-team@company.com
-Date: 2024-02-25 09:15 AM
-Subject: Re: API Rate Limiting Implementation
-
-Sarah: Team, we need to finalize the rate limiting strategy. Current API
-is getting 5M requests/day, mostly from dashboard. Two proposals:
-
-1. Token bucket with 1000 req/min per API key (Alice's proposal)
-2. Sliding window counter, 500 req/min per key (Bob's proposal)
-
-Let me know thoughts by EOD. We need to ship by March 15th.
-
----
-
-From: bob@company.com
-Date: 2024-02-25 02:30 PM
-Subject: Re: API Rate Limiting Implementation
-
-Sarah, I prefer sliding window. Token bucket can have clock skew issues
-in distributed systems. Also prefer 500/min to be conservative—better to
-upgrade limits later than deal with abuse. Can we do a quick load test
-to see what 500/min looks like during peak hours?
-
----
-
-From: alice@company.com
-Date: 2024-02-25 03:45 PM
-Subject: Re: API Rate Limiting Implementation
-
-Bob makes a good point on clock skew. I'm fine with sliding window.
-However 500/min might be aggressive for our power users. Let's do 750/min
-as a compromise. Load test is smart—I can run that Tuesday if we freeze
-the implementation details.
-
-Carol, what's your timeline for updating the client SDKs to handle 429s?
-
----
-
-From: carol@company.com
-Date: 2024-02-25 04:15 PM
-Subject: Re: API Rate Limiting Implementation
-
-SDK updates: I can have the 429 handling in v2.1.0 by March 10th if you
-freeze the spec by March 1st. That gives us 10 days for integration testing.
-
-Sarah, once the rate limit is final, I'll send the spec to mobile team too.
-
----
-
-From: sarah@company.com
-Date: 2024-02-25 05:00 PM
-Subject: Re: API Rate Limiting Implementation
-
-DECISION: Sliding window counter, 750 req/min per API key.
-Load test Tuesday. Spec freeze: March 1st. Ship: March 15th.
-
-Action items:
-- Bob: Run load test, validate 750/min doesn't tank performance (due Tuesday)
-- Alice: Finalize implementation spec (due Feb 29)
-- Carol: SDK v2.1.0 with 429 handling (due March 10)
-- Me: Notify customers, update API docs (due March 5)
-
-Expect an email Tuesday evening with load test results.
-```
-
-Upload this thread:
+Save a representative email thread as plain text and share it:
 
 ```bash
-curl -X POST "https://app.alfred.black/api/v1/inbox/upload" \
+curl -X POST "https://app.alfred.black/api/v1/vault/inbox" \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "filename": "email_thread_api_rate_limiting.txt",
-    "content": "[Full email thread content from above]",
-    "context": "email-thread"
+    "filename": "email_thread_api_rate_limiting.md",
+    "content": "From: sarah@company.com\nTo: eng-team@company.com\nDate: 2026-02-25 09:15 AM\nSubject: Re: API Rate Limiting Implementation\n\nSarah: Team, we need to finalize the rate limiting strategy. Current API is getting 5M requests/day, mostly from dashboard. Two proposals:\n\n1. Token bucket with 1000 req/min per API key (Alice proposal)\n2. Sliding window counter, 500 req/min per key (Bob proposal)\n\nLet me know thoughts by EOD. We need to ship by March 15th.\n\n---\n\nFrom: bob@company.com\nDate: 2026-02-25 02:30 PM\n\nSarah, I prefer sliding window. Token bucket can have clock skew issues in distributed systems. Also prefer 500/min to be conservative. Can we do a quick load test?\n\n---\n\nFrom: alice@company.com\nDate: 2026-02-25 03:45 PM\n\nBob makes a good point on clock skew. Fine with sliding window. However 500/min might be aggressive for power users. 750/min as a compromise. Load test is smart.\n\nCarol, timeline for updating client SDKs to handle 429s?\n\n---\n\nFrom: carol@company.com\nDate: 2026-02-25 04:15 PM\n\nSDK updates: I can have 429 handling in v2.1.0 by March 10th if you freeze the spec by March 1st.\n\n---\n\nFrom: sarah@company.com\nDate: 2026-02-25 05:00 PM\n\nDECISION: Sliding window counter, 750 req/min per API key.\nLoad test Tuesday. Spec freeze: March 1st. Ship: March 15th.\n\nAction items:\n- Bob: Run load test (due Tuesday)\n- Alice: Finalize implementation spec (due Feb 29)\n- Carol: SDK v2.1.0 with 429 handling (due March 10)\n- Me: Notify customers, update API docs (due March 5)"
   }'
 ```
 
-**Expected Response:**
-
-```json
-{
-  "success": true,
-  "inbox_id": "inbox_a7f2e1c9",
-  "filename": "email_thread_api_rate_limiting.txt",
-  "size_bytes": 1893,
-  "processing_status": "queued",
-  "estimated_processing_time_seconds": 6,
-  "message": "Email thread uploaded successfully."
-}
-```
-
 </Step>
 
-<Step title="Check Processing Status">
+<Step title="See What Alfred Extracted">
+
+After the Curator reads the thread, search for what it found:
 
 ```bash
-curl -X GET "https://app.alfred.black/api/v1/inbox/inbox_a7f2e1c9/status" \
-  -H "Authorization: Bearer YOUR_API_KEY"
+# Find the decisions
+curl -s "https://app.alfred.black/api/v1/vault/search?grep=rate+limit" \
+  -H "Authorization: Bearer YOUR_API_KEY" | jq .
+
+# List all tasks from this thread
+curl -s "https://app.alfred.black/api/v1/vault/list/task" \
+  -H "Authorization: Bearer YOUR_API_KEY" | jq .
 ```
 
-**Response (completed):**
-
-```json
-{
-  "inbox_id": "inbox_a7f2e1c9",
-  "filename": "email_thread_api_rate_limiting.txt",
-  "status": "completed",
-  "created_at": "2024-02-25T09:00:00Z",
-  "completed_at": "2024-02-25T09:06:15Z",
-  "records_created": 11,
-  "summary": {
-    "participants": 4,
-    "decisions": 2,
-    "action_items": 4,
-    "key_dates": 3
-  },
-  "records": [
-    {
-      "type": "person",
-      "name": "Sarah",
-      "role": "Team Lead",
-      "email": "sarah@company.com"
-    },
-    {
-      "type": "person",
-      "name": "Bob",
-      "role": "Backend Engineer",
-      "email": "bob@company.com"
-    },
-    {
-      "type": "person",
-      "name": "Alice",
-      "role": "Backend Engineer",
-      "email": "alice@company.com"
-    },
-    {
-      "type": "person",
-      "name": "Carol",
-      "role": "SDK Maintainer",
-      "email": "carol@company.com"
-    },
-    {
-      "type": "decision",
-      "title": "API Rate Limiting Strategy",
-      "description": "Adopt sliding window counter with 750 requests per minute per API key",
-      "rationale": "Sliding window avoids clock skew issues. 750/min is a compromise between conservative (500) and user-friendly (1000) approaches.",
-      "status": "active",
-      "date": "2024-02-25"
-    },
-    {
-      "type": "constraint",
-      "title": "SDK Spec Freeze Deadline",
-      "description": "API rate limiting implementation spec must be frozen by March 1st to allow SDK updates by March 10th",
-      "deadline": "2024-03-01",
-      "impact": "SDK v2.1.0 release timeline depends on this"
-    },
-    {
-      "type": "task",
-      "title": "Run API Load Test",
-      "assigned_to": "Bob",
-      "due_date": "2024-02-27",
-      "description": "Validate 750 req/min performance impact under peak load",
-      "status": "pending"
-    },
-    {
-      "type": "task",
-      "title": "Finalize Rate Limiting Implementation Spec",
-      "assigned_to": "Alice",
-      "due_date": "2024-02-29",
-      "description": "Complete technical specification for sliding window counter implementation",
-      "status": "pending"
-    },
-    {
-      "type": "task",
-      "title": "Release SDK v2.1.0 with 429 Handling",
-      "assigned_to": "Carol",
-      "due_date": "2024-03-10",
-      "description": "SDK update to handle 429 rate limit responses",
-      "status": "pending"
-    },
-    {
-      "type": "task",
-      "title": "Notify Customers & Update API Docs",
-      "assigned_to": "Sarah",
-      "due_date": "2024-03-05",
-      "description": "Communicate rate limit changes to customers and update documentation",
-      "status": "pending"
-    }
-  ]
-}
-```
-
-</Step>
-
-<Step title="Search for Decisions & Action Items">
-
-Get a quick overview of what was decided and what needs to happen:
-
-```bash
-curl -X GET "https://app.alfred.black/api/v1/vault/search?type=decision&query=rate+limit" \
-  -H "Authorization: Bearer YOUR_API_KEY"
-```
-
-**Response:**
-
-```json
-{
-  "query": "rate limit",
-  "filter": {
-    "type": "decision"
-  },
-  "total_results": 1,
-  "results": [
-    {
-      "id": "decision/API_Rate_Limiting_Strategy",
-      "type": "decision",
-      "title": "API Rate Limiting Strategy",
-      "path": "learning/decisions/API_Rate_Limiting_Strategy.md",
-      "snippet": "Sliding window counter with 750 requests per minute per API key. Rationale: Clock skew avoidance in distributed systems.",
-      "metadata": {
-        "date": "2024-02-25",
-        "source": "email_thread_api_rate_limiting.txt"
-      }
-    }
-  ]
-}
-```
-
-Similarly, get all tasks from this thread:
-
-```bash
-curl -X GET "https://app.alfred.black/api/v1/vault/search?type=task&query=email_thread_api_rate_limiting" \
-  -H "Authorization: Bearer YOUR_API_KEY"
-```
-
-</Step>
-
-<Step title="View Timeline">
-
-Use the vault timeline endpoint to see all upcoming deadlines from this thread:
-
-```bash
-curl -X GET "https://app.alfred.black/api/v1/vault/timeline?start=2024-02-25&end=2024-03-20" \
-  -H "Authorization: Bearer YOUR_API_KEY"
-```
-
-**Response:**
-
-```json
-{
-  "period": {
-    "start": "2024-02-25",
-    "end": "2024-03-20"
-  },
-  "events": [
-    {
-      "date": "2024-02-27",
-      "title": "Run API Load Test",
-      "type": "task",
-      "assigned_to": "Bob",
-      "status": "pending",
-      "source": "email_thread_api_rate_limiting.txt"
-    },
-    {
-      "date": "2024-02-29",
-      "title": "Finalize Rate Limiting Implementation Spec",
-      "type": "task",
-      "assigned_to": "Alice",
-      "status": "pending",
-      "source": "email_thread_api_rate_limiting.txt"
-    },
-    {
-      "date": "2024-03-01",
-      "title": "Spec Freeze Deadline",
-      "type": "constraint",
-      "status": "active",
-      "source": "email_thread_api_rate_limiting.txt"
-    },
-    {
-      "date": "2024-03-05",
-      "title": "Notify Customers & Update API Docs",
-      "type": "task",
-      "assigned_to": "Sarah",
-      "status": "pending",
-      "source": "email_thread_api_rate_limiting.txt"
-    },
-    {
-      "date": "2024-03-10",
-      "title": "Release SDK v2.1.0 with 429 Handling",
-      "type": "task",
-      "assigned_to": "Carol",
-      "status": "pending",
-      "source": "email_thread_api_rate_limiting.txt"
-    },
-    {
-      "date": "2024-03-15",
-      "title": "API Rate Limiting Ship Date",
-      "type": "milestone",
-      "status": "active",
-      "source": "email_thread_api_rate_limiting.txt"
-    }
-  ]
-}
-```
+Alfred creates records for all four participants, the rate limiting decision with its rationale, a constraint (spec freeze deadline), and individual tasks for each action item with owners and due dates — all linked together.
 
 </Step>
 </Steps>
 
 <Note>
-The curator automatically extracts all participants, decisions, constraints, and action items from email threads. The `context: "email-thread"` hint helps the AI understand email formatting and threading conventions.
+The Curator understands email threading conventions. It identifies participants from email headers, decisions from explicit markers, and action items from lists — even when spread across multiple replies.
 </Note>
 
 ---
 
-## Recipe 3: Daily Vault Maintenance
+## Recipe 3: Vault Maintenance
 
-Scan your vault for structural issues, review them, and apply automated fixes.
+Have the Janitor scan your vault for broken links, missing metadata, and structural issues — then repair them.
 
 <Steps>
-<Step title="Scan for Issues">
+<Step title="Run a Scan">
 
-Run a janitor scan to identify broken links, invalid frontmatter, orphaned records, and other issues:
-
-```bash
-curl -X POST "https://app.alfred.black/api/v1/janitor/scan" \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  -d '{}'
-```
-
-**Expected Response:**
-
-```json
-{
-  "scan_id": "scan_20240228_001",
-  "started_at": "2024-02-28T09:00:00Z",
-  "status": "running",
-  "estimated_completion_time_seconds": 45,
-  "message": "Scanning vault for structural issues..."
-}
-```
-
-</Step>
-
-<Step title="Check Scan Results">
-
-Once scanning is complete, retrieve the full report:
+Ask the Janitor to look things over:
 
 ```bash
-curl -X GET "https://app.alfred.black/api/v1/janitor/scan/scan_20240228_001/results" \
+curl -X POST "https://app.alfred.black/api/v1/workers/janitor/scan" \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
-**Response:**
-
-```json
-{
-  "scan_id": "scan_20240228_001",
-  "completed_at": "2024-02-28T09:01:15Z",
-  "total_issues": 23,
-  "issues_by_category": {
-    "broken_links": 8,
-    "invalid_frontmatter": 4,
-    "orphaned_records": 6,
-    "missing_required_fields": 3,
-    "duplicate_names": 2
-  },
-  "issues": [
-    {
-      "category": "broken_links",
-      "severity": "high",
-      "file": "projects/Mobile_App_Redesign.md",
-      "line": 12,
-      "issue": "Link to [[person/Steve Johnson]] but record does not exist",
-      "suggestion": "Create person/Steve_Johnson.md or update link to existing person"
-    },
-    {
-      "category": "broken_links",
-      "severity": "medium",
-      "file": "learning/decisions/Adopt_PostgreSQL_15.md",
-      "line": 8,
-      "issue": "Link to [[project/Database_Migration]] is now at [[project/Infrastructure_Migration]]",
-      "suggestion": "Update link to current location"
-    },
-    {
-      "category": "orphaned_records",
-      "severity": "low",
-      "file": "people/old_intern.md",
-      "issue": "Record not referenced by any other record in vault",
-      "suggestion": "Review if still relevant; consider archiving"
-    },
-    {
-      "category": "invalid_frontmatter",
-      "severity": "high",
-      "file": "tasks/Update_API_Docs.md",
-      "issue": "Missing required field 'assigned_to' for task type",
-      "suggestion": "Add assigned_to field to frontmatter"
-    },
-    {
-      "category": "missing_required_fields",
-      "severity": "medium",
-      "file": "org/TechStartup_Inc.md",
-      "issue": "Person type missing 'role' field",
-      "suggestion": "Add role: [role description] to frontmatter"
-    },
-    {
-      "category": "duplicate_names",
-      "severity": "medium",
-      "issue": "Files 'Robert_Smith.md' and 'Bob_Smith.md' appear to be same person",
-      "files": ["people/Robert_Smith.md", "people/Bob_Smith.md"],
-      "suggestion": "Merge records under single canonical name"
-    }
-  ]
-}
-```
+The Janitor walks through your entire vault checking for broken links, invalid frontmatter, orphaned records, missing required fields, and duplicate entries.
 
 </Step>
 
-<Step title="Review Issues">
+<Step title="Check the Results">
 
-The janitor report gives you a detailed breakdown. In your UI dashboard, you can:
-- See high-severity issues highlighted in red
-- Click through to the exact line in each file
-- Review suggestions
-- Approve/reject fixes before applying
+See what the Janitor found:
 
-For the most critical issue (broken link to Steve Johnson), you have options:
-1. Create the missing person record
-2. Update the link to point to an existing person
-3. Remove the link
+```bash
+curl -s "https://app.alfred.black/api/v1/workers/janitor/status" \
+  -H "Authorization: Bearer YOUR_API_KEY" | jq .
+```
+
+The scan report groups issues by category and severity — broken links, invalid frontmatter, orphaned records, missing fields, and potential duplicates.
 
 </Step>
 
-<Step title="Apply Automated Fixes">
+<Step title="Repair the Issues">
 
-Once you've reviewed, apply the janitor's recommended fixes:
-
-```bash
-curl -X POST "https://app.alfred.black/api/v1/janitor/fix" \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  -d '{
-    "scan_id": "scan_20240228_001",
-    "auto_fix_categories": [
-      "invalid_frontmatter",
-      "missing_required_fields"
-    ],
-    "skip_categories": [
-      "broken_links"
-    ],
-    "manual_resolutions": {
-      "broken_links": [
-        {
-          "file": "projects/Mobile_App_Redesign.md",
-          "line": 12,
-          "action": "create_record",
-          "record_type": "person",
-          "record_name": "Steve Johnson"
-        },
-        {
-          "file": "learning/decisions/Adopt_PostgreSQL_15.md",
-          "line": 8,
-          "action": "update_link",
-          "old_link": "[[project/Database_Migration]]",
-          "new_link": "[[project/Infrastructure_Migration]]"
-        }
-      ]
-    }
-  }'
-```
-
-**Response:**
-
-```json
-{
-  "fix_id": "fix_20240228_001",
-  "status": "in_progress",
-  "started_at": "2024-02-28T09:05:00Z",
-  "estimated_completion_seconds": 20,
-  "plan": {
-    "auto_fixes": 7,
-    "manual_fixes": 2,
-    "skipped": 8,
-    "total": 17
-  }
-}
-```
-
-Check the status:
+Have the Janitor fix what it found:
 
 ```bash
-curl -X GET "https://app.alfred.black/api/v1/janitor/fix/fix_20240228_001" \
+curl -X POST "https://app.alfred.black/api/v1/workers/janitor/fix" \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
-**Response (when complete):**
-
-```json
-{
-  "fix_id": "fix_20240228_001",
-  "status": "completed",
-  "completed_at": "2024-02-28T09:05:22Z",
-  "summary": {
-    "fixes_applied": 17,
-    "records_created": 1,
-    "records_updated": 11,
-    "records_merged": 1,
-    "links_updated": 4
-  },
-  "changes": [
-    {
-      "file": "projects/Mobile_App_Redesign.md",
-      "action": "created_linked_record",
-      "record_type": "person",
-      "record_name": "Steve Johnson",
-      "new_file": "people/Steve_Johnson.md"
-    },
-    {
-      "file": "tasks/Update_API_Docs.md",
-      "action": "updated_frontmatter",
-      "changes": [
-        {
-          "field": "assigned_to",
-          "old_value": null,
-          "new_value": "[[person/Sarah_Kim]]"
-        }
-      ]
-    },
-    {
-      "file": "people/Robert_Smith.md",
-      "action": "merged_into",
-      "merged_into": "people/Bob_Smith.md",
-      "consolidation_reason": "Same person, canonicalized name"
-    },
-    {
-      "file": "learning/decisions/Adopt_PostgreSQL_15.md",
-      "action": "updated_links",
-      "links_fixed": 1
-    }
-  ]
-}
-```
+The Janitor repairs broken links, fills in missing metadata, and resolves structural issues. It works carefully — creating missing records where needed and updating links to point to the right places.
 
 </Step>
 
-<Step title="Verify Fixes">
+<Step title="Verify">
 
-Run a follow-up scan to confirm the issues are resolved:
+Run another scan to confirm everything is clean:
 
 ```bash
-curl -X POST "https://app.alfred.black/api/v1/janitor/scan" \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  -d '{}'
-```
-
-**Response (after fixes):**
-
-```json
-{
-  "scan_id": "scan_20240228_002",
-  "completed_at": "2024-02-28T09:06:00Z",
-  "total_issues": 6,
-  "issues_by_category": {
-    "broken_links": 2,
-    "invalid_frontmatter": 0,
-    "orphaned_records": 3,
-    "missing_required_fields": 0,
-    "duplicate_names": 0
-  },
-  "improvement": {
-    "issues_fixed": 17,
-    "vault_health_improved_percent": 74
-  }
-}
+curl -X POST "https://app.alfred.black/api/v1/workers/janitor/scan" \
+  -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
 </Step>
 </Steps>
 
 <Tip>
-Schedule janitor scans during off-hours or run them daily at 2 AM. The `auto_fix_categories` parameter lets you automatically fix safe issues (invalid YAML, missing fields) while requiring manual review for risky changes (merging records, deleting links).
+The Janitor also runs periodic scans automatically. For hands-off maintenance, you can schedule scans using Temporal workflows — see the [Schedules API](/api-reference/schedules/create).
 </Tip>
 
 ---
 
 ## Recipe 4: Knowledge Extraction
 
-After your vault has accumulated many operational records, use distiller to extract latent knowledge—the assumptions, decisions, constraints, and contradictions embedded in your records.
+After your vault has accumulated operational records, ask the Distiller to surface the knowledge hiding between the lines — assumptions, decisions, constraints, and contradictions.
 
 <Steps>
-<Step title="Understand the Distiller Workflow">
+<Step title="Understand What the Distiller Finds">
 
-The distiller analyzes your vault records to find:
+The Distiller reads your records and surfaces:
 - **Assumptions**: Beliefs underlying decisions (e.g., "users prefer mobile over desktop")
 - **Decisions**: Past choices and their rationales
-- **Constraints**: Limitations that shape decisions (e.g., "limited budget", "strict compliance requirements")
+- **Constraints**: Limitations that shape decisions (e.g., "limited budget", "compliance requirements")
 - **Contradictions**: Conflicting assumptions or decisions that need resolution
-- **Syntheses**: Connections between concepts
+- **Syntheses**: Connections between concepts across your vault
 
-Before running distiller, ensure you have at least 20-30 operational records (tasks, projects, decisions) in your vault.
-
-</Step>
-
-<Step title="Run Distiller Analysis">
-
-Trigger a full distiller run:
-
-```bash
-curl -X POST "https://app.alfred.black/api/v1/distiller/analyze" \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  -d '{
-    "scope": "all",
-    "analysis_types": [
-      "assumptions",
-      "decisions",
-      "constraints",
-      "contradictions"
-    ]
-  }'
-```
-
-**Expected Response:**
-
-```json
-{
-  "analysis_id": "analysis_20240228_001",
-  "started_at": "2024-02-28T10:00:00Z",
-  "status": "running",
-  "estimated_completion_seconds": 120,
-  "scope": "all",
-  "message": "Analyzing vault for latent knowledge patterns..."
-}
-```
+For best results, have at least 20-30 operational records in your vault before running the Distiller.
 
 </Step>
 
-<Step title="Check Analysis Progress & Results">
+<Step title="Scan for Extractable Knowledge">
 
 ```bash
-curl -X GET "https://app.alfred.black/api/v1/distiller/analyze/analysis_20240228_001" \
+curl -X POST "https://app.alfred.black/api/v1/workers/distiller/scan" \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
-**Response (in progress):**
-
-```json
-{
-  "analysis_id": "analysis_20240228_001",
-  "status": "running",
-  "progress_percent": 62,
-  "processed_records": 45,
-  "total_records": 73,
-  "findings_so_far": {
-    "assumptions": 8,
-    "decisions": 12,
-    "constraints": 6,
-    "contradictions": 2
-  }
-}
-```
-
-**Response (when complete):**
-
-```json
-{
-  "analysis_id": "analysis_20240228_001",
-  "completed_at": "2024-02-28T10:02:15Z",
-  "status": "completed",
-  "records_analyzed": 73,
-  "learning_records_created": 28,
-  "findings": {
-    "assumptions": [
-      {
-        "id": "assumption/Mobile_First_Strategy",
-        "title": "Mobile users are our core audience",
-        "description": "Assumption: 60%+ of users access via mobile; mobile-first design will drive engagement",
-        "evidence": [
-          "decision/Mobile_App_Redesign approved in Q1 planning",
-          "task/Mobile_App_Redesign underway",
-          "project/iOS_App has 3 engineers allocated"
-        ],
-        "impact": "High - shapes product roadmap and resource allocation",
-        "created": true
-      },
-      {
-        "id": "assumption/API_Cost_Constraints",
-        "title": "API infrastructure costs limit feature scope",
-        "description": "Assumption: Current cloud budget ($50k/month) constrains feature complexity and real-time capabilities",
-        "evidence": [
-          "decision/Rate_Limiting_750_per_min prevents API overuse",
-          "constraint/Limited_Infrastructure_Budget",
-          "project/Cost_Optimization_Q1"
-        ],
-        "impact": "Medium - affects feature prioritization",
-        "created": true
-      }
-    ],
-    "decisions": [
-      {
-        "id": "decision/Adopt_PostgreSQL_15",
-        "title": "Adopt PostgreSQL 15 for database",
-        "description": "Decision made in Feb 2024. Rationale: Better performance, JSON support, improved parallelization",
-        "rationale": "Clock skew avoidance in distributed systems",
-        "date": "2024-02-25",
-        "status": "active",
-        "evidence_records": 4,
-        "created": false
-      },
-      {
-        "id": "decision/Rate_Limiting_750_per_min",
-        "title": "Implement 750 req/min rate limit",
-        "description": "Sliding window counter rate limiting to prevent API abuse while allowing power users",
-        "date": "2024-02-25",
-        "status": "active",
-        "created": false
-      }
-    ],
-    "constraints": [
-      {
-        "id": "constraint/Q1_Hiring_Freeze",
-        "title": "Hiring freeze until Q2",
-        "description": "Cannot hire additional engineers or product staff until April 1st. Impacts project timeline.",
-        "impact": "High - limits resource allocation",
-        "source_records": ["project/Mobile_App_Redesign", "org/Engineering_Team"],
-        "created": true
-      },
-      {
-        "id": "constraint/GDPR_Compliance_Required",
-        "title": "Must maintain GDPR compliance",
-        "description": "EU operations require data residency, encryption, and audit trails",
-        "impact": "High - affects database design and infrastructure",
-        "created": true
-      }
-    ],
-    "contradictions": [
-      {
-        "id": "contradiction/Feature_Speed_vs_Quality",
-        "title": "Tension between feature velocity and code quality",
-        "description": "Assumption: Ship fast to compete. vs. Constraint: Code quality and testing take time. Contradiction: Can't do both maximally.",
-        "records": [
-          "assumption/Mobile_First_Strategy",
-          "project/Mobile_App_Redesign",
-          "constraint/Code_Quality_Standards"
-        ],
-        "suggested_resolution": "Define velocity targets by feature tier (MVP features fast, core features thoroughly tested)",
-        "created": true
-      }
-    ]
-  }
-}
-```
+The Distiller identifies which records could yield learning records.
 
 </Step>
 
-<Step title="View Knowledge Records">
-
-All extracted knowledge is now in your vault as learning records. Search for them:
+<Step title="Run the Extraction">
 
 ```bash
-curl -X GET "https://app.alfred.black/api/v1/vault/search?type=assumption" \
+curl -X POST "https://app.alfred.black/api/v1/workers/distiller/run" \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
-**Response:**
-
-```json
-{
-  "query": "",
-  "filter": {
-    "type": "assumption"
-  },
-  "total_results": 8,
-  "results": [
-    {
-      "id": "assumption/Mobile_First_Strategy",
-      "type": "assumption",
-      "title": "Mobile users are our core audience",
-      "path": "learning/assumptions/Mobile_First_Strategy.md",
-      "snippet": "60%+ of users access via mobile; mobile-first design drives engagement. Evidence: Mobile App Redesign project, iOS App allocation.",
-      "metadata": {
-        "created_by": "distiller",
-        "analysis_id": "analysis_20240228_001",
-        "confidence": "high"
-      }
-    }
-  ]
-}
-```
-
-View a full assumption record:
-
-```bash
-curl -X GET "https://app.alfred.black/api/v1/vault/assumption/Mobile_First_Strategy" \
-  -H "Authorization: Bearer YOUR_API_KEY"
-```
-
-**Response:**
-
-```json
-{
-  "id": "assumption/Mobile_First_Strategy",
-  "type": "assumption",
-  "title": "Mobile users are our core audience",
-  "path": "learning/assumptions/Mobile_First_Strategy.md",
-  "content": "---\ntype: assumption\ntitle: Mobile users are our core audience\nstatus: active\nconfidence: high\nevidence:\n  - [[decision/Mobile_App_Redesign]]\n  - [[project/iOS_App]]\n  - [[task/Mobile_App_Redesign]]\nimpact: High\nrelated_decisions:\n  - [[decision/Mobile_First_Design_Pattern]]\nrelated_constraints:\n  - [[constraint/Limited_Engineering_Resources]]\n---\n\n# Mobile users are our core audience\n\n## Summary\n\nAssumption: 60%+ of users access via mobile; mobile-first design will drive engagement and retention.\n\n## Evidence\n\n- Q1 2024 product planning meeting identified mobile redesign as top priority\n- 3 engineers allocated to iOS App project\n- Dashboard analytics (if available) would validate actual user distribution\n\n## Impact\n\nHigh. This assumption shapes:\n- Product roadmap (mobile features first)\n- Engineering resource allocation (mobile engineers)\n- Design approach (mobile-first, responsive web)\n\n## Related Records\n\n- [[decision/Mobile_App_Redesign]]\n- [[project/iOS_App]]\n- [[constraint/Limited_Engineering_Resources]]\n\n## Validation Needed\n\nQuestion: Do we have actual analytics data on mobile vs web user distribution? Should validate quarterly.\n",
-  "metadata": {
-    "created_at": "2024-02-28T10:02:15Z",
-    "source_analysis": "analysis_20240228_001",
-    "evidence_count": 3,
-    "related_records": 5
-  }
-}
-```
+The Distiller reads through your records and creates learning records — each linked back to the source records it was surfaced from.
 
 </Step>
 
-<Step title="Review Contradictions">
-
-Contradictions help you identify where your organization may have conflicting goals or beliefs:
+<Step title="Browse What Was Surfaced">
 
 ```bash
-curl -X GET "https://app.alfred.black/api/v1/vault/search?type=contradiction" \
-  -H "Authorization: Bearer YOUR_API_KEY"
+# See assumptions the Distiller found
+curl -s "https://app.alfred.black/api/v1/vault/list/assumption" \
+  -H "Authorization: Bearer YOUR_API_KEY" | jq .
+
+# See contradictions that need attention
+curl -s "https://app.alfred.black/api/v1/vault/list/contradiction" \
+  -H "Authorization: Bearer YOUR_API_KEY" | jq .
+
+# See synthesized insights
+curl -s "https://app.alfred.black/api/v1/vault/list/synthesis" \
+  -H "Authorization: Bearer YOUR_API_KEY" | jq .
 ```
 
-**Response:**
-
-```json
-{
-  "query": "",
-  "filter": {
-    "type": "contradiction"
-  },
-  "total_results": 2,
-  "results": [
-    {
-      "id": "contradiction/Feature_Speed_vs_Quality",
-      "type": "contradiction",
-      "title": "Tension between feature velocity and code quality",
-      "path": "learning/contradictions/Feature_Speed_vs_Quality.md",
-      "snippet": "Ship fast to compete vs. Code quality takes time. Resolution: Define velocity targets by feature tier.",
-      "metadata": {
-        "created_by": "distiller",
-        "suggested_resolution": true
-      }
-    }
-  ]
-}
-```
+Each learning record includes the evidence trail — which records it was surfaced from, the reasoning, and suggested actions.
 
 </Step>
 </Steps>
 
 <Tip>
-Run distiller analysis monthly or quarterly to capture evolving organizational knowledge. As you make new decisions and take on new constraints, re-running distiller reveals how your knowledge landscape is shifting. It's a great way to catch outdated assumptions before they cause problems.
+Run the Distiller monthly or quarterly. As your world evolves — new decisions, new constraints, shifting priorities — the Distiller reveals how your knowledge landscape is changing. It's a good way to catch outdated assumptions before they cause problems.
 </Tip>
 
 ---
 
 ## Recipe 5: Bulk Document Import
 
-Upload a batch of related documents (requirements, architecture diagrams as text, timeline, etc.) in one API call and have Alfred process them together, extracting relationships and shared context.
+Share a batch of related documents at once — requirements, architecture, timeline — and Alfred creates an interconnected project graph from all of them together.
 
 <Steps>
-<Step title="Prepare Multiple Documents">
+<Step title="Prepare Your Documents">
 
-Organize your documents. For example, a new project might have:
-
-**Document 1: Requirements (requirements.txt)**
-
-```
-PROJECT: Mobile Payment Integration
-DATE: 2024-02-28
-
-REQUIREMENTS:
-
-1. Payment Processing
-   - Support Stripe, PayPal, Apple Pay, Google Pay
-   - Tokenization for repeat payments
-   - PCI DSS compliance required
-   - Handle failed payments with retry logic
-
-2. User Experience
-   - Checkout flow < 2 minutes
-   - Biometric auth on mobile
-   - Payment history visible in user dashboard
-   - Invoice generation (PDF download)
-
-3. Compliance & Security
-   - PCI DSS Level 1 compliance
-   - SOC 2 Type II certification
-   - Annual penetration testing
-   - Encryption in transit (TLS 1.3+) and at rest
-```
-
-**Document 2: Architecture (architecture.txt)**
-
-```
-SYSTEM ARCHITECTURE: Payment Integration
-
-Components:
-- Payment API (Node.js, Express)
-- Vault Service (encrypted payment data storage)
-- Webhook Processor (async event handling)
-- Analytics Service (transaction logging)
-
-Data Flow:
-1. Client sends payment details via TLS
-2. API validates and tokenizes with Stripe
-3. Vault stores encrypted token
-4. Transaction logged to analytics with PII masked
-5. Webhook confirms completion to client
-
-Scalability:
-- 10,000 payments/day capacity
-- Auto-scale payment API on 70% CPU
-- Read replicas for analytics queries
-```
-
-**Document 3: Timeline (timeline.txt)**
-
-```
-PROJECT TIMELINE: Mobile Payment Integration
-
-Phase 1: Infrastructure (Feb 28 - Mar 15, 2 weeks)
-- Set up Stripe account and sandbox
-- Build Payment API skeleton
-- Set up Vault Service
-- Assign: Bob (API), Carol (Vault), David (Ops)
-
-Phase 2: MVP (Mar 16 - Apr 15, 4 weeks)
-- Implement Stripe integration
-- Build checkout UI component
-- Payment history in dashboard
-- Assign: Alice (UI), Bob (Backend)
-
-Phase 3: Extended (Apr 16 - May 30, 6 weeks)
-- Add PayPal, Apple Pay, Google Pay
-- Compliance audit & fixes
-- Load testing to 10k/day
-- Assign: Engineering team
-
-Phase 4: Launch (Jun 1, 1 week)
-- Final QA, staging verification
-- Customer comms & docs
-- Go live
-
-Milestones:
-- Mar 15: Infrastructure complete
-- Apr 15: MVP shipped to beta users
-- May 30: All payment providers working
-- Jun 1: General availability
-```
+Organize your documents. For a new project, you might have requirements, an architecture overview, and a timeline.
 
 </Step>
 
-<Step title="Prepare Bulk Upload Payload">
+<Step title="Share Them Together">
 
-Construct a single bulk upload request:
+Use the bulk inbox endpoint:
 
 ```bash
-curl -X POST "https://app.alfred.black/api/v1/inbox/bulk-upload" \
+curl -X POST "https://app.alfred.black/api/v1/vault/inbox/bulk" \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "batch_name": "Mobile Payment Integration Project",
-    "batch_context": "project-launch",
-    "documents": [
+    "files": [
       {
-        "filename": "requirements.txt",
-        "content": "PROJECT: Mobile Payment Integration\nDATE: 2024-02-28\n\nREQUIREMENTS:\n\n1. Payment Processing\n   - Support Stripe, PayPal, Apple Pay, Google Pay\n   - Tokenization for repeat payments\n   - PCI DSS compliance required\n   - Handle failed payments with retry logic\n\n2. User Experience\n   - Checkout flow < 2 minutes\n   - Biometric auth on mobile\n   - Payment history visible in user dashboard\n   - Invoice generation (PDF download)\n\n3. Compliance & Security\n   - PCI DSS Level 1 compliance\n   - SOC 2 Type II certification\n   - Annual penetration testing\n   - Encryption in transit (TLS 1.3+) and at rest",
-        "document_type": "requirements"
+        "filename": "requirements.md",
+        "content": "PROJECT: Mobile Payment Integration\nDATE: 2026-02-28\n\nREQUIREMENTS:\n\n1. Payment Processing\n   - Support Stripe, PayPal, Apple Pay, Google Pay\n   - PCI DSS compliance required\n\n2. User Experience\n   - Checkout flow < 2 minutes\n   - Biometric auth on mobile\n\n3. Compliance\n   - PCI DSS Level 1\n   - SOC 2 Type II certification"
       },
       {
-        "filename": "architecture.txt",
-        "content": "SYSTEM ARCHITECTURE: Payment Integration\n\nComponents:\n- Payment API (Node.js, Express)\n- Vault Service (encrypted payment data storage)\n- Webhook Processor (async event handling)\n- Analytics Service (transaction logging)\n\nData Flow:\n1. Client sends payment details via TLS\n2. API validates and tokenizes with Stripe\n3. Vault stores encrypted token\n4. Transaction logged to analytics with PII masked\n5. Webhook confirms completion to client\n\nScalability:\n- 10,000 payments/day capacity\n- Auto-scale payment API on 70% CPU\n- Read replicas for analytics queries",
-        "document_type": "architecture"
+        "filename": "architecture.md",
+        "content": "SYSTEM ARCHITECTURE: Payment Integration\n\nComponents:\n- Payment API (Node.js, Express)\n- Vault Service (encrypted payment data storage)\n- Webhook Processor (async event handling)\n\nScalability:\n- 10,000 payments/day capacity\n- Auto-scale on 70% CPU"
       },
       {
-        "filename": "timeline.txt",
-        "content": "PROJECT TIMELINE: Mobile Payment Integration\n\nPhase 1: Infrastructure (Feb 28 - Mar 15, 2 weeks)\n- Set up Stripe account and sandbox\n- Build Payment API skeleton\n- Set up Vault Service\n- Assign: Bob (API), Carol (Vault), David (Ops)\n\nPhase 2: MVP (Mar 16 - Apr 15, 4 weeks)\n- Implement Stripe integration\n- Build checkout UI component\n- Payment history in dashboard\n- Assign: Alice (UI), Bob (Backend)\n\nPhase 3: Extended (Apr 16 - May 30, 6 weeks)\n- Add PayPal, Apple Pay, Google Pay\n- Compliance audit & fixes\n- Load testing to 10k/day\n- Assign: Engineering team\n\nPhase 4: Launch (Jun 1, 1 week)\n- Final QA, staging verification\n- Customer comms & docs\n- Go live\n\nMilestones:\n- Mar 15: Infrastructure complete\n- Apr 15: MVP shipped to beta users\n- May 30: All payment providers working\n- Jun 1: General availability",
-        "document_type": "timeline"
+        "filename": "timeline.md",
+        "content": "PROJECT TIMELINE: Mobile Payment Integration\n\nPhase 1: Infrastructure (Feb 28 - Mar 15)\n- Assign: Bob (API), Carol (Vault), David (Ops)\n\nPhase 2: MVP (Mar 16 - Apr 15)\n- Assign: Alice (UI), Bob (Backend)\n\nPhase 3: Extended Providers (Apr 16 - May 30)\n\nPhase 4: Launch (Jun 1)\n\nMilestones:\n- Mar 15: Infrastructure complete\n- Apr 15: MVP shipped\n- Jun 1: General availability"
       }
     ]
   }'
 ```
 
-**Expected Response:**
-
-```json
-{
-  "success": true,
-  "batch_id": "batch_62d1f8a3",
-  "batch_name": "Mobile Payment Integration Project",
-  "documents_queued": 3,
-  "total_size_bytes": 3421,
-  "processing_status": "queued",
-  "estimated_processing_time_seconds": 25,
-  "message": "Batch upload successful. Curator will process documents together."
-}
-```
-
 </Step>
 
-<Step title="Monitor Batch Processing">
+<Step title="Explore the Project Graph">
+
+The Curator reads all three documents together, finding cross-document relationships. Check what was created:
 
 ```bash
-curl -X GET "https://app.alfred.black/api/v1/inbox/batch/batch_62d1f8a3/status" \
-  -H "Authorization: Bearer YOUR_API_KEY"
+# Search for the project
+curl -s "https://app.alfred.black/api/v1/vault/search?grep=Payment+Integration" \
+  -H "Authorization: Bearer YOUR_API_KEY" | jq .
+
+# See all tasks
+curl -s "https://app.alfred.black/api/v1/vault/list/task" \
+  -H "Authorization: Bearer YOUR_API_KEY" | jq .
+
+# See all people
+curl -s "https://app.alfred.black/api/v1/vault/list/person" \
+  -H "Authorization: Bearer YOUR_API_KEY" | jq .
 ```
 
-**Response (in progress):**
-
-```json
-{
-  "batch_id": "batch_62d1f8a3",
-  "batch_name": "Mobile Payment Integration Project",
-  "status": "processing",
-  "created_at": "2024-02-28T14:00:00Z",
-  "started_at": "2024-02-28T14:00:05Z",
-  "documents_processed": 2,
-  "documents_total": 3,
-  "progress_percent": 67,
-  "records_created_so_far": 18
-}
-```
-
-**Response (when complete):**
-
-```json
-{
-  "batch_id": "batch_62d1f8a3",
-  "batch_name": "Mobile Payment Integration Project",
-  "status": "completed",
-  "completed_at": "2024-02-28T14:00:30Z",
-  "documents_processed": 3,
-  "documents_total": 3,
-  "records_created": 31,
-  "relationship_connections": 12,
-  "summary": {
-    "by_type": {
-      "project": 1,
-      "requirement": 8,
-      "architecture_component": 5,
-      "milestone": 4,
-      "task": 10,
-      "person": 4,
-      "constraint": 2,
-      "decision": 2
-    }
-  },
-  "documents": [
-    {
-      "filename": "requirements.txt",
-      "status": "processed",
-      "records_created": 10
-    },
-    {
-      "filename": "architecture.txt",
-      "status": "processed",
-      "records_created": 9
-    },
-    {
-      "filename": "timeline.txt",
-      "status": "processed",
-      "records_created": 12
-    }
-  ]
-}
-```
-
-</Step>
-
-<Step title="View Extracted Project Structure">
-
-The bulk import created an interconnected set of records. Search for the project:
-
-```bash
-curl -X GET "https://app.alfred.black/api/v1/vault/project/Mobile_Payment_Integration" \
-  -H "Authorization: Bearer YOUR_API_KEY"
-```
-
-**Response:**
-
-```json
-{
-  "id": "project/Mobile_Payment_Integration",
-  "type": "project",
-  "title": "Mobile Payment Integration",
-  "path": "projects/Mobile_Payment_Integration.md",
-  "content": "---\ntype: project\ntitle: Mobile Payment Integration\nstatus: active\nstart_date: 2024-02-28\nend_date: 2024-06-01\nteam_members:\n  - [[person/Alice]]\n  - [[person/Bob]]\n  - [[person/Carol]]\n  - [[person/David]]\nrequirements:\n  - [[requirement/Payment_Processing]]\n  - [[requirement/User_Experience]]\n  - [[requirement/Compliance_Security]]\narchitecture:\n  - [[component/Payment_API]]\n  - [[component/Vault_Service]]\n  - [[component/Webhook_Processor]]\nmilestones:\n  - [[milestone/Infrastructure_Complete]]\n  - [[milestone/MVP_Shipped]]\n  - [[milestone/All_Providers_Working]]\n  - [[milestone/General_Availability]]\ntasks:\n  - [[task/Setup_Stripe_Account]]\n  - [[task/Build_Payment_API]]\n  - [[task/Implement_Checkout_UI]]\n  - [[task/Security_Audit]]\n---\n\n# Mobile Payment Integration\n\n## Overview\nAdd payment processing capabilities to mobile app. Support multiple payment providers (Stripe, PayPal, Apple Pay, Google Pay) with PCI DSS compliance.\n\n## Timeline\n- **Phase 1** (Feb 28 - Mar 15): Infrastructure setup\n- **Phase 2** (Mar 16 - Apr 15): MVP with Stripe\n- **Phase 3** (Apr 16 - May 30): Extended providers\n- **Phase 4** (Jun 1): Launch\n\n## Key Requirements\n- PCI DSS Level 1 compliance\n- < 2 minute checkout flow\n- Payment history & invoicing\n- Support 4 payment providers\n\n## Team\n- Alice: UI/Frontend\n- Bob: Backend/Payment API\n- Carol: Vault/Encryption\n- David: DevOps\n\n## Milestones\n- [[milestone/Infrastructure_Complete]] - Mar 15\n- [[milestone/MVP_Shipped]] - Apr 15\n- [[milestone/All_Providers_Working]] - May 30\n- [[milestone/General_Availability]] - Jun 1\n",
-  "metadata": {
-    "created_at": "2024-02-28T14:00:30Z",
-    "source_batch": "batch_62d1f8a3",
-    "records_linked": 31,
-    "teams_involved": 4
-  }
-}
-```
-
-View all milestones:
-
-```bash
-curl -X GET "https://app.alfred.black/api/v1/vault/search?type=milestone&query=payment" \
-  -H "Authorization: Bearer YOUR_API_KEY"
-```
-
-**Response:**
-
-```json
-{
-  "query": "payment",
-  "filter": {
-    "type": "milestone"
-  },
-  "total_results": 4,
-  "results": [
-    {
-      "id": "milestone/Infrastructure_Complete",
-      "type": "milestone",
-      "title": "Infrastructure Complete",
-      "path": "milestones/Infrastructure_Complete.md",
-      "metadata": {
-        "date": "2024-03-15",
-        "project": "Mobile_Payment_Integration",
-        "phase": "Phase 1"
-      }
-    },
-    {
-      "id": "milestone/MVP_Shipped",
-      "type": "milestone",
-      "title": "MVP Shipped",
-      "path": "milestones/MVP_Shipped.md",
-      "metadata": {
-        "date": "2024-04-15",
-        "project": "Mobile_Payment_Integration"
-      }
-    }
-  ]
-}
-```
-
-</Step>
-
-<Step title="View Task Assignments">
-
-All team member assignments are extracted and linked:
-
-```bash
-curl -X GET "https://app.alfred.black/api/v1/vault/search?type=task&query=payment" \
-  -H "Authorization: Bearer YOUR_API_KEY"
-```
-
-**Response:**
-
-```json
-{
-  "query": "payment",
-  "filter": {
-    "type": "task"
-  },
-  "total_results": 10,
-  "results": [
-    {
-      "id": "task/Setup_Stripe_Account",
-      "type": "task",
-      "title": "Setup Stripe Account",
-      "path": "tasks/Setup_Stripe_Account.md",
-      "metadata": {
-        "assigned_to": "Bob",
-        "due_date": "2024-03-15",
-        "phase": "Infrastructure",
-        "project": "Mobile_Payment_Integration"
-      }
-    },
-    {
-      "id": "task/Build_Checkout_UI",
-      "type": "task",
-      "title": "Build Checkout UI",
-      "path": "tasks/Build_Checkout_UI.md",
-      "metadata": {
-        "assigned_to": "Alice",
-        "due_date": "2024-04-15",
-        "phase": "MVP",
-        "project": "Mobile_Payment_Integration"
-      }
-    }
-  ]
-}
-```
+Alfred creates a complete project graph: the project record linked to team members, requirements, architecture components, tasks with phase assignments, and milestone dates — all cross-referenced.
 
 </Step>
 </Steps>
 
 <Note>
-Bulk imports are ideal when you're starting a new project or major initiative. Upload all relevant docs at once, and Alfred automatically extracts relationships between them—requirements linked to tasks, timeline milestones linked to deliverables, team members linked to their assignments. This creates a complete project graph in one go.
+Bulk imports are ideal when starting a new project or initiative. Share all relevant docs at once and Alfred finds the relationships between them — requirements linked to tasks, milestones linked to deliverables, team members linked to their assignments.
 </Note>
 
 ---
 
-## Recipe 6: Automated Inbox via Bash Script
+## Recipe 6: Automated Inbox via Script
 
-Create a simple bash script that watches a local folder and automatically uploads new files to Alfred's inbox. This is perfect for continuous input from notes apps, email exports, or document processors.
+Create a script that watches a local folder and automatically shares new files with Alfred. Perfect for continuous input from notes apps, email exports, or document processors.
 
 <Steps>
 <Step title="Create the Watcher Script">
@@ -1470,7 +350,7 @@ Save this as `watch_and_upload.sh`:
 #!/bin/bash
 
 # Alfred Inbox Auto-Uploader
-# Watches a local folder and uploads new files to Alfred
+# Watches a local folder and shares new files with Alfred
 
 set -e
 
@@ -1494,38 +374,26 @@ upload_file() {
   local file="$1"
   local filename=$(basename "$file")
 
-  log "Uploading: $filename"
+  log "Sharing: $filename"
 
   # Read file content
   local content=$(cat "$file")
 
-  # Determine context based on file extension
-  local context="document"
-  if [[ "$filename" == *".meeting"* ]] || [[ "$filename" == *"meeting"* ]]; then
-    context="meeting-notes"
-  elif [[ "$filename" == *".email"* ]] || [[ "$filename" == *"thread"* ]]; then
-    context="email-thread"
-  elif [[ "$filename" == *".md" ]] || [[ "$filename" == *".txt" ]]; then
-    context="document"
-  fi
-
   # Upload via API
-  local response=$(curl -s -X POST "$API_BASE_URL/api/v1/inbox/upload" \
+  local response=$(curl -s -X POST "$API_BASE_URL/api/v1/vault/inbox" \
     -H "Authorization: Bearer $API_KEY" \
     -H "Content-Type: application/json" \
     -d @- <<EOF
 {
   "filename": "$filename",
-  "content": $(echo "$content" | jq -Rs .),
-  "context": "$context"
+  "content": $(echo "$content" | jq -Rs .)
 }
 EOF
   )
 
   # Check for success
   if echo "$response" | jq -e '.success' > /dev/null 2>&1; then
-    local inbox_id=$(echo "$response" | jq -r '.inbox_id')
-    log "SUCCESS: $filename (inbox_id: $inbox_id)"
+    log "SUCCESS: $filename"
     echo "$file" >> "$STATE_FILE"
   else
     log "FAILED: $filename"
@@ -1535,26 +403,21 @@ EOF
 }
 
 monitor_directory() {
-  log "Starting to monitor: $WATCH_DIR"
-  log "API Key: ${API_KEY:0:10}..."
+  log "Watching: $WATCH_DIR"
 
   # Initial scan
   while IFS= read -r file; do
-    # Skip if already uploaded
     if grep -q "^$file$" "$STATE_FILE"; then
       continue
     fi
-
-    # Skip special files
-    if [[ "$file" == .* ]] || [[ "$file" == *"~" ]] || [[ "$file" == ".alfred_upload_state" ]]; then
+    if [[ "$file" == .* ]] || [[ "$file" == *"~" ]]; then
       continue
     fi
-
     upload_file "$file"
   done < <(find "$WATCH_DIR" -maxdepth 1 -type f)
 
   # Watch for new files using fswatch (install: brew install fswatch)
-  # Fallback to simple polling if fswatch not available
+  # Falls back to polling if fswatch is not available
   if command -v fswatch &> /dev/null; then
     log "Using fswatch for real-time monitoring"
     fswatch -r "$WATCH_DIR" | while read file; do
@@ -1563,7 +426,7 @@ monitor_directory() {
       fi
     done
   else
-    log "fswatch not available, using polling (60s intervals)"
+    log "fswatch not available, polling every 60s"
     while true; do
       while IFS= read -r file; do
         if [ -f "$file" ] && ! grep -q "^$file$" "$STATE_FILE"; then
@@ -1575,7 +438,6 @@ monitor_directory() {
   fi
 }
 
-# Main
 if [ ! -d "$WATCH_DIR" ]; then
   log "ERROR: Directory not found: $WATCH_DIR"
   exit 1
@@ -1586,35 +448,18 @@ monitor_directory
 
 </Step>
 
-<Step title="Set Up Environment">
-
-Create a `.env` file in your watch directory:
+<Step title="Set Up and Run">
 
 ```bash
-# .env
-export ALFRED_API_KEY="your_api_key_here"
-export ALFRED_API_URL="https://app.alfred.black"
-```
+# Set your API key
+export ALFRED_API_KEY="alf_your_key_here"
 
-Make the script executable:
-
-```bash
+# Make the script executable
 chmod +x watch_and_upload.sh
-```
 
-</Step>
-
-<Step title="Test the Script">
-
-Create a test file and run the script:
-
-```bash
-# Source environment
-source .env
-
-# Create a test meeting note
-cat > "team_meeting_2024-02-28.txt" << 'EOF'
-Team Meeting - Feb 28, 2024
+# Create a test file
+cat > "team_meeting_2026-02-28.txt" << 'EOF'
+Team Meeting - Feb 28, 2026
 
 Attendees: Alice, Bob, Carol
 
@@ -1626,241 +471,113 @@ Topics:
 Decision: Focus on API optimization for March
 EOF
 
-# Run the script (watch first 5 files then exit)
-timeout 5 ./watch_and_upload.sh || true
-```
-
-**Expected Output:**
-
-```
-[2024-02-28 14:30:15] Starting to monitor: .
-[2024-02-28 14:30:15] API Key: $2a$10$abc...
-[2024-02-28 14:30:16] Uploading: team_meeting_2024-02-28.txt
-[2024-02-28 14:30:18] SUCCESS: team_meeting_2024-02-28.txt (inbox_id: inbox_f9d2c1a7)
+# Run the script
+./watch_and_upload.sh
 ```
 
 </Step>
 
 <Step title="Run as Background Service">
 
-For continuous monitoring, run in the background:
+For continuous monitoring:
 
 ```bash
-# Start the watcher
-source .env && ./watch_and_upload.sh > /dev/null 2>&1 &
+# Start in background
+export ALFRED_API_KEY="alf_your_key_here"
+./watch_and_upload.sh > /dev/null 2>&1 &
 echo $! > .watch_and_upload.pid
 
-# Check status
-ps -p $(cat .watch_and_upload.pid)
-
-# Stop the watcher
+# Stop when done
 kill $(cat .watch_and_upload.pid)
 ```
 
-Or use a systemd service (Linux) / launchd (macOS):
-
-**macOS launchd plist** — save as `~/Library/LaunchAgents/com.alfred.inbox-watcher.plist`:
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>Label</key>
-  <string>com.alfred.inbox-watcher</string>
-  <key>ProgramArguments</key>
-  <array>
-    <string>/path/to/watch_and_upload.sh</string>
-  </array>
-  <key>WorkingDirectory</key>
-  <string>/path/to/watch/directory</string>
-  <key>StandardOutPath</key>
-  <string>/path/to/watch/directory/alfred_uploads.log</string>
-  <key>StandardErrorPath</key>
-  <string>/path/to/watch/directory/alfred_uploads.log</string>
-  <key>EnvironmentVariables</key>
-  <dict>
-    <key>ALFRED_API_KEY</key>
-    <string>your_api_key_here</string>
-    <key>ALFRED_API_URL</key>
-    <string>https://app.alfred.black</string>
-  </dict>
-  <key>RunAtLoad</key>
-  <true/>
-  <key>KeepAlive</key>
-  <true/>
-</dict>
-</plist>
-```
-
-Load the service:
-
-```bash
-launchctl load ~/Library/LaunchAgents/com.alfred.inbox-watcher.plist
-```
-
-</Step>
-
-<Step title="Verify Uploads in Dashboard">
-
-Once running, new files added to the watch directory are automatically uploaded:
-
-```bash
-# Create a new meeting note
-cat > "weekly_standup.txt" << 'EOF'
-Weekly Standup - 2024-02-28
-Team synced on blockers and progress.
-EOF
-
-# Wait 61 seconds (poll interval) and check the inbox
-curl -X GET "https://app.alfred.black/api/v1/inbox?limit=10" \
-  -H "Authorization: Bearer YOUR_API_KEY"
-```
-
-**Response:**
-
-```json
-{
-  "total_count": 15,
-  "inbox_items": [
-    {
-      "inbox_id": "inbox_f9d2c1a7",
-      "filename": "team_meeting_2024-02-28.txt",
-      "status": "completed",
-      "created_at": "2024-02-28T14:30:18Z",
-      "records_created": 3
-    },
-    {
-      "inbox_id": "inbox_a1b2c3d4",
-      "filename": "weekly_standup.txt",
-      "status": "processing",
-      "created_at": "2024-02-28T14:31:20Z"
-    }
-  ]
-}
-```
+Or use a launchd plist (macOS) or systemd service (Linux) for persistence.
 
 </Step>
 </Steps>
 
 <AccordionGroup>
-<Accordion title="Advanced: Integration with Obsidian">
+<Accordion title="Integration: Obsidian">
 
-If you use Obsidian, point the watch script to your `Inbox/` folder:
+Point the watch script at your Obsidian Inbox folder:
 
 ```bash
-export WATCH_DIR="~/Obsidian\ Vault/Inbox"
+export WATCH_DIR="$HOME/Obsidian Vault/Inbox"
 ./watch_and_upload.sh
 ```
 
-Now whenever you create a new note in your Obsidian Inbox folder, it's automatically sent to Alfred. After processing, Alfred creates structured vault records that you can reference from within Obsidian via wikilinks.
+Whenever you create a new note in your Obsidian Inbox, it's automatically shared with Alfred. After the Curator reads it, Alfred creates structured records that you can reference from within Obsidian via wikilinks.
 
 </Accordion>
 
-<Accordion title="Advanced: Integration with Email Forwarding">
+<Accordion title="Integration: Email Forwarding">
 
-Set up email forwarding to auto-save meeting invites and emails as text:
+Set up email forwarding to auto-save messages as text:
 
 1. Forward relevant emails to a folder (e.g., `~/email_archive/`)
-2. Use a tool like `mail2json` or `muttrc` to export emails as plaintext
-3. Point the watch script to that folder
-4. Alfred processes incoming emails and extracts decisions, action items, participants
+2. Use a tool like `mail2json` to export emails as plaintext
+3. Point the watch script at that folder
+4. Alfred reads incoming emails and extracts decisions, action items, and participants
 
 </Accordion>
 
 <Accordion title="Troubleshooting">
 
-**Problem: "API Key not set"**
+**"API Key not set"**
 ```bash
-# Solution: Source .env file
 source .env && ./watch_and_upload.sh
 ```
 
-**Problem: Files uploaded twice**
+**Files uploaded twice**
 ```bash
-# Solution: Delete .alfred_upload_state file to reset tracking
-rm .alfred_upload_state
+rm .alfred_upload_state  # Reset tracking
 ```
 
-**Problem: Permission denied**
+**fswatch not found**
 ```bash
-# Solution: Make script executable
-chmod +x watch_and_upload.sh
-```
-
-**Problem: fswatch not found**
-```bash
-# Solution: Install fswatch (optional, script falls back to polling)
 brew install fswatch  # macOS
-apt-get install fswatch  # Linux
+# The script falls back to polling if fswatch is unavailable
 ```
 
 </Accordion>
 </AccordionGroup>
-
-<Tip>
-The script uses a `.alfred_upload_state` file to track which files have been uploaded, preventing duplicates. To force a re-upload, simply remove that file. Logs are written to `alfred_uploads.log` for debugging.
-</Tip>
 
 ---
 
 ## Quick Reference
 
 <CodeGroup>
-```bash Upload Meeting Notes
-curl -X POST "https://app.alfred.black/api/v1/inbox/upload" \
+```bash Share Meeting Notes
+curl -X POST "https://app.alfred.black/api/v1/vault/inbox" \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "filename": "meeting.txt",
-    "content": "...",
-    "context": "meeting-notes"
+    "filename": "meeting.md",
+    "content": "..."
   }'
 ```
 
-```bash Check Inbox Status
-curl -X GET "https://app.alfred.black/api/v1/inbox/INBOX_ID/status" \
-  -H "Authorization: Bearer YOUR_API_KEY"
-```
-
-```bash Search Vault
-curl -X GET "https://app.alfred.black/api/v1/vault/search?query=TERM&type=TYPE" \
+```bash Search Your Vault
+curl -s "https://app.alfred.black/api/v1/vault/search?grep=TERM" \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
 ```bash Run Janitor Scan
-curl -X POST "https://app.alfred.black/api/v1/janitor/scan" \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  -d '{}'
+curl -X POST "https://app.alfred.black/api/v1/workers/janitor/scan" \
+  -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
-```bash Run Distiller Analysis
-curl -X POST "https://app.alfred.black/api/v1/distiller/analyze" \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  -d '{
-    "scope": "all",
-    "analysis_types": ["assumptions", "decisions"]
-  }'
+```bash Run Distiller
+curl -X POST "https://app.alfred.black/api/v1/workers/distiller/run" \
+  -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
 ```bash Bulk Upload
-curl -X POST "https://app.alfred.black/api/v1/inbox/bulk-upload" \
+curl -X POST "https://app.alfred.black/api/v1/vault/inbox/bulk" \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "batch_name": "...",
-    "documents": [...]
+    "files": [...]
   }'
 ```
 </CodeGroup>
-
----
-
-## Next Steps
-
-- **Explore the API Reference** for all available endpoints
-- **Read the Architecture Guide** to understand how Alfred processes and structures data
-- **Set up automation** using the bash script or your preferred scheduler
-- **Join the community** for workflows, tips, and use cases from other Alfred users
-
-Happy automating!

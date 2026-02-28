@@ -1,31 +1,31 @@
 ---
 title: "Quickstart"
-description: "Get up and running with Alfred Black in 5 minutes."
+description: "Share your first piece of content with Alfred and watch your vault come to life."
 icon: "rocket"
 ---
 
 import AuthHeader from "/snippets/auth-header.mdx";
 import BaseUrl from "/snippets/base-url.mdx";
 
-## Prerequisites
+## Before you begin
 
-Before you begin, make sure you have:
+You'll need:
 
 - An **Alfred Black account** with an active subscription at [app.alfred.black](https://app.alfred.black)
-- An **API key** (we'll create one in Step 1)
+- An **API key** (you'll create one in a moment)
 - `curl` or any HTTP client
 
 ## Step 1: Create an API key
 
-Go to your [Alfred Black dashboard](https://app.alfred.black), navigate to **Settings → API Keys**, click **Create**, give it a name, and copy the key. It starts with `alf_` and is shown only once.
+Go to your [Alfred Black dashboard](https://app.alfred.black), navigate to **Settings > API Keys**, click **Create**, give it a name, and copy the key. It starts with `alf_` and is shown only once.
 
 <Warning>
   Copy your API key immediately — you won't be able to see it again. Store it somewhere safe.
 </Warning>
 
-## Step 2: Test connectivity
+## Step 2: Make sure Alfred is ready
 
-Confirm your API key works by checking your instance health:
+Confirm your key works and your Alfred is healthy:
 
 <CodeGroup>
 ```bash cURL
@@ -51,22 +51,22 @@ print(res.json())
 ```
 </CodeGroup>
 
-You should see a JSON response with health status information.
+You should see a JSON response with health status information. If Alfred reports healthy, you're ready.
 
-## Step 3: Explore your vault schema
+## Step 3: See what Alfred knows
 
-See what record types Alfred manages:
+Take a look at your vault schema — the types of records Alfred manages for you:
 
 ```bash
 curl -s https://app.alfred.black/api/v1/vault/schema \
   -H "Authorization: Bearer alf_your_key_here" | jq .known_types
 ```
 
-This returns all 19 record types -- from `person` and `project` to `assumption` and `decision`.
+This returns all 19 record types — from `person` and `project` to `assumption` and `decision`. These are the building blocks of your world.
 
-## Step 4: Drop your first item into the inbox
+## Step 4: Share your first content
 
-Upload a meeting note to the inbox. You can do this from your dashboard (**Inbox** page) or via the API:
+Hand Alfred a meeting note. You can do this from your dashboard (**Inbox** page) or via the API:
 
 ```bash
 curl -X POST https://app.alfred.black/api/v1/vault/inbox \
@@ -78,9 +78,9 @@ curl -X POST https://app.alfred.black/api/v1/vault/inbox \
   }'
 ```
 
-## Step 5: Check what the Curator produced
+## Step 5: See what the Curator prepared
 
-Wait a few seconds for the Curator to process, then list records:
+Wait a few seconds for the Curator to read your notes, then see what Alfred created:
 
 <CodeGroup>
 ```bash List people
@@ -99,27 +99,27 @@ curl -s https://app.alfred.black/api/v1/vault/list/decision \
 ```
 </CodeGroup>
 
-The Curator will have created records for the people mentioned, any tasks, decisions, and projects — all linked together.
+The Curator will have created records for the people mentioned, any tasks, decisions, and projects — all linked together. From a single meeting note, your vault already holds a web of connected knowledge.
 
-## Step 6: Check worker status
+## Step 6: Check your specialists
 
-See which agents are running:
+See which specialists are working:
 
 ```bash
 curl -s https://app.alfred.black/api/v1/workers/status \
   -H "Authorization: Bearer alf_your_key_here"
 ```
 
-## Step 7: Run a Janitor scan
+## Step 7: Ask the Janitor to look things over
 
-Ask the Janitor to check your vault for structural issues:
+Have the Janitor scan your vault for anything that needs attention:
 
 ```bash
 curl -X POST https://app.alfred.black/api/v1/workers/janitor/scan \
   -H "Authorization: Bearer alf_your_key_here" | jq .
 ```
 
-If issues are found, fix them:
+If anything needs fixing:
 
 ```bash
 curl -X POST https://app.alfred.black/api/v1/workers/janitor/fix \
@@ -130,13 +130,13 @@ curl -X POST https://app.alfred.black/api/v1/workers/janitor/fix \
 
 <Columns cols={2}>
   <Card title="Using the Inbox" icon="inbox" href="/guides/using-the-inbox">
-    Learn the full inbox-to-record pipeline
+    The best ways to share content with Alfred
   </Card>
   <Card title="Browsing Your Vault" icon="vault" href="/guides/browsing-your-vault">
-    Explore and search your vault records
+    Explore and search the records Alfred creates for you
   </Card>
-  <Card title="Your AI Agents" icon="gears" href="/guides/your-ai-agents">
-    Control the Curator, Janitor, Distiller, and Surveyor
+  <Card title="Your Specialists" icon="gears" href="/guides/your-ai-agents">
+    Understand the Curator, Janitor, Distiller, and Surveyor
   </Card>
   <Card title="API Reference" icon="code" href="/api-reference/introduction">
     Full endpoint documentation

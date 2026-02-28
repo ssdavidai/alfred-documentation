@@ -1,18 +1,18 @@
 ---
 title: "Device Pairing"
-description: "Connect apps and tools to your Alfred instance."
+description: "Connect your apps and tools to your Alfred."
 icon: "mobile"
 ---
 
 ## Overview
 
-Devices are apps and tools that connect directly to your Alfred instance — like Obsidian on your laptop or a mobile app. Device pairing lets you control which devices have access.
+Devices are apps and tools that connect directly to your Alfred — like Obsidian on your laptop or a mobile app. Device pairing lets you control which devices have access.
 
 ## How it works
 
 <Steps>
-  <Step title="Device requests to pair">
-    A client app initiates a pairing request with your Alfred instance.
+  <Step title="A device requests to pair">
+    A client app initiates a pairing request with your Alfred.
   </Step>
   <Step title="Review the request">
     The request appears as "pending" in your dashboard or via the API.
@@ -122,15 +122,15 @@ curl -X POST /api/v1/devices/clear \
 
 | Operation | Method | Path | Identifier |
 |-----------|--------|------|------------|
-| **List** | GET | `/api/v1/devices` | -- |
+| **List** | GET | `/api/v1/devices` | — |
 | **Approve** | POST | `/api/v1/devices/:requestId/approve` | `requestId` |
 | **Reject** | POST | `/api/v1/devices/:requestId/reject` | `requestId` |
 | **Remove** | DELETE | `/api/v1/devices/:deviceId` | `deviceId` |
 | **Rotate** | POST | `/api/v1/devices/:deviceId/rotate` | `deviceId` |
 | **Revoke** | POST | `/api/v1/devices/:deviceId/revoke` | `deviceId` |
-| **Clear** | POST | `/api/v1/devices/clear` | -- |
+| **Clear** | POST | `/api/v1/devices/clear` | — |
 
-## Security tips
+## Security
 
 <Warning>
   Only approve devices you recognize. If you see an unfamiliar pairing request, reject it immediately.

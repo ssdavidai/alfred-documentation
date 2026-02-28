@@ -1,14 +1,14 @@
 ---
 title: "Using the Inbox"
-description: "How to feed content to Alfred for processing."
+description: "How to share content with Alfred."
 icon: "inbox"
 ---
 
 ## Overview
 
-The inbox is how you feed content to Alfred. Drop in meeting notes, conversation exports, research, ideas — any raw text. The Curator agent processes each item within seconds, creating structured vault records and linking them together automatically.
+The inbox is how you share content with Alfred. Hand it meeting notes, conversation exports, research, ideas — any raw text. The Curator reads each item within seconds, creating structured vault records and linking them together automatically.
 
-## Ways to submit content
+## Ways to share content
 
 ### From the dashboard
 
@@ -17,7 +17,7 @@ The inbox is how you feed content to Alfred. Drop in meeting notes, conversation
 3. Enter a title and paste your content
 4. Click **Submit**
 
-The Curator begins processing immediately.
+The Curator begins attending to it immediately.
 
 ### Via the API — single item
 
@@ -60,9 +60,9 @@ response = requests.post(
 ```
 </CodeGroup>
 
-### Via the API — bulk upload
+### Via the API — multiple items at once
 
-Send multiple items at once:
+Share several items in a single request:
 
 ```bash
 curl -X POST /api/v1/vault/inbox/bulk \
@@ -77,7 +77,7 @@ curl -X POST /api/v1/vault/inbox/bulk \
   }'
 ```
 
-## What to send
+## What to share
 
 Alfred works best with rich, natural-language content:
 
@@ -89,24 +89,24 @@ Alfred works best with rich, natural-language content:
 - **Project updates** — status reports, progress summaries, post-mortems
 
 <Tip>
-  For best results, include names (people, companies, projects), dates, and specific details. The more context you provide, the richer the records Alfred creates.
+  For best results, include names (people, companies, projects), dates, and specific details. The more context you provide, the richer the records Alfred creates for you.
 </Tip>
 
 ## What happens next
 
-Once content hits the inbox:
+Once content reaches the inbox:
 
 1. The **Curator** picks it up within seconds
 2. It identifies entities: people, organizations, projects, tasks, decisions
 3. It creates structured records for each entity
 4. All records are cross-linked to each other
-5. The original input is marked as processed
+5. The original input is marked as attended to
 
-## Checking results
+## Seeing what Alfred prepared
 
-After submitting content, you can see what Alfred produced:
+After sharing content, you can see what Alfred created:
 
-**From the dashboard:** Browse the vault, filter by type, and see newly created records.
+**From the dashboard:** Browse your vault, filter by type, and see newly created records.
 
 **Via the API:**
 
