@@ -25,7 +25,7 @@ Alfred has three AI-powered workers that maintain your vault. Each runs as a dae
 ### Check All Workers
 
 ```bash
-curl -X GET https://alfred-acme.tailnet.ts.net/api/v1/workers/status \
+curl -X GET https://app.alfred.black/api/v1/workers/status \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
@@ -42,7 +42,7 @@ The status endpoint always returns raw text from the `alfred status` command:
 ### Check Individual Worker
 
 ```bash
-curl -X GET https://alfred-acme.tailnet.ts.net/api/v1/workers/janitor/status \
+curl -X GET https://app.alfred.black/api/v1/workers/janitor/status \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
@@ -55,14 +55,14 @@ If the underlying CLI returns valid JSON, it is passed through directly. Otherwi
 ### Start Workers
 
 ```bash
-curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/workers/up \
+curl -X POST https://app.alfred.black/api/v1/workers/up \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
 You can optionally start only specific workers:
 
 ```bash
-curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/workers/up \
+curl -X POST https://app.alfred.black/api/v1/workers/up \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"only": "curator,janitor"}'
@@ -79,7 +79,7 @@ curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/workers/up \
 ### Stop Workers
 
 ```bash
-curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/workers/down \
+curl -X POST https://app.alfred.black/api/v1/workers/down \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
@@ -96,7 +96,7 @@ curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/workers/down \
 Restart the entire alfred container (stops and restarts all workers):
 
 ```bash
-curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/workers/restart \
+curl -X POST https://app.alfred.black/api/v1/workers/restart \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
@@ -121,7 +121,7 @@ Curator watches the inbox and processes raw inputs into structured vault records
 Trigger immediate processing:
 
 ```bash
-curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/workers/process \
+curl -X POST https://app.alfred.black/api/v1/workers/process \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
@@ -132,7 +132,7 @@ If the underlying CLI returns valid JSON, it is passed through directly. Otherwi
 You can optionally pass parameters:
 
 ```bash
-curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/workers/process \
+curl -X POST https://app.alfred.black/api/v1/workers/process \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"limit": 5, "dry_run": true, "jobs": 2}'
@@ -143,7 +143,7 @@ curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/workers/process \
 Split bulk conversations into inbox files:
 
 ```bash
-curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/workers/ingest \
+curl -X POST https://app.alfred.black/api/v1/workers/ingest \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
@@ -154,7 +154,7 @@ If the underlying CLI returns valid JSON, it is passed through directly. Otherwi
 You can optionally run a dry-run:
 
 ```bash
-curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/workers/ingest \
+curl -X POST https://app.alfred.black/api/v1/workers/ingest \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"dry_run": true}'
@@ -169,7 +169,7 @@ Janitor scans the vault for structural issues (broken links, invalid frontmatter
 Run a vault scan without fixing:
 
 ```bash
-curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/workers/janitor/scan \
+curl -X POST https://app.alfred.black/api/v1/workers/janitor/scan \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
@@ -182,7 +182,7 @@ If the underlying CLI returns valid JSON, it is passed through directly. Otherwi
 Run Janitor to fix detected issues:
 
 ```bash
-curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/workers/janitor/fix \
+curl -X POST https://app.alfred.black/api/v1/workers/janitor/fix \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
@@ -199,7 +199,7 @@ Janitor can modify or delete records. Review scan results before running fix.
 Get recent scan/fix runs:
 
 ```bash
-curl -X GET "https://alfred-acme.tailnet.ts.net/api/v1/workers/janitor/history?limit=5" \
+curl -X GET "https://app.alfred.black/api/v1/workers/janitor/history?limit=5" \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
@@ -212,7 +212,7 @@ If the underlying CLI returns valid JSON, it is passed through directly. Otherwi
 Tell Janitor to ignore a specific file in future scans:
 
 ```bash
-curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/workers/janitor/ignore \
+curl -X POST https://app.alfred.black/api/v1/workers/janitor/ignore \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -238,14 +238,14 @@ Distiller extracts latent knowledge (assumptions, decisions, constraints) from o
 Scan for records that may contain extractable knowledge:
 
 ```bash
-curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/workers/distiller/scan \
+curl -X POST https://app.alfred.black/api/v1/workers/distiller/scan \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
 You can optionally scope to a specific project:
 
 ```bash
-curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/workers/distiller/scan \
+curl -X POST https://app.alfred.black/api/v1/workers/distiller/scan \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"project": "API Redesign"}'
@@ -260,7 +260,7 @@ If the underlying CLI returns valid JSON, it is passed through directly. Otherwi
 Run Distiller to scan and extract learning records:
 
 ```bash
-curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/workers/distiller/run \
+curl -X POST https://app.alfred.black/api/v1/workers/distiller/run \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
@@ -271,14 +271,14 @@ If the underlying CLI returns valid JSON, it is passed through directly. Otherwi
 ### Distiller Status
 
 ```bash
-curl -X GET https://alfred-acme.tailnet.ts.net/api/v1/workers/distiller/status \
+curl -X GET https://app.alfred.black/api/v1/workers/distiller/status \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
 ### Distiller History
 
 ```bash
-curl -X GET "https://alfred-acme.tailnet.ts.net/api/v1/workers/distiller/history?limit=5" \
+curl -X GET "https://app.alfred.black/api/v1/workers/distiller/history?limit=5" \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
@@ -311,7 +311,7 @@ Error codes: `UNAUTHORIZED` (401), `VALIDATION_ERROR` (400), `NOT_FOUND` (404), 
 <Steps>
   <Step title="Scan for issues">
     ```bash
-    curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/workers/janitor/scan \
+    curl -X POST https://app.alfred.black/api/v1/workers/janitor/scan \
       -H "Authorization: Bearer YOUR_API_KEY"
     ```
   </Step>
@@ -320,7 +320,7 @@ Error codes: `UNAUTHORIZED` (401), `VALIDATION_ERROR` (400), `NOT_FOUND` (404), 
   </Step>
   <Step title="Fix issues">
     ```bash
-    curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/workers/janitor/fix \
+    curl -X POST https://app.alfred.black/api/v1/workers/janitor/fix \
       -H "Authorization: Bearer YOUR_API_KEY"
     ```
   </Step>
@@ -334,7 +334,7 @@ Error codes: `UNAUTHORIZED` (401), `VALIDATION_ERROR` (400), `NOT_FOUND` (404), 
 <Steps>
   <Step title="Identify candidates">
     ```bash
-    curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/workers/distiller/scan \
+    curl -X POST https://app.alfred.black/api/v1/workers/distiller/scan \
       -H "Authorization: Bearer YOUR_API_KEY"
     ```
   </Step>
@@ -343,13 +343,13 @@ Error codes: `UNAUTHORIZED` (401), `VALIDATION_ERROR` (400), `NOT_FOUND` (404), 
   </Step>
   <Step title="Run extraction">
     ```bash
-    curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/workers/distiller/run \
+    curl -X POST https://app.alfred.black/api/v1/workers/distiller/run \
       -H "Authorization: Bearer YOUR_API_KEY"
     ```
   </Step>
   <Step title="Review extracted records">
     ```bash
-    curl -X GET https://alfred-acme.tailnet.ts.net/api/v1/vault/list/decision \
+    curl -X GET https://app.alfred.black/api/v1/vault/list/decision \
       -H "Authorization: Bearer YOUR_API_KEY"
     ```
   </Step>
@@ -361,19 +361,19 @@ Run all workers in sequence:
 
 ```bash
 # 1. Process inbox
-curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/workers/process \
+curl -X POST https://app.alfred.black/api/v1/workers/process \
   -H "Authorization: Bearer YOUR_API_KEY"
 
 # 2. Fix structural issues
-curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/workers/janitor/fix \
+curl -X POST https://app.alfred.black/api/v1/workers/janitor/fix \
   -H "Authorization: Bearer YOUR_API_KEY"
 
 # 3. Extract knowledge
-curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/workers/distiller/run \
+curl -X POST https://app.alfred.black/api/v1/workers/distiller/run \
   -H "Authorization: Bearer YOUR_API_KEY"
 
 # 4. Check status
-curl -X GET https://alfred-acme.tailnet.ts.net/api/v1/workers/status \
+curl -X GET https://app.alfred.black/api/v1/workers/status \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
@@ -384,23 +384,16 @@ curl -X GET https://alfred-acme.tailnet.ts.net/api/v1/workers/status \
 If workers seem stuck (status shows running but no recent activity), restart the Alfred container:
 
 ```bash
-curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/workers/restart \
+curl -X POST https://app.alfred.black/api/v1/workers/restart \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
 ### Worker Crashed
 
-Check logs:
-
-```bash
-curl -N "https://alfred-acme.tailnet.ts.net/api/v1/logs?service=alfred&tail=100" \
-  -H "Authorization: Bearer YOUR_API_KEY"
-```
-
 If the worker hit the retry limit (5 crashes), it won't auto-restart. Start workers manually:
 
 ```bash
-curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/workers/up \
+curl -X POST https://app.alfred.black/api/v1/workers/up \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
@@ -409,7 +402,7 @@ curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/workers/up \
 Curator/Distiller can be slow for large inputs (60+ seconds). This is normal for complex extractions. Check history to see average duration:
 
 ```bash
-curl -X GET "https://alfred-acme.tailnet.ts.net/api/v1/workers/janitor/history?limit=20" \
+curl -X GET "https://app.alfred.black/api/v1/workers/janitor/history?limit=20" \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
@@ -424,10 +417,10 @@ If Janitor scan returns no issues but you see problems manually:
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card title="Monitoring" icon="chart-line" href="/guides/monitoring">
-    Monitor worker health and logs
+  <Card title="Inbox Workflow" icon="inbox" href="/guides/inbox-workflow">
+    Learn the ingestion pipeline
   </Card>
-  <Card title="Configuration" icon="sliders" href="/guides/configuration">
-    Configure worker behavior
+  <Card title="Device Pairing" icon="mobile" href="/guides/device-pairing">
+    Manage OpenClaw device access
   </Card>
 </CardGroup>

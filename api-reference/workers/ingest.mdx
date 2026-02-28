@@ -13,13 +13,13 @@ Processes a bulk conversation export and splits it into individual inbox files f
 <RequestExample>
 
 ```bash Standard Ingest
-curl -X POST https://alfred-acme.tailnet.ts.net:3100/api/v1/workers/ingest \
+curl -X POST https://app.alfred.black/api/v1/workers/ingest \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json"
 ```
 
 ```bash Dry Run
-curl -X POST https://alfred-acme.tailnet.ts.net:3100/api/v1/workers/ingest \
+curl -X POST https://app.alfred.black/api/v1/workers/ingest \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{

@@ -1,16 +1,15 @@
 ---
 title: "API Reference"
-description: "Complete reference for the Alfred tenant API — 80 endpoints across 8 domains."
+description: "Complete reference for the Alfred API — ~48 endpoints across 5 domains."
 icon: "code"
 ---
 
 ## Overview
 
-The Alfred tenant API provides programmatic access to all Alfred functionality. Each instance exposes a REST API secured by Tailscale networking and Bearer token authentication.
+The Alfred API provides programmatic access to all Alfred functionality. The REST API is secured by Bearer token authentication using `alf_` API keys created in the dashboard.
 
 <Note>
-  The base URL for all API requests is `https://<your-tailscale-hostname>:3100`. Replace
-  `<your-tailscale-hostname>` with your instance's Tailscale hostname (e.g., `alfred-acme.tailnet.ts.net`).
+  The base URL for all API requests is `https://app.alfred.black`. All endpoints are prefixed with `/api/v1/`.
 </Note>
 
 ## Request format
@@ -18,8 +17,8 @@ The Alfred tenant API provides programmatic access to all Alfred functionality. 
 All requests that send data must use `application/json` as the `Content-Type`.
 
 ```bash
-curl https://alfred-acme.tailnet.ts.net:3100/api/v1/vault/context \
-  -H "Authorization: Bearer your_api_key_here" \
+curl https://app.alfred.black/api/v1/vault/context \
+  -H "Authorization: Bearer alf_your_api_key_here" \
   -H "Content-Type: application/json"
 ```
 
@@ -62,7 +61,7 @@ All origins are allowed (`Access-Control-Allow-Origin: *`). The API responds to 
 
 ## Endpoint groups
 
-The API is organized into 8 functional groups:
+The API is organized into 5 functional groups:
 
 <Columns cols={2}>
   <Card title="Vault (12 endpoints)" icon="vault" href="/api-reference/vault/get-context">
@@ -80,30 +79,17 @@ The API is organized into 8 functional groups:
   <Card title="Devices (7 endpoints)" icon="mobile" href="/api-reference/devices/list">
     OpenClaw device pairing. Approve, reject, remove, rotate keys, revoke access.
   </Card>
-  <Card title="OpenClaw (13 endpoints)" icon="claw-marks" href="/api-reference/openclaw/health">
-    Gateway management. Health checks, skills, sessions, agents, cron, plugins, hooks, secrets.
-  </Card>
-  <Card title="Logs (1 endpoint)" icon="scroll" href="/api-reference/logs/stream">
-    SSE log streaming from Docker Compose services. Real-time output with auto-reconnect.
-  </Card>
-  <Card title="Admin (18 endpoints)" icon="server" href="/api-reference/admin/list-containers">
-    Containers, config, Tailscale, backups, system info. Full instance administration.
-  </Card>
 </Columns>
 
 ## Rate limits
 
-There are no rate limits. The API is designed for single-user or team use within a private Tailscale network.
+There are no rate limits. The API is designed for single-user or small-team use.
 
 ## Versioning
 
-The API is unversioned. Changes will be documented in the changelog and deployment notes.
+All endpoints are prefixed with `/api/v1/`. Breaking changes will be introduced under a new version prefix.
 
 ## SDK & tooling
-
-<Tip>
-  Use the control plane CLI (`aas`) to manage fleet-wide operations. The tenant API is designed for direct integration into custom workflows, automation scripts, and third-party tools.
-</Tip>
 
 No official SDK is provided. The API follows REST conventions and can be consumed from any HTTP client.
 

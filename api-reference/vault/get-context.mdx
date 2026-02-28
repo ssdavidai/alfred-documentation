@@ -6,7 +6,7 @@ api: "GET /api/v1/vault/context"
 
 ## Overview
 
-Returns the output of `alfred vault context`, executed inside the Alfred container via `docker exec`. If the CLI returns valid JSON, it is passed through directly. Otherwise, the raw text output is wrapped in a `{ "raw": "..." }` object.
+Returns the output of `alfred vault context`. If the CLI returns valid JSON, it is passed through directly. Otherwise, the raw text output is wrapped in a `{ "raw": "..." }` object.
 
 ## Response
 
@@ -22,12 +22,12 @@ The response structure depends on the `alfred vault context` CLI output.
 
 ```bash cURL
 curl -X GET \
-  https://alfred-acme.tailnet.ts.net:3100/api/v1/vault/context \
+  https://app.alfred.black/api/v1/vault/context \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
 ```javascript JavaScript
-const response = await fetch('https://alfred-acme.tailnet.ts.net:3100/api/v1/vault/context', {
+const response = await fetch('https://app.alfred.black/api/v1/vault/context', {
   method: 'GET',
   headers: {
     'Authorization': 'Bearer YOUR_API_KEY'
@@ -46,7 +46,7 @@ console.log(context);
 
 ```json 200 OK (raw text fallback)
 {
-  "raw": "Vault path: /mnt/encrypted/vault\n\n127 records across 18 types.\n\nMost recent activity: 3 tasks updated today, 2 people added this week."
+  "raw": "127 records across 18 types.\n\nMost recent activity: 3 tasks updated today, 2 people added this week."
 }
 ```
 

@@ -30,7 +30,7 @@ OpenClaw devices (mobile, desktop, web clients) connect to your Alfred instance 
 Get both pending and paired devices:
 
 ```bash
-curl -X GET https://alfred-acme.tailnet.ts.net/api/v1/devices \
+curl -X GET https://app.alfred.black/api/v1/devices \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
@@ -63,7 +63,7 @@ The response is the parsed JSON output from the `openclaw devices list --json` c
 Approve a pending pairing request using the `requestId`:
 
 ```bash
-curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/devices/req_abc123/approve \
+curl -X POST https://app.alfred.black/api/v1/devices/req_abc123/approve \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
@@ -86,7 +86,7 @@ Approve and reject operations use the `:requestId` path parameter (from the pend
 Reject a pending pairing request using the `requestId`:
 
 ```bash
-curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/devices/req_abc123/reject \
+curl -X POST https://app.alfred.black/api/v1/devices/req_abc123/reject \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
@@ -105,7 +105,7 @@ The request is permanently discarded. The device must initiate a new pairing req
 Remove a paired device using the `deviceId` (HTTP DELETE):
 
 ```bash
-curl -X DELETE https://alfred-acme.tailnet.ts.net/api/v1/devices/dev_xyz789 \
+curl -X DELETE https://app.alfred.black/api/v1/devices/dev_xyz789 \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
@@ -130,7 +130,7 @@ Removing a device is permanent. The device must re-pair to regain access.
 Rotate a device's access token using the `deviceId`:
 
 ```bash
-curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/devices/dev_xyz789/rotate \
+curl -X POST https://app.alfred.black/api/v1/devices/dev_xyz789/rotate \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -159,7 +159,7 @@ Rotate tokens periodically (every 90 days) for security. The device should suppo
 Revoke a device's access using the `deviceId`:
 
 ```bash
-curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/devices/dev_xyz789/revoke \
+curl -X POST https://app.alfred.black/api/v1/devices/dev_xyz789/revoke \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -187,11 +187,11 @@ Clear all devices, or only pending requests:
 
 ```bash
 # Clear all devices
-curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/devices/clear \
+curl -X POST https://app.alfred.black/api/v1/devices/clear \
   -H "Authorization: Bearer YOUR_API_KEY"
 
 # Clear pending requests only
-curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/devices/clear \
+curl -X POST https://app.alfred.black/api/v1/devices/clear \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"pending_only": true}'
@@ -246,13 +246,13 @@ Error codes: `UNAUTHORIZED` (401), `VALIDATION_ERROR` (400), `NOT_FOUND` (404), 
   </Step>
   <Step title="Admin checks pending requests">
     ```bash
-    curl -X GET https://alfred-acme.tailnet.ts.net/api/v1/devices \
+    curl -X GET https://app.alfred.black/api/v1/devices \
       -H "Authorization: Bearer YOUR_API_KEY"
     ```
   </Step>
   <Step title="Admin approves the device">
     ```bash
-    curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/devices/req_abc123/approve \
+    curl -X POST https://app.alfred.black/api/v1/devices/req_abc123/approve \
       -H "Authorization: Bearer YOUR_API_KEY"
     ```
   </Step>
@@ -269,13 +269,13 @@ Error codes: `UNAUTHORIZED` (401), `VALIDATION_ERROR` (400), `NOT_FOUND` (404), 
   </Step>
   <Step title="Admin identifies the device">
     ```bash
-    curl -X GET https://alfred-acme.tailnet.ts.net/api/v1/devices \
+    curl -X GET https://app.alfred.black/api/v1/devices \
       -H "Authorization: Bearer YOUR_API_KEY"
     ```
   </Step>
   <Step title="Admin removes the device">
     ```bash
-    curl -X DELETE https://alfred-acme.tailnet.ts.net/api/v1/devices/dev_xyz789 \
+    curl -X DELETE https://app.alfred.black/api/v1/devices/dev_xyz789 \
       -H "Authorization: Bearer YOUR_API_KEY"
     ```
   </Step>
@@ -290,16 +290,16 @@ Periodic token rotation for all devices:
 
 ```bash
 # List all devices
-curl -X GET https://alfred-acme.tailnet.ts.net/api/v1/devices \
+curl -X GET https://app.alfred.black/api/v1/devices \
   -H "Authorization: Bearer YOUR_API_KEY"
 
 # Rotate each device token
-curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/devices/dev_abc123/rotate \
+curl -X POST https://app.alfred.black/api/v1/devices/dev_abc123/rotate \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"role": "user"}'
 
-curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/devices/dev_def456/rotate \
+curl -X POST https://app.alfred.black/api/v1/devices/dev_def456/rotate \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"role": "user"}'
@@ -315,13 +315,13 @@ Clear all test devices:
 
 ```bash
 # Clear pending requests only
-curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/devices/clear \
+curl -X POST https://app.alfred.black/api/v1/devices/clear \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"pending_only": true}'
 
 # Or clear all devices
-curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/devices/clear \
+curl -X POST https://app.alfred.black/api/v1/devices/clear \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
@@ -332,7 +332,7 @@ curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/devices/clear \
 List devices and check if the request arrived:
 
 ```bash
-curl -X GET https://alfred-acme.tailnet.ts.net/api/v1/devices \
+curl -X GET https://app.alfred.black/api/v1/devices \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
@@ -345,7 +345,7 @@ If no request appears:
 Verify the device is still paired:
 
 ```bash
-curl -X GET https://alfred-acme.tailnet.ts.net/api/v1/devices \
+curl -X GET https://app.alfred.black/api/v1/devices \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
@@ -354,7 +354,7 @@ If missing, the device was removed. Re-pair required.
 If present, rotate the token:
 
 ```bash
-curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/devices/dev_xyz789/rotate \
+curl -X POST https://app.alfred.black/api/v1/devices/dev_xyz789/rotate \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"role": "user"}'
@@ -365,7 +365,7 @@ curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/devices/dev_xyz789/rotate
 This happens if the device retries pairing. Reject duplicates:
 
 ```bash
-curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/devices/req_old123/reject \
+curl -X POST https://app.alfred.black/api/v1/devices/req_old123/reject \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
@@ -374,10 +374,10 @@ Then approve the most recent request.
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card title="Configuration" icon="sliders" href="/guides/configuration">
-    Configure OpenClaw gateway settings
+  <Card title="Vault Management" icon="vault" href="/guides/vault-management">
+    Learn CRUD operations on vault records
   </Card>
-  <Card title="Monitoring" icon="chart-line" href="/guides/monitoring">
-    Monitor device connections and activity
+  <Card title="Worker Operations" icon="gears" href="/guides/worker-operations">
+    Manage Curator, Janitor, and Distiller
   </Card>
 </CardGroup>

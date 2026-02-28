@@ -1,34 +1,25 @@
 ---
 title: "Authentication"
-description: "How to authenticate with the Alfred tenant API."
+description: "How to authenticate with the Alfred API."
 icon: "key"
 ---
 
 ## Overview
 
-Every API request must include a Bearer token in the `Authorization` header. The token is a secret API key provided during instance provisioning.
-
-<Warning>
-  The standalone API server requires the `AAS_API_KEY` environment variable to be set and will exit with a fatal error if it is missing. However, the authentication middleware itself allows open access if no key is configured — when `AAS_API_KEY` is absent at the middleware level, all requests are accepted without a token.
-</Warning>
-
-All endpoints (except OPTIONS for CORS preflight) are subject to authentication when a key is configured.
+Every API request must include a Bearer token in the `Authorization` header. API keys are created in the Alfred dashboard and scoped to your account.
 
 ## Getting your API key
 
-Your API key is generated during instance provisioning and stored in the instance's `.env` file. You can retrieve it using the control plane CLI:
+1. Log in to the [Alfred dashboard](https://app.alfred.black)
+2. Navigate to **Settings > API Keys**
+3. Click **Create API Key** and give it a descriptive name
+4. Copy the key immediately — it is only shown once
 
-```bash
-# On the control plane (where alfred-ctrl is running)
-aas api-key <instance-name>
-```
+API keys use the format `alf_<32 hex characters>`. You can create up to 10 keys per account.
 
-Or by SSH'ing into the instance and reading the environment:
-
-```bash
-ssh deploy@alfred-acme.tailnet.ts.net
-grep AAS_API_KEY /opt/alfred/compose/.env
-```
+<Warning>
+  API keys are shown only at creation time. If you lose a key, revoke it and create a new one.
+</Warning>
 
 ## Making authenticated requests
 
@@ -36,14 +27,14 @@ Include the API key as a Bearer token in the `Authorization` header:
 
 <CodeGroup>
 ```bash cURL
-curl https://alfred-acme.tailnet.ts.net:3100/api/v1/vault/context \
-  -H "Authorization: Bearer your_api_key_here"
+curl https://app.alfred.black/api/v1/vault/context \
+  -H "Authorization: Bearer alf_your_api_key_here"
 ```
 
 ```javascript JavaScript (fetch)
-const response = await fetch('https://alfred-acme.tailnet.ts.net:3100/api/v1/vault/context', {
+const response = await fetch('https://app.alfred.black/api/v1/vault/context', {
   headers: {
-    'Authorization': 'Bearer your_api_key_here'
+    'Authorization': 'Bearer alf_your_api_key_here'
   }
 });
 
@@ -54,8 +45,8 @@ const data = await response.json();
 import requests
 
 response = requests.get(
-    'https://alfred-acme.tailnet.ts.net:3100/api/v1/vault/context',
-    headers={'Authorization': 'Bearer your_api_key_here'}
+    'https://app.alfred.black/api/v1/vault/context',
+    headers={'Authorization': 'Bearer alf_your_api_key_here'}
 )
 
 data = response.json()
@@ -65,10 +56,10 @@ data = response.json()
 import axios from 'axios';
 
 const response = await axios.get(
-  'https://alfred-acme.tailnet.ts.net:3100/api/v1/vault/context',
+  'https://app.alfred.black/api/v1/vault/context',
   {
     headers: {
-      'Authorization': 'Bearer your_api_key_here'
+      'Authorization': 'Bearer alf_your_api_key_here'
     }
   }
 );
@@ -83,20 +74,18 @@ const data = response.data;
   Token comparison uses `crypto.timingSafeEqual` for constant-time comparison, making the API resistant to timing attacks.
 </Note>
 
+### How keys are stored
+
+- API keys are **hashed** server-side using SHA-256 before storage — the plaintext key is never persisted
+- Hashes are **encrypted at rest** using AES-256-GCM
+- Each key is associated with your user account and instance
+
 ### Best practices
 
 - Store API keys in environment variables or secret management systems — never hardcode them
-- Rotate keys periodically by updating `AAS_API_KEY` in the instance's `.env` and restarting the API container
-- Use Tailscale ACLs to restrict which devices can reach the API (default: all devices in your tailnet)
-- The API serves over HTTPS using Tailscale's auto-generated certificates
-
-### Network security
-
-The API is only accessible via Tailscale. Even with the API key, requests from outside your tailnet will fail (no route to host). This provides defense-in-depth:
-
-1. Network boundary (Tailscale mesh)
-2. Transport security (HTTPS/TLS)
-3. Application authentication (Bearer token)
+- Use descriptive names when creating keys so you can identify and revoke them later
+- Revoke unused keys promptly from **Settings > API Keys**
+- All API traffic uses HTTPS (TLS) end-to-end
 
 ## Error responses
 
@@ -122,18 +111,18 @@ Missing or invalid authentication returns a 401 status with the `UNAUTHORIZED` e
 ```
 </ResponseExample>
 
-The first error is returned when the `Authorization` header is absent or does not start with `Bearer `. The second is returned when the token is present but does not match the configured key.
+The first error is returned when the `Authorization` header is absent or does not start with `Bearer `. The second is returned when the token is present but does not match any valid key.
 
 ## Testing authentication
 
-Use the `/api/v1/admin/health` endpoint to verify your credentials:
+Use the `/api/v1/vault/schema` endpoint to verify your credentials:
 
 ```bash
-curl https://alfred-acme.tailnet.ts.net:3100/api/v1/admin/health \
-  -H "Authorization: Bearer your_api_key_here"
+curl https://app.alfred.black/api/v1/vault/schema \
+  -H "Authorization: Bearer alf_your_api_key_here"
 ```
 
-A successful response confirms authentication is working. The health endpoint runs `/opt/alfred/healthcheck.sh` on the instance and returns its output, so the response format depends on what the script produces (it may be raw text or JSON).
+A successful response returns the vault schema with all record types, confirming authentication is working.
 
 ## Next steps
 

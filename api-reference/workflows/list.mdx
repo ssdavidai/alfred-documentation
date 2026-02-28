@@ -18,12 +18,12 @@ Returns a list of workflows in the Temporal namespace. Runs `temporal workflow l
 # List all workflows
 curl -X GET \
   -H "Authorization: Bearer YOUR_API_KEY" \
-  https://alfred-acme.tailnet.ts.net:3100/api/v1/workflows
+  https://app.alfred.black/api/v1/workflows
 
 # List running workflows
 curl -X GET \
   -H "Authorization: Bearer YOUR_API_KEY" \
-  "https://alfred-acme.tailnet.ts.net:3100/api/v1/workflows?query=ExecutionStatus%3D%27Running%27"
+  "https://app.alfred.black/api/v1/workflows?query=ExecutionStatus%3D%27Running%27"
 ```
 </RequestExample>
 

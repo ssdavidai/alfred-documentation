@@ -4,7 +4,7 @@ description: "Retrieve the overall status of all Alfred daemon workers"
 api: "GET /api/v1/workers/status"
 ---
 
-Returns the current operational status of all Alfred workers (curator, janitor, distiller, surveyor). This endpoint runs `alfred status` inside the Alfred container and returns the raw text output.
+Returns the current operational status of all Alfred workers (curator, janitor, distiller, surveyor). This endpoint returns the raw text output from `alfred status`.
 
 <Note>
   This endpoint always returns raw text output from `alfred status`, not structured JSON. The response contains a single `raw` field with the status text.
@@ -13,7 +13,7 @@ Returns the current operational status of all Alfred workers (curator, janitor, 
 <RequestExample>
 
 ```bash cURL
-curl -X GET https://alfred-acme.tailnet.ts.net:3100/api/v1/workers/status \
+curl -X GET https://app.alfred.black/api/v1/workers/status \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 

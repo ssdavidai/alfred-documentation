@@ -7,7 +7,7 @@ description: "Alfred is an AI-powered knowledge management system that turns raw
 
 Alfred watches your inbox, processes raw inputs (meeting notes, conversations, documents), and produces structured Markdown records in an [Obsidian](https://obsidian.md) vault. It maintains relationships between records using wikilinks, enforces schemas, and continuously improves vault quality through automated scans and knowledge extraction.
 
-Each Alfred instance runs on a dedicated server, accessible exclusively through your [Tailscale](https://tailscale.com) mesh network. Everything — from dropping files into the inbox to managing Temporal workflows — is available through the REST API documented here.
+Each Alfred instance is accessible through the dashboard at [app.alfred.black](https://app.alfred.black) and the REST API. Everything — from dropping files into the inbox to managing Temporal workflows — is available through the API documented here.
 
 ## How it works
 
@@ -49,12 +49,6 @@ Each Alfred instance runs on a dedicated server, accessible exclusively through 
   </Card>
   <Card title="Manage devices" icon="mobile" href="/api-reference/devices/list">
     Approve, reject, rotate, and revoke OpenClaw device access.
-  </Card>
-  <Card title="Administer the instance" icon="server" href="/api-reference/admin/health">
-    Manage containers, environment config, Tailscale networking, backups, and system health.
-  </Card>
-  <Card title="Stream logs" icon="scroll" href="/api-reference/logs/stream">
-    Real-time SSE log streaming from any Docker Compose service.
   </Card>
 </Columns>
 

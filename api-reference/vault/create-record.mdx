@@ -6,7 +6,7 @@ api: "POST /api/v1/vault/records"
 
 ## Overview
 
-Creates a new record in the vault with the specified type, name, frontmatter fields, and markdown body. The endpoint runs `alfred vault create` inside the Alfred container via `docker exec` and returns the CLI output.
+Creates a new record in the vault with the specified type, name, frontmatter fields, and markdown body. The endpoint runs `alfred vault create` and returns the CLI output.
 
 ## Body Parameters
 
@@ -44,7 +44,7 @@ Returns status `201 Created`. The response structure depends on the `alfred vaul
 
 ```bash cURL
 curl -X POST \
-  https://alfred-acme.tailnet.ts.net:3100/api/v1/vault/records \
+  https://app.alfred.black/api/v1/vault/records \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -60,7 +60,7 @@ curl -X POST \
 ```
 
 ```javascript JavaScript
-const response = await fetch('https://alfred-acme.tailnet.ts.net:3100/api/v1/vault/records', {
+const response = await fetch('https://app.alfred.black/api/v1/vault/records', {
   method: 'POST',
   headers: {
     'Authorization': 'Bearer YOUR_API_KEY',

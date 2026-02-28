@@ -6,7 +6,7 @@ api: "POST /api/v1/vault/inbox/bulk"
 
 ## Overview
 
-Uploads multiple files to the vault's inbox directory at `/mnt/encrypted/vault/inbox/` in a single request. Files in the inbox are processed by Alfred's Curator daemon, which converts raw inputs into structured vault records. Each filename is sanitized before writing. If any file has an invalid filename or missing content, the entire request fails.
+Uploads multiple files to the vault's inbox directory in a single request. Files in the inbox are processed by Alfred's Curator daemon, which converts raw inputs into structured vault records. Each filename is sanitized before writing. If any file has an invalid filename or missing content, the entire request fails.
 
 ## Body Parameters
 
@@ -36,7 +36,7 @@ Uploads multiple files to the vault's inbox directory at `/mnt/encrypted/vault/i
 
 ```bash cURL
 curl -X POST \
-  https://alfred-acme.tailnet.ts.net:3100/api/v1/vault/inbox/bulk \
+  https://app.alfred.black/api/v1/vault/inbox/bulk \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -58,7 +58,7 @@ curl -X POST \
 ```
 
 ```javascript JavaScript
-const response = await fetch('https://alfred-acme.tailnet.ts.net:3100/api/v1/vault/inbox/bulk', {
+const response = await fetch('https://app.alfred.black/api/v1/vault/inbox/bulk', {
   method: 'POST',
   headers: {
     'Authorization': 'Bearer YOUR_API_KEY',

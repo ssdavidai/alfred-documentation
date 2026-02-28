@@ -39,7 +39,7 @@ All filenames are sanitized automatically (special characters like `/\:*?"<>|` a
 Upload a single file to the inbox by sending JSON with the filename and content:
 
 ```bash
-curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/vault/inbox \
+curl -X POST https://app.alfred.black/api/v1/vault/inbox \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -66,7 +66,7 @@ The API automatically sanitizes filenames. `Meeting Notes (2026).md` becomes `Me
 Upload multiple files at once:
 
 ```bash
-curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/vault/inbox/bulk \
+curl -X POST https://app.alfred.black/api/v1/vault/inbox/bulk \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -92,7 +92,7 @@ curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/vault/inbox/bulk \
 Check what's in the inbox:
 
 ```bash
-curl -X GET https://alfred-acme.tailnet.ts.net/api/v1/vault/inbox \
+curl -X GET https://app.alfred.black/api/v1/vault/inbox \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
@@ -118,7 +118,7 @@ Curator watches the inbox directory and processes new files automatically (defau
 To check worker status:
 
 ```bash
-curl -X GET https://alfred-acme.tailnet.ts.net/api/v1/workers/status \
+curl -X GET https://app.alfred.black/api/v1/workers/status \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
@@ -137,7 +137,7 @@ The workers status endpoint always returns raw text from the `alfred status` com
 Trigger immediate processing without waiting for the next sweep:
 
 ```bash
-curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/workers/process \
+curl -X POST https://app.alfred.black/api/v1/workers/process \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
@@ -148,7 +148,7 @@ If the underlying CLI returns valid JSON, it is passed through directly. Otherwi
 You can optionally pass parameters in the body:
 
 ```bash
-curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/workers/process \
+curl -X POST https://app.alfred.black/api/v1/workers/process \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -166,7 +166,7 @@ Manual processing runs synchronously and may take 30-60 seconds for large files 
 After Curator processes inbox files, check the vault for new records:
 
 ```bash
-curl -X GET https://alfred-acme.tailnet.ts.net/api/v1/vault/list/person \
+curl -X GET https://app.alfred.black/api/v1/vault/list/person \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
@@ -184,7 +184,7 @@ If the underlying CLI returns valid JSON, it is passed through directly. Otherwi
   </Step>
   <Step title="Upload to inbox">
     ```bash
-    curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/vault/inbox \
+    curl -X POST https://app.alfred.black/api/v1/vault/inbox \
       -H "Authorization: Bearer YOUR_API_KEY" \
       -H "Content-Type: application/json" \
       -d '{"filename": "weekly-standup-2026-02-26.md", "content": "..."}'
@@ -195,7 +195,7 @@ If the underlying CLI returns valid JSON, it is passed through directly. Otherwi
   </Step>
   <Step title="Review results">
     ```bash
-    curl -X GET https://alfred-acme.tailnet.ts.net/api/v1/vault/list/task \
+    curl -X GET https://app.alfred.black/api/v1/vault/list/task \
       -H "Authorization: Bearer YOUR_API_KEY"
     ```
   </Step>
@@ -206,7 +206,7 @@ If the underlying CLI returns valid JSON, it is passed through directly. Otherwi
 Upload a chat transcript:
 
 ```bash
-curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/vault/inbox \
+curl -X POST https://app.alfred.black/api/v1/vault/inbox \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -225,7 +225,7 @@ Curator extracts:
 Upload multiple files from a project:
 
 ```bash
-curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/vault/inbox/bulk \
+curl -X POST https://app.alfred.black/api/v1/vault/inbox/bulk \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -261,25 +261,18 @@ Error codes: `UNAUTHORIZED` (401), `VALIDATION_ERROR` (400), `NOT_FOUND` (404), 
 Check worker status:
 
 ```bash
-curl -X GET https://alfred-acme.tailnet.ts.net/api/v1/workers/status \
+curl -X GET https://app.alfred.black/api/v1/workers/status \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
 If workers are stopped, start them:
 
 ```bash
-curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/workers/up \
+curl -X POST https://app.alfred.black/api/v1/workers/up \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
 ### File Rejected
-
-Check logs:
-
-```bash
-curl -N https://alfred-acme.tailnet.ts.net/api/v1/logs?service=alfred&tail=50 \
-  -H "Authorization: Bearer YOUR_API_KEY"
-```
 
 Common issues:
 - **Unsupported format**: Only text-based formats are supported
@@ -288,18 +281,10 @@ Common issues:
 
 ### Duplicate Records
 
-Curator uses content hashing to avoid re-processing the same file. If you upload the same content twice, it will be skipped. To force re-processing, delete the state file:
+Curator uses content hashing to avoid re-processing the same file. If you upload the same content twice, it will be skipped. To force re-processing, restart the workers:
 
 ```bash
-# Not exposed via API -- requires SSH access
-ssh deploy@alfred-acme.tailnet.ts.net
-rm /mnt/encrypted/data/curator_state.json
-```
-
-Then restart the worker container:
-
-```bash
-curl -X POST https://alfred-acme.tailnet.ts.net/api/v1/workers/restart \
+curl -X POST https://app.alfred.black/api/v1/workers/restart \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 

@@ -46,10 +46,7 @@
               "guides/inbox-workflow",
               "guides/vault-management",
               "guides/worker-operations",
-              "guides/device-pairing",
-              "guides/monitoring",
-              "guides/configuration",
-              "guides/backups-recovery"
+              "guides/device-pairing"
             ]
           },
           {
@@ -143,53 +140,6 @@
               "api-reference/devices/clear",
               "api-reference/devices/rotate",
               "api-reference/devices/revoke"
-            ]
-          },
-          {
-            "group": "OpenClaw",
-            "pages": [
-              "api-reference/openclaw/health",
-              "api-reference/openclaw/status",
-              "api-reference/openclaw/restart",
-              "api-reference/openclaw/skills",
-              "api-reference/openclaw/sessions",
-              "api-reference/openclaw/agents",
-              "api-reference/openclaw/cron",
-              "api-reference/openclaw/plugins",
-              "api-reference/openclaw/hooks",
-              "api-reference/openclaw/secrets",
-              "api-reference/openclaw/doctor",
-              "api-reference/openclaw/security",
-              "api-reference/openclaw/memory"
-            ]
-          },
-          {
-            "group": "Logs",
-            "pages": [
-              "api-reference/logs/stream"
-            ]
-          },
-          {
-            "group": "Admin",
-            "pages": [
-              "api-reference/admin/list-containers",
-              "api-reference/admin/restart-container",
-              "api-reference/admin/stop-container",
-              "api-reference/admin/start-container",
-              "api-reference/admin/container-logs",
-              "api-reference/admin/get-env",
-              "api-reference/admin/update-env",
-              "api-reference/admin/get-openclaw-config",
-              "api-reference/admin/update-openclaw-config",
-              "api-reference/admin/tailscale-status",
-              "api-reference/admin/tailscale-serve",
-              "api-reference/admin/tailscale-cert",
-              "api-reference/admin/health",
-              "api-reference/admin/system-info",
-              "api-reference/admin/trigger-backup",
-              "api-reference/admin/list-snapshots",
-              "api-reference/admin/temporal-cluster",
-              "api-reference/admin/temporal-task-queues"
             ]
           }
         ]

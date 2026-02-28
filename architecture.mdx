@@ -70,7 +70,7 @@ All services bind to `127.0.0.1`. The only way to reach them is through Cloudfla
 
 A standalone Node.js process (`/opt/alfred/api.mjs`) running as a systemd service. Zero npm dependencies -- just Node.js 22 built-ins.
 
-- **Auth**: Bearer token via `AAS_API_KEY` (timing-safe comparison)
+- **Auth**: Bearer token via `alf_` API keys (timing-safe comparison)
 - **Binding**: `127.0.0.1:3100` (exposed via Tailscale Serve)
 - **Execution**: Uses `child_process.execFile` with array arguments (no shell interpretation)
 - **Accessed by**: SaaS dashboard proxy over Tailscale
@@ -212,7 +212,7 @@ Verify all containers healthy, subdomain reachable, backup successful.
 - **Encryption**: Per-instance random password (AES-256)
 - **Retention**: 7 daily, 4 weekly, 6 monthly snapshots
 - LUKS keyfile and restic credentials backed up to control plane
-- On-demand backups via `POST /api/v1/admin/backups/trigger`
+- On-demand backups managed by the control plane
 
 <Tip>
 Backup failure during provisioning is a **hard error**. Every instance has at least one known-good backup from day one.
