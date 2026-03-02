@@ -16,7 +16,7 @@
   },
   "openapi": "openapi.yaml",
   "api": {
-    "baseUrl": "https://app.alfred.black",
+    "baseUrl": "https://alfred.black",
     "mdx": {
       "auth": {
         "method": "bearer",
@@ -46,6 +46,15 @@
               "vault/understanding-your-vault",
               "vault/record-types",
               "vault/vault-schema"
+            ]
+          },
+          {
+            "group": "Features",
+            "pages": [
+              "features/streams",
+              "features/automation",
+              "features/talk-mode",
+              "features/ambient-mode"
             ]
           },
           {

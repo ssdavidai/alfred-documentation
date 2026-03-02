@@ -11,13 +11,13 @@ import BaseUrl from "/snippets/base-url.mdx";
 
 You'll need:
 
-- An **Alfred Black account** with an active subscription at [app.alfred.black](https://app.alfred.black)
+- An **Alfred Black account** with an active subscription at [alfred.black](https://alfred.black)
 - An **API key** (you'll create one in a moment)
 - `curl` or any HTTP client
 
 ## Step 1: Create an API key
 
-Go to your [Alfred Black dashboard](https://app.alfred.black), navigate to **Settings > API Keys**, click **Create**, give it a name, and copy the key. It starts with `alf_` and is shown only once.
+Go to your [Alfred Black dashboard](https://alfred.black), navigate to **Settings > API Keys**, click **Create**, give it a name, and copy the key. It starts with `alf_` and is shown only once.
 
 <Warning>
   Copy your API key immediately — you won't be able to see it again. Store it somewhere safe.
@@ -29,12 +29,12 @@ Confirm your key works and your Alfred is healthy:
 
 <CodeGroup>
 ```bash cURL
-curl -s https://app.alfred.black/api/v1/admin/health \
+curl -s https://alfred.black/api/v1/admin/health \
   -H "Authorization: Bearer alf_your_key_here" | jq .
 ```
 
 ```javascript JavaScript
-const res = await fetch('https://app.alfred.black/api/v1/admin/health', {
+const res = await fetch('https://alfred.black/api/v1/admin/health', {
   headers: { 'Authorization': 'Bearer alf_your_key_here' }
 });
 console.log(await res.json());
@@ -44,7 +44,7 @@ console.log(await res.json());
 import requests
 
 res = requests.get(
-    'https://app.alfred.black/api/v1/admin/health',
+    'https://alfred.black/api/v1/admin/health',
     headers={'Authorization': 'Bearer alf_your_key_here'}
 )
 print(res.json())
@@ -58,7 +58,7 @@ You should see a JSON response with health status information. If Alfred reports
 Take a look at your vault schema — the types of records Alfred manages for you:
 
 ```bash
-curl -s https://app.alfred.black/api/v1/vault/schema \
+curl -s https://alfred.black/api/v1/vault/schema \
   -H "Authorization: Bearer alf_your_key_here" | jq .known_types
 ```
 
@@ -69,7 +69,7 @@ This returns all 19 record types — from `person` and `project` to `assumption`
 Hand Alfred a meeting note. You can do this from your dashboard (**Inbox** page) or via the API:
 
 ```bash
-curl -X POST https://app.alfred.black/api/v1/vault/inbox \
+curl -X POST https://alfred.black/api/v1/vault/inbox \
   -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
   -d '{
@@ -84,17 +84,17 @@ Wait a few seconds for the Curator to read your notes, then see what Alfred crea
 
 <CodeGroup>
 ```bash List people
-curl -s https://app.alfred.black/api/v1/vault/list/person \
+curl -s https://alfred.black/api/v1/vault/list/person \
   -H "Authorization: Bearer alf_your_key_here" | jq .
 ```
 
 ```bash List tasks
-curl -s https://app.alfred.black/api/v1/vault/list/task \
+curl -s https://alfred.black/api/v1/vault/list/task \
   -H "Authorization: Bearer alf_your_key_here" | jq .
 ```
 
 ```bash List decisions
-curl -s https://app.alfred.black/api/v1/vault/list/decision \
+curl -s https://alfred.black/api/v1/vault/list/decision \
   -H "Authorization: Bearer alf_your_key_here" | jq .
 ```
 </CodeGroup>
@@ -106,7 +106,7 @@ The Curator will have created records for the people mentioned, any tasks, decis
 See which specialists are working:
 
 ```bash
-curl -s https://app.alfred.black/api/v1/workers/status \
+curl -s https://alfred.black/api/v1/workers/status \
   -H "Authorization: Bearer alf_your_key_here"
 ```
 
@@ -115,14 +115,14 @@ curl -s https://app.alfred.black/api/v1/workers/status \
 Have the Janitor scan your vault for anything that needs attention:
 
 ```bash
-curl -X POST https://app.alfred.black/api/v1/workers/janitor/scan \
+curl -X POST https://alfred.black/api/v1/workers/janitor/scan \
   -H "Authorization: Bearer alf_your_key_here" | jq .
 ```
 
 If anything needs fixing:
 
 ```bash
-curl -X POST https://app.alfred.black/api/v1/workers/janitor/fix \
+curl -X POST https://alfred.black/api/v1/workers/janitor/fix \
   -H "Authorization: Bearer alf_your_key_here" | jq .
 ```
 

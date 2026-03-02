@@ -98,20 +98,29 @@ Every record can reference other records. When the Curator creates a person ment
 
 Your vault grows richer with everything you share.
 
+## Streams — your world, flowing in
+
+You don't have to hand everything to Alfred manually. [Streams](/features/streams) are data pipelines that capture events from external sources — your email, calendar, payment providers, and ambient recording devices — and deliver them to Alfred's Inbox automatically. The Curator processes each event the same way it handles anything you share directly.
+
+Alfred also comes with a default stream: **OpenClaw Session Logs**, which captures every conversation you have with Alfred and processes it for decisions, entities, tasks, and patterns.
+
 ## Always working
 
 Your specialists run continuously in the background:
 
-- **Curator** attends to new inbox items within seconds of arrival
+- **Curator** attends to new inbox items within seconds of arrival — whether shared manually or delivered by a Stream
 - **Janitor** runs periodic health scans automatically
 - **Distiller** can be triggered on-demand or scheduled
 - **Surveyor** can be triggered on-demand or scheduled to re-cluster and discover new relationships
 
 You can check on your specialists, trigger a run, and view their history from your dashboard or via the API.
 
-<Columns cols={2}>
+<Columns cols={3}>
   <Card title="Your Vault" icon="vault" href="/vault/understanding-your-vault">
     Understand how your vault works
+  </Card>
+  <Card title="Streams" icon="wave-pulse" href="/features/streams">
+    Data pipelines that feed Alfred automatically
   </Card>
   <Card title="Your Specialists" icon="gears" href="/guides/your-ai-agents">
     Monitor and direct your specialists

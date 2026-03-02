@@ -1,0 +1,153 @@
+---
+title: "Streams"
+description: "Data pipelines that capture events from the world around you and deliver them to Alfred automatically."
+icon: "wave-pulse"
+---
+
+## Your world, flowing in
+
+You don't have to hand everything to Alfred manually. Streams are data pipelines that capture events from external sources — your email, your calendar, your payments, your conversations — and deliver them to Alfred's Inbox automatically.
+
+Once a stream is active, Alfred receives a continuous feed of structured events. The Curator processes each one, creating and updating vault records just as if you'd shared the content yourself.
+
+## How streams work
+
+Every stream follows the same pattern:
+
+<Steps>
+  <Step title="An event occurs">
+    Something happens in the outside world — an email arrives, a calendar event starts, a payment is processed, a conversation takes place.
+  </Step>
+  <Step title="The stream captures it">
+    Your configured stream detects the event and wraps it in a StreamEvent envelope with metadata: source, timestamp, tenant, and the raw payload.
+  </Step>
+  <Step title="Alfred receives it">
+    The StreamEvent lands in your Inbox. The Curator reads it, extracts entities, and creates or updates vault records — people, tasks, decisions, whatever the content contains.
+  </Step>
+</Steps>
+
+## Source types
+
+Streams come in three flavours, depending on how the source delivers data.
+
+### Scheduled Pull
+
+A Temporal workflow polls an external API on an interval you define. Alfred reaches out, checks for new data, and pulls it in.
+
+| Source | What it captures | Typical interval |
+|--------|-----------------|-----------------|
+| **Gmail** | New emails and threads | Every 5 minutes |
+| **Calendar** | Upcoming and past events | Every 15 minutes |
+| **Health data** | Activity, sleep, vitals | Every 30 minutes |
+| **OpenClaw sessions** | Your Alfred conversations and subagent runs | Every 5 minutes |
+
+### Webhook Push
+
+An external service POSTs events directly to your dedicated webhook URL. Alfred receives them instantly as they happen.
+
+| Source | What it captures |
+|--------|-----------------|
+| **Polar** | Payment confirmations and subscription events |
+| **GitHub** | Commits, PRs, issues, and releases |
+| **Stripe** | Charges, invoices, and subscription changes |
+| **Custom** | Any service that supports webhook delivery |
+
+Each webhook stream generates a unique, secure URL. Copy it from your dashboard and configure it in the external service.
+
+### Realtime
+
+A long-lived WebSocket connection maintains a continuous feed for sources that produce data in real time.
+
+| Source | What it captures |
+|--------|-----------------|
+| **Omi** | Ambient audio recordings and transcripts from your wearable device |
+
+Realtime streams stay connected as long as your Alfred is running, automatically reconnecting if the connection drops.
+
+## The StreamEvent envelope
+
+Every event from every stream arrives in a standard envelope:
+
+```json
+{
+  "stream_id": "stream_gmail_abc123",
+  "stream_type": "scheduled_pull",
+  "tenant_id": "tenant_xyz",
+  "received_at": "2026-03-01T14:32:00Z",
+  "source_ref": "msg_18f3a2b4c5d6e7f8",
+  "payload": { ... },
+  "summary": "Email from Alice Chen re: Q1 launch timeline"
+}
+```
+
+| Field | Purpose |
+|-------|---------|
+| `stream_id` | Identifies which stream produced this event |
+| `stream_type` | `scheduled_pull`, `webhook_push`, or `realtime` |
+| `tenant_id` | Your tenant identifier |
+| `received_at` | When Alfred received the event |
+| `source_ref` | Unique reference from the source, used for deduplication |
+| `payload` | The raw event data from the external source |
+| `summary` | Optional human-readable summary of the event |
+
+The `source_ref` field ensures Alfred never processes the same event twice, even if a stream delivers it more than once.
+
+## Default stream: OpenClaw Session Logs
+
+Every Alfred comes with one stream already active — **OpenClaw Session Logs**.
+
+This stream captures every conversation between you and Alfred, plus all subagent runs that happen behind the scenes. A Temporal schedule polls for new session data every 5 minutes and delivers it to your Inbox.
+
+Alfred processes these sessions to extract:
+
+- **Decisions made** during conversation
+- **Entities mentioned** — people, projects, organizations
+- **Tasks and commitments** identified in dialogue
+- **Patterns over time** — recurring topics, evolving priorities
+
+This means your conversations with Alfred aren't ephemeral. They become part of your vault — searchable, connected, and available to your specialists for deeper analysis.
+
+<Note>
+  OpenClaw Session Logs are enabled by default for all tenants. You can pause the stream from your dashboard if you prefer conversations to remain unprocessed.
+</Note>
+
+## Managing streams
+
+### Your dashboard
+
+Navigate to [alfred.black/dashboard/streams](https://alfred.black/dashboard/streams) to see all your configured streams. The Home page also includes a **Streams** widget — click **Manage →** to go directly to the full stream list.
+
+Each stream shows:
+
+| Element | What it means |
+|---------|---------------|
+| **Status dot** | Green = active, Red = error, Dim = paused |
+| **Stream name** | The name you gave this stream |
+| **Type badge** | Scheduled Pull, Webhook Push, or Realtime |
+| **Last event** | When the most recent event was received |
+
+### Stream actions
+
+Every stream supports these actions:
+
+- **Pause** — Temporarily stop capturing events (the stream configuration is preserved)
+- **Resume** — Restart a paused stream
+- **Edit** — Change the stream's configuration (interval, filters, etc.)
+- **Delete** — Remove the stream entirely
+
+For webhook streams, you'll also see a **copyable webhook URL** — the endpoint where the external service should send events.
+
+## What happens next
+
+Once events land in your Inbox, the standard specialist pipeline takes over. The Curator reads and structures. The Janitor verifies. The Distiller surfaces insights. Your vault grows richer, automatically.
+
+Streams are the front door — the rest of Alfred's team handles everything behind it.
+
+<Columns cols={2}>
+  <Card title="Using the Inbox" icon="inbox" href="/guides/using-the-inbox">
+    How content flows through Alfred's intake pipeline
+  </Card>
+  <Card title="Ambient Mode" icon="microphone" href="/features/ambient-mode">
+    Continuous listening via the Omi wearable — Alfred's realtime stream
+  </Card>
+</Columns>

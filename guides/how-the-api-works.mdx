@@ -13,7 +13,7 @@ When you make an API call with your `alf_` key, the request travels through a se
 ```mermaid
 sequenceDiagram
     participant Script as Your Script
-    participant SaaS as SaaS Proxy<br/>(app.alfred.black)
+    participant SaaS as SaaS Proxy<br/>(alfred.black)
     participant TS as Tailscale Network
     participant Tenant as Your Alfred<br/>(alfred-ctrl)
     participant Docker as Services
@@ -41,14 +41,14 @@ Your Script (alf_xxx) --> SaaS Proxy --> Tailscale --> Your Alfred --> Services
 
 ### 1. You send a request with your API key
 
-You create API keys in your [dashboard](https://app.alfred.black) under **Settings > API Keys**. Each key starts with `alf_` followed by 32 hex characters:
+You create API keys in your [dashboard](https://alfred.black) under **Settings > API Keys**. Each key starts with `alf_` followed by 32 hex characters:
 
 ```bash
 curl -X GET /api/v1/vault/context \
   -H "Authorization: Bearer alf_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"
 ```
 
-Your request hits the SaaS server at `app.alfred.black`.
+Your request hits the SaaS server at `alfred.black`.
 
 ### 2. The proxy authenticates your key
 
