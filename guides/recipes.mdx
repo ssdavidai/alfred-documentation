@@ -41,7 +41,7 @@ Action Items:
 Share these notes via the inbox:
 
 ```bash
-curl -X POST "https://app.alfred.black/api/v1/vault/inbox" \
+curl -X POST "https://alfred.black/api/v1/vault/inbox" \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -58,15 +58,15 @@ Wait a few seconds for the Curator to read your notes, then check what records A
 
 ```bash
 # See all people Alfred identified
-curl -s "https://app.alfred.black/api/v1/vault/list/person" \
+curl -s "https://alfred.black/api/v1/vault/list/person" \
   -H "Authorization: Bearer YOUR_API_KEY" | jq .
 
 # See decisions captured
-curl -s "https://app.alfred.black/api/v1/vault/list/decision" \
+curl -s "https://alfred.black/api/v1/vault/list/decision" \
   -H "Authorization: Bearer YOUR_API_KEY" | jq .
 
 # See tasks extracted
-curl -s "https://app.alfred.black/api/v1/vault/list/task" \
+curl -s "https://alfred.black/api/v1/vault/list/task" \
   -H "Authorization: Bearer YOUR_API_KEY" | jq .
 ```
 
@@ -79,7 +79,7 @@ From a single meeting note, Alfred creates records for each person (Alice, Bob, 
 Read the full detail of any record:
 
 ```bash
-curl -s "https://app.alfred.black/api/v1/vault/records/person/Alice%20Chen.md" \
+curl -s "https://alfred.black/api/v1/vault/records/person/Alice%20Chen.md" \
   -H "Authorization: Bearer YOUR_API_KEY" | jq .
 ```
 
@@ -104,7 +104,7 @@ Share a long email thread and Alfred extracts every decision, action item, and p
 Save a representative email thread as plain text and share it:
 
 ```bash
-curl -X POST "https://app.alfred.black/api/v1/vault/inbox" \
+curl -X POST "https://alfred.black/api/v1/vault/inbox" \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -121,11 +121,11 @@ After the Curator reads the thread, search for what it found:
 
 ```bash
 # Find the decisions
-curl -s "https://app.alfred.black/api/v1/vault/search?grep=rate+limit" \
+curl -s "https://alfred.black/api/v1/vault/search?grep=rate+limit" \
   -H "Authorization: Bearer YOUR_API_KEY" | jq .
 
 # List all tasks from this thread
-curl -s "https://app.alfred.black/api/v1/vault/list/task" \
+curl -s "https://alfred.black/api/v1/vault/list/task" \
   -H "Authorization: Bearer YOUR_API_KEY" | jq .
 ```
 
@@ -150,7 +150,7 @@ Have the Janitor scan your vault for broken links, missing metadata, and structu
 Ask the Janitor to look things over:
 
 ```bash
-curl -X POST "https://app.alfred.black/api/v1/workers/janitor/scan" \
+curl -X POST "https://alfred.black/api/v1/workers/janitor/scan" \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
@@ -163,7 +163,7 @@ The Janitor walks through your entire vault checking for broken links, invalid f
 See what the Janitor found:
 
 ```bash
-curl -s "https://app.alfred.black/api/v1/workers/janitor/status" \
+curl -s "https://alfred.black/api/v1/workers/janitor/status" \
   -H "Authorization: Bearer YOUR_API_KEY" | jq .
 ```
 
@@ -176,7 +176,7 @@ The scan report groups issues by category and severity — broken links, invalid
 Have the Janitor fix what it found:
 
 ```bash
-curl -X POST "https://app.alfred.black/api/v1/workers/janitor/fix" \
+curl -X POST "https://alfred.black/api/v1/workers/janitor/fix" \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
@@ -189,7 +189,7 @@ The Janitor repairs broken links, fills in missing metadata, and resolves struct
 Run another scan to confirm everything is clean:
 
 ```bash
-curl -X POST "https://app.alfred.black/api/v1/workers/janitor/scan" \
+curl -X POST "https://alfred.black/api/v1/workers/janitor/scan" \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
@@ -223,7 +223,7 @@ For best results, have at least 20-30 operational records in your vault before r
 <Step title="Scan for Extractable Knowledge">
 
 ```bash
-curl -X POST "https://app.alfred.black/api/v1/workers/distiller/scan" \
+curl -X POST "https://alfred.black/api/v1/workers/distiller/scan" \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
@@ -234,7 +234,7 @@ The Distiller identifies which records could yield learning records.
 <Step title="Run the Extraction">
 
 ```bash
-curl -X POST "https://app.alfred.black/api/v1/workers/distiller/run" \
+curl -X POST "https://alfred.black/api/v1/workers/distiller/run" \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
@@ -246,15 +246,15 @@ The Distiller reads through your records and creates learning records — each l
 
 ```bash
 # See assumptions the Distiller found
-curl -s "https://app.alfred.black/api/v1/vault/list/assumption" \
+curl -s "https://alfred.black/api/v1/vault/list/assumption" \
   -H "Authorization: Bearer YOUR_API_KEY" | jq .
 
 # See contradictions that need attention
-curl -s "https://app.alfred.black/api/v1/vault/list/contradiction" \
+curl -s "https://alfred.black/api/v1/vault/list/contradiction" \
   -H "Authorization: Bearer YOUR_API_KEY" | jq .
 
 # See synthesized insights
-curl -s "https://app.alfred.black/api/v1/vault/list/synthesis" \
+curl -s "https://alfred.black/api/v1/vault/list/synthesis" \
   -H "Authorization: Bearer YOUR_API_KEY" | jq .
 ```
 
@@ -285,7 +285,7 @@ Organize your documents. For a new project, you might have requirements, an arch
 Use the bulk inbox endpoint:
 
 ```bash
-curl -X POST "https://app.alfred.black/api/v1/vault/inbox/bulk" \
+curl -X POST "https://alfred.black/api/v1/vault/inbox/bulk" \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -314,15 +314,15 @@ The Curator reads all three documents together, finding cross-document relations
 
 ```bash
 # Search for the project
-curl -s "https://app.alfred.black/api/v1/vault/search?grep=Payment+Integration" \
+curl -s "https://alfred.black/api/v1/vault/search?grep=Payment+Integration" \
   -H "Authorization: Bearer YOUR_API_KEY" | jq .
 
 # See all tasks
-curl -s "https://app.alfred.black/api/v1/vault/list/task" \
+curl -s "https://alfred.black/api/v1/vault/list/task" \
   -H "Authorization: Bearer YOUR_API_KEY" | jq .
 
 # See all people
-curl -s "https://app.alfred.black/api/v1/vault/list/person" \
+curl -s "https://alfred.black/api/v1/vault/list/person" \
   -H "Authorization: Bearer YOUR_API_KEY" | jq .
 ```
 
@@ -357,7 +357,7 @@ set -e
 # Configuration
 WATCH_DIR="${WATCH_DIR:-.}"
 API_KEY="${ALFRED_API_KEY:?Error: ALFRED_API_KEY not set}"
-API_BASE_URL="${ALFRED_API_URL:-https://app.alfred.black}"
+API_BASE_URL="${ALFRED_API_URL:-https://alfred.black}"
 STATE_FILE=".alfred_upload_state"
 LOG_FILE="alfred_uploads.log"
 
@@ -548,7 +548,7 @@ brew install fswatch  # macOS
 
 <CodeGroup>
 ```bash Share Meeting Notes
-curl -X POST "https://app.alfred.black/api/v1/vault/inbox" \
+curl -X POST "https://alfred.black/api/v1/vault/inbox" \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -558,22 +558,22 @@ curl -X POST "https://app.alfred.black/api/v1/vault/inbox" \
 ```
 
 ```bash Search Your Vault
-curl -s "https://app.alfred.black/api/v1/vault/search?grep=TERM" \
+curl -s "https://alfred.black/api/v1/vault/search?grep=TERM" \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
 ```bash Run Janitor Scan
-curl -X POST "https://app.alfred.black/api/v1/workers/janitor/scan" \
+curl -X POST "https://alfred.black/api/v1/workers/janitor/scan" \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
 ```bash Run Distiller
-curl -X POST "https://app.alfred.black/api/v1/workers/distiller/run" \
+curl -X POST "https://alfred.black/api/v1/workers/distiller/run" \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
 ```bash Bulk Upload
-curl -X POST "https://app.alfred.black/api/v1/vault/inbox/bulk" \
+curl -X POST "https://alfred.black/api/v1/vault/inbox/bulk" \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{

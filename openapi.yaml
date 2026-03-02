@@ -9,7 +9,7 @@ info:
     management, and OpenClaw device pairing.
 
 servers:
-  - url: https://app.alfred.black
+  - url: https://alfred.black
     description: Production
 
 security:
