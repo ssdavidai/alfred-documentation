@@ -2213,6 +2213,698 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  # ---------------------------------------------------------------------------
+  # Intuition
+  # ---------------------------------------------------------------------------
+  /api/v1/learning/status:
+    get:
+      operationId: getIntuitionStatus
+      summary: Get Intuition Status
+      description: >
+        Returns the current state of the intuition system including processing
+        stats, observation counts, instinct counts, auto-route rate, and recent
+        activity.
+      tags:
+        - Intuition
+      responses:
+        "200":
+          description: Intuition status returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  enabled:
+                    type: boolean
+                    description: Whether the intuition system is currently enabled
+                  processedToday:
+                    type: integer
+                    description: Number of events processed today
+                  observations:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                      unprocessed:
+                        type: integer
+                      processed:
+                        type: integer
+                      invalid:
+                        type: integer
+                  instincts:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                      active:
+                        type: integer
+                      proposed:
+                        type: integer
+                      deprecated:
+                        type: integer
+                      merged:
+                        type: integer
+                  instinctCount:
+                    type: integer
+                    description: Number of active instincts
+                  autoRouteRate:
+                    type: integer
+                    description: Percentage of inputs auto-routed by instincts
+                  queueSize:
+                    type: integer
+                    description: Number of inputs awaiting human judgment
+                  recentActivity:
+                    type: array
+                    items:
+                      type: object
+                    description: Recent intuition system activity entries
+                  lastDigest:
+                    type: object
+                    properties:
+                      timestamp:
+                        type: string
+                        format: date-time
+                      path:
+                        type: string
+                      summary:
+                        type: string
+                  reflections:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                  streams:
+                    type: object
+                    properties:
+                      processed:
+                        type: integer
+              example:
+                enabled: true
+                processedToday: 12
+                observations:
+                  total: 45
+                  unprocessed: 3
+                  processed: 40
+                  invalid: 2
+                instincts:
+                  total: 8
+                  active: 6
+                  proposed: 1
+                  deprecated: 1
+                  merged: 0
+                instinctCount: 6
+                autoRouteRate: 34
+                queueSize: 3
+                recentActivity: []
+                lastDigest:
+                  timestamp: "2026-03-04T18:00:00Z"
+                  path: event/2026/03/daily-digest-2026-03-04.md
+                  summary: Processed 12 events today
+                reflections:
+                  total: 14
+                streams:
+                  processed: 247
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/learning/observations:
+    get:
+      operationId: listObservations
+      summary: List Observations
+      description: >
+        Returns paginated observation records. Observations are routing
+        decisions captured when you organize inputs.
+      tags:
+        - Intuition
+      parameters:
+        - name: status
+          in: query
+          required: false
+          description: "Filter by observation status (`unprocessed`, `processed`, `invalid`)"
+          schema:
+            type: string
+            enum: [unprocessed, processed, invalid]
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of observations to return
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          required: false
+          description: Number of observations to skip for pagination
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Observation list returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                  total:
+                    type: integer
+                    description: Total number of matching observations
+                required:
+                  - items
+                  - total
+              example:
+                items: []
+                total: 45
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/learning/observations/{id}:
+    get:
+      operationId: getObservationDetail
+      summary: Get Observation Detail
+      description: >
+        Returns a single observation with full frontmatter, body, and file
+        path.
+      tags:
+        - Intuition
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The unique identifier of the observation
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Observation detail returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  path:
+                    type: string
+                    description: Vault-relative path to the observation file
+                  frontmatter:
+                    type: object
+                    additionalProperties: true
+                    description: Parsed YAML frontmatter from the observation
+                  body:
+                    type: string
+                    description: Markdown body content
+                required:
+                  - path
+                  - frontmatter
+                  - body
+              example:
+                path: observation/2026/03/obs-20260304-143022.md
+                frontmatter:
+                  type: observation
+                  status: processed
+                  created: "2026-03-04T14:30:22Z"
+                body: "Routed meeting notes to project/client-onboarding"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Observation not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error:
+                  code: NOT_FOUND
+                  message: Observation not found
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/learning/instincts:
+    get:
+      operationId: listInstincts
+      summary: List Instincts
+      description: >
+        Returns all instincts (learned routing patterns). Instincts are formed
+        by nightly reflection when at least 3 observations show the same
+        pattern.
+      tags:
+        - Intuition
+      responses:
+        "200":
+          description: Instinct list returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                  total:
+                    type: integer
+                    description: Total number of instincts
+                required:
+                  - items
+                  - total
+              example:
+                items: []
+                total: 8
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/learning/instincts/{id}:
+    get:
+      operationId: getInstinctDetail
+      summary: Get Instinct Detail
+      description: >
+        Returns a single instinct with full details including observation
+        sources and match history.
+      tags:
+        - Intuition
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The unique identifier of the instinct
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Instinct detail returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  path:
+                    type: string
+                    description: Vault-relative path to the instinct file
+                  frontmatter:
+                    type: object
+                    additionalProperties: true
+                    description: Parsed YAML frontmatter from the instinct
+                  body:
+                    type: string
+                    description: Markdown body content
+                required:
+                  - path
+                  - frontmatter
+                  - body
+              example:
+                path: intuition/instincts/route-meeting-notes.md
+                frontmatter:
+                  type: instinct
+                  status: active
+                  created: "2026-03-01T02:00:00Z"
+                body: "Route meeting notes containing client names to the corresponding project folder"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Instinct not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error:
+                  code: NOT_FOUND
+                  message: Instinct not found
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/learning/reflections:
+    get:
+      operationId: listReflections
+      summary: List Reflections
+      description: >
+        Returns nightly reflection reports. Each report documents what Alfred
+        reviewed, what patterns it found, and what changes it made to
+        instincts.
+      tags:
+        - Intuition
+      responses:
+        "200":
+          description: Reflection list returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                  total:
+                    type: integer
+                    description: Total number of reflections
+                required:
+                  - items
+                  - total
+              example:
+                items: []
+                total: 14
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/learning/sessions:
+    get:
+      operationId: listSessions
+      summary: List Sessions
+      description: >
+        Returns session records sorted by creation date. Sessions are
+        time-bounded groups of related vault activity.
+      tags:
+        - Intuition
+      responses:
+        "200":
+          description: Session list returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                  total:
+                    type: integer
+                    description: Total number of sessions
+                required:
+                  - items
+                  - total
+              example:
+                items: []
+                total: 22
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/learning/queue:
+    get:
+      operationId: getJudgmentQueue
+      summary: Get Judgment Queue
+      description: >
+        Returns inputs awaiting human judgment -- items that Alfred's instincts
+        couldn't confidently route.
+      tags:
+        - Intuition
+      responses:
+        "200":
+          description: Judgment queue returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                  total:
+                    type: integer
+                    description: Total number of items in the queue
+                required:
+                  - items
+                  - total
+              example:
+                items: []
+                total: 3
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/learning/route:
+    post:
+      operationId: routeInput
+      summary: Route an Input
+      description: >
+        Manually route an input to a vault destination. Creates an observation
+        from the routing decision, strengthening Alfred's instincts.
+      tags:
+        - Intuition
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - input_id
+                - destination
+              properties:
+                input_id:
+                  type: string
+                  description: The unique identifier of the input to route
+                destination:
+                  type: string
+                  description: "Vault destination path (e.g., `project/client-onboarding`)"
+      responses:
+        "200":
+          description: Input routed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  routed:
+                    type: boolean
+                    description: Whether the input was successfully routed
+                  observation_created:
+                    type: boolean
+                    description: Whether an observation was created from this routing
+                  destination:
+                    type: string
+                    description: The vault destination the input was routed to
+                required:
+                  - routed
+                  - observation_created
+                  - destination
+              example:
+                routed: true
+                observation_created: true
+                destination: project/client-onboarding
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/learning/enable:
+    post:
+      operationId: enableIntuition
+      summary: Enable Intuition
+      description: >
+        Enables the intuition system. Resumes all six background processes.
+        Existing observations and instincts are preserved.
+      tags:
+        - Intuition
+      responses:
+        "200":
+          description: Intuition enabled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  enabled:
+                    type: boolean
+                required:
+                  - message
+                  - enabled
+              example:
+                message: Alfred Learn enabled
+                enabled: true
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/learning/disable:
+    post:
+      operationId: disableIntuition
+      summary: Disable Intuition
+      description: >
+        Disables the intuition system. Pauses all six background processes but
+        preserves existing data.
+      tags:
+        - Intuition
+      responses:
+        "200":
+          description: Intuition disabled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  enabled:
+                    type: boolean
+                required:
+                  - message
+                  - enabled
+              example:
+                message: Alfred Learn disabled
+                enabled: false
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/learning/quarantine:
+    get:
+      operationId: listQuarantinedEvents
+      summary: List Quarantined Events
+      description: >
+        Returns stream events that failed processing twice and were
+        quarantined.
+      tags:
+        - Intuition
+      responses:
+        "200":
+          description: Quarantine list returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                  total:
+                    type: integer
+                    description: Total number of quarantined events
+                required:
+                  - items
+                  - total
+              example:
+                items: []
+                total: 1
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/learning/quarantine/{id}/retry:
+    post:
+      operationId: retryQuarantinedEvent
+      summary: Retry Quarantined Event
+      description: Resubmits a quarantined event for processing.
+      tags:
+        - Intuition
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The unique identifier of the quarantined event
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Event resubmitted for processing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  retried:
+                    type: boolean
+                required:
+                  - retried
+              example:
+                retried: true
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/learning/quarantine/{id}/dismiss:
+    post:
+      operationId: dismissQuarantinedEvent
+      summary: Dismiss Quarantined Event
+      description: >
+        Permanently dismisses a quarantined event. The event will not be
+        processed.
+      tags:
+        - Intuition
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The unique identifier of the quarantined event
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Event dismissed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dismissed:
+                    type: boolean
+                required:
+                  - dismissed
+              example:
+                dismissed: true
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/learning/bootstrap:
+    post:
+      operationId: bootstrapIntuition
+      summary: Bootstrap Intuition
+      description: >
+        Adds the alfred-learn service to the tenant's Docker stack and starts
+        it. Safe to call on any tenant. Idempotent.
+      tags:
+        - Intuition
+      responses:
+        "200":
+          description: Intuition bootstrapped
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  already_present:
+                    type: boolean
+                    description: Whether the service was already present in the stack
+                required:
+                  - message
+                  - already_present
+              example:
+                message: Alfred Learn bootstrapped successfully
+                already_present: false
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
 tags:
   - name: Vault
     description: >
@@ -2234,3 +2926,7 @@ tags:
     description: >
       OpenClaw device pairing and access management -- list, approve, reject,
       remove, clear, rotate tokens, and revoke access
+  - name: Intuition
+    description: >
+      Endpoints for Alfred's intuition system -- the learning layer that
+      observes your preferences and gradually handles routine decisions

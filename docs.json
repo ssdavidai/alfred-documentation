@@ -69,6 +69,7 @@
               "guides/api-keys",
               "guides/how-the-api-works",
               "guides/recipes",
+              "guides/intuition",
               "guides/monitoring",
               "guides/security"
             ]
@@ -138,6 +139,26 @@
               "api-reference/workflows/signal",
               "api-reference/workflows/cancel",
               "api-reference/workflows/history"
+            ]
+          },
+          {
+            "group": "Intuition",
+            "pages": [
+              "api-reference/learning/status",
+              "api-reference/learning/observations",
+              "api-reference/learning/observation-detail",
+              "api-reference/learning/instincts",
+              "api-reference/learning/instinct-detail",
+              "api-reference/learning/reflections",
+              "api-reference/learning/sessions",
+              "api-reference/learning/queue",
+              "api-reference/learning/route",
+              "api-reference/learning/enable",
+              "api-reference/learning/disable",
+              "api-reference/learning/quarantine",
+              "api-reference/learning/quarantine-retry",
+              "api-reference/learning/quarantine-dismiss",
+              "api-reference/learning/bootstrap"
             ]
           },
           {

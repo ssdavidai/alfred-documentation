@@ -6,7 +6,7 @@ icon: "shapes"
 
 ## Overview
 
-Alfred manages 19 distinct record types organized into three layers: **Standing Entities** (7) for the stable elements of your world, **Activity Records** (7) for what happens, and **Learning Types** (5) for the deeper knowledge the Distiller surfaces.
+Alfred manages 22 distinct record types organized into four layers: **Standing Entities** (7) for the stable elements of your world, **Activity Records** (7) for what happens, **Learning Types** (5) for the deeper knowledge the Distiller surfaces, and **Intuition Types** (3) for the patterns Alfred learns from how you work.
 
 ## Standing Entities
 
@@ -161,13 +161,13 @@ Records capturing events, work, and interactions.
 <Accordion title="session — Working Sessions" icon="clock">
 **What it represents:** Time-bounded activity periods or work blocks.
 
-**When it's created:** The Curator creates session records when focused work periods are described.
+**When it's created:** Created automatically by the Session Tracker, which groups related vault activity into time-bounded sessions every 5 minutes. Sessions are also created by the Curator when focused work periods are described.
 
-**Example:** "Morning focus block — spent 3 hours on the migration." Alfred creates a session record linked to the project and tasks.
+**Example:** Alfred detects 4 vault records created within 20 minutes about database migration. It groups them into a session with the topic summary 'Database migration planning' and links to all member records.
 
-**Status values:** `active`, `completed`
+**Status values:** `active`, `paused`, `finished`
 
-**Key fields:** name, status, tags
+**Key fields:** name, status, topic_summary, idle_minutes, participants, records (links to session members), tags
 </Accordion>
 
 <Accordion title="input — Incoming Items" icon="inbox">
@@ -268,6 +268,54 @@ Records created by the Distiller that capture deeper knowledge surfaced from you
 
 <Note>
   Learning types are automatically surfaced by the Distiller. While you can create them via the API, they're typically generated automatically from your existing records.
+</Note>
+
+## Intuition Types
+
+Records created by Alfred's intuition system as it learns your preferences and routing patterns. See the [Intuition guide](/guides/intuition) for how these work together.
+
+<AccordionGroup>
+
+<Accordion title="observation — Routing Observations" icon="eye">
+**What it represents:** A record of why something was routed a certain way — Alfred observed your preference.
+
+**When it's created:** Automatically when you route an input through conversation, or when Alfred's judgment system routes something autonomously. Also created when you add a `routing_hint` to a vault record.
+
+**Example:** You tell Alfred to file a vendor email under the client onboarding project. Alfred creates an observation recording the input type (email), the routing decision (project/client-onboarding), and the signals that characterized the input (sender domain, keywords, attachment type).
+
+**Status values:** `unprocessed`, `processed`, `invalid`
+
+**Key fields:** input_type, input_source, input_ref, routing_decision, reasoning, signals, confidence, routed_by
+</Accordion>
+
+<Accordion title="instinct — Learned Routing Patterns" icon="bolt">
+**What it represents:** A learned pattern distilled from multiple observations — an instinct Alfred has developed for how to handle a recurring type of input.
+
+**When it's created:** During nightly reflection, when Alfred identifies at least 3 observations of the same routing pattern. Instincts are also updated, merged, or deprecated during reflection as new evidence accumulates.
+
+**Example:** After observing you route several vendor invoices to the same process, Alfred creates an instinct: "Emails from vendor domains containing invoice keywords and PDF attachments should be routed to process/invoice-processing."
+
+**Status values:** `active`, `proposed`, `deprecated`, `merged`
+
+**Key fields:** domain, observation_count, discretion_threshold, signals, matching_weights, routing_destination, last_matched, total_matches, total_escalations, based_on
+</Accordion>
+
+<Accordion title="reflection — Nightly Reflection Reports" icon="moon">
+**What it represents:** A report from Alfred's nightly reflection process — what it reviewed, what patterns it found, and what changes it made to its instincts.
+
+**When it's created:** Every night at 2am during the reflection process. One reflection report per night (only created when there are new observations to review).
+
+**Example:** "Reviewed 8 new observations. Created 1 new instinct (Hiring Pipeline Updates). Strengthened 2 existing instincts (Vendor Invoices, Meeting Notes). No deprecations."
+
+**Status values:** _(no status constraint)_
+
+**Key fields:** observations_reviewed, instincts_created, instincts_updated, instincts_deprecated, reasoning
+</Accordion>
+
+</AccordionGroup>
+
+<Note>
+  Intuition types are managed automatically by Alfred's learning system. Observations are captured from your routing decisions, instincts are refined during nightly reflection, and reflection reports document what Alfred learned. See the [Intuition guide](/guides/intuition) for the full picture.
 </Note>
 
 ## Naming conventions
