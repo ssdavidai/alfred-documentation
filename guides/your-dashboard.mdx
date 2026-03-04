@@ -15,6 +15,7 @@ The sidebar provides access to all dashboard sections:
 - **Home** — Command Center with stats and activity overview
 - **Vault** — Browse and search vault records
 - **Streams** — View and manage data pipelines feeding Alfred ([learn more](/features/streams))
+- **Intuition** — See how Alfred is learning and route items that need your judgment
 - **Services** — Manage services and specialist model configuration
 - **Credentials** — Set API keys for LLM providers
 - **Logs** — Real-time service log viewer
@@ -145,6 +146,28 @@ The Devices section (accessible from the Home page Quick Actions area) manages O
 4. You can **remove** a paired device at any time
 
 For more details, see the [Device Pairing](/guides/device-pairing) guide.
+
+## Intuition
+
+The Intuition page shows how Alfred is learning from your routing decisions. It has four sections:
+
+### Status bar
+
+Four metrics across the top: events processed today, total observations, active instincts, and auto-route rate (the percentage of inputs Alfred handles autonomously).
+
+### Awaiting Judgment
+
+Inputs that need your routing decision. Each item shows a brief summary, how long ago it arrived, and the best instinct match (if any) with its confidence score. Use the **Route** dropdown to route the input to a vault destination — this creates an observation and teaches Alfred for next time.
+
+### Instincts
+
+Your active and developing instincts. Each instinct shows its observation count, discretion level, and how many inputs it has auto-routed. Instincts marked as "developing" need more observations before Alfred will use them for autonomous routing.
+
+### Activity feed
+
+A chronological log of recent intuition activity: events processed, inputs auto-routed, and reflection outcomes.
+
+For more details on how intuition works, see the [Intuition guide](/guides/intuition).
 
 ## Credentials
 

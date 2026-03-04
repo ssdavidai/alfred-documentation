@@ -18,6 +18,8 @@ graph LR
     F --> G[Learning Records]
     E --> H[Surveyor]
     H --> I[Clusters & Relationships]
+    E --> J[Intuition]
+    J --> K[Observations & Instincts]
 ```
 
 ## Your specialists
@@ -40,9 +42,15 @@ The Distiller reads your records and finds the knowledge hiding between the line
 
 The Surveyor takes a different approach. Instead of reading individual records, it works across your entire vault: **Embed** (represent each record as a vector), **Cluster** (group records by meaning), **Label** (name the clusters), and **Write** (add cluster tags and relationship links back to your vault). The result is a bird's-eye view of how everything connects.
 
+### Intuition — learns how you work
+
+Over time, Alfred develops **intuition** — the accumulated understanding of your preferences. When you route inputs, make organizational decisions, or categorize content, Alfred observes the pattern. Those observations are refined into **instincts** during nightly reflection — learned routing patterns that let Alfred handle routine decisions on your behalf.
+
+Alfred starts cautious, asking about everything. As evidence accumulates, it gradually handles more on its own — but always errs on the side of asking when uncertain. This is **discretion** — a good butler's most important quality.
+
 ## Record types
 
-Alfred manages 19 types of records organized into three layers:
+Alfred manages 22 types of records organized into four layers:
 
 ### The who and what — Standing entities
 
@@ -84,6 +92,16 @@ Created by the Distiller from your records:
 | `contradiction` | Conflicts between different records |
 | `synthesis` | Insights connecting multiple records |
 
+### How Alfred learns — Intuition records
+
+Created by Alfred's intuition system as it learns your preferences:
+
+| Type | What it represents |
+|------|-------------------|
+| `observation` | A routing decision Alfred observed and recorded |
+| `instinct` | A learned routing pattern, distilled from multiple observations |
+| `reflection` | A nightly report on what Alfred learned and refined |
+
 ## How records connect
 
 Every record can reference other records. When the Curator creates a person mentioned in a conversation, both records automatically link to each other. Over time, these connections build a rich, navigable map of your world.
@@ -106,12 +124,13 @@ Alfred also comes with a default stream: **OpenClaw Session Logs**, which captur
 
 ## Always working
 
-Your specialists run continuously in the background:
+Your specialists and intuition processes run continuously in the background:
 
 - **Curator** attends to new inbox items within seconds of arrival — whether shared manually or delivered by a Stream
 - **Janitor** runs periodic health scans automatically
 - **Distiller** can be triggered on-demand or scheduled
 - **Surveyor** can be triggered on-demand or scheduled to re-cluster and discover new relationships
+- **Intuition** observes, learns, and routes on automated schedules — no intervention needed
 
 You can check on your specialists, trigger a run, and view their history from your dashboard or via the API.
 
@@ -124,5 +143,8 @@ You can check on your specialists, trigger a run, and view their history from yo
   </Card>
   <Card title="Your Specialists" icon="gears" href="/guides/your-ai-agents">
     Monitor and direct your specialists
+  </Card>
+  <Card title="Intuition" icon="brain" href="/guides/intuition">
+    How Alfred learns your preferences
   </Card>
 </Columns>

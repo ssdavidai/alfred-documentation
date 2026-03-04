@@ -34,6 +34,28 @@ Alfred uses state-of-the-art language models optimized for knowledge extraction.
 
 </AccordionGroup>
 
+## Intuition
+
+<AccordionGroup>
+
+<Accordion title="What is Alfred's intuition?">
+Intuition is Alfred's learning system. As you route inputs and make organizational decisions, Alfred observes the patterns. Over time, those observations are refined into instincts — learned routing patterns that let Alfred handle routine decisions on your behalf. See the [Intuition guide](/guides/intuition) for the full picture.
+</Accordion>
+
+<Accordion title="How long until Alfred starts routing things on its own?">
+Alfred needs at least 3 observations of the same pattern before creating an instinct, and new instincts start with high discretion thresholds. In practice, expect Alfred to begin handling its first routine decisions within 1-2 weeks of regular use. The more you route through Alfred, the faster it learns.
+</Accordion>
+
+<Accordion title="Can I turn off intuition?">
+Yes. Disable it with `POST /api/v1/learning/disable` or from your dashboard. Disabling pauses all learning processes but preserves your existing observations and instincts. Re-enable at any time to pick up where you left off.
+</Accordion>
+
+<Accordion title="What if Alfred routes something incorrectly?">
+Route it correctly yourself — this creates a new observation that will be factored into the next nightly reflection. Alfred adjusts its instincts based on new evidence. If an instinct becomes consistently wrong, reflection will deprecate it automatically.
+</Accordion>
+
+</AccordionGroup>
+
 ## Troubleshooting
 
 <AccordionGroup>
@@ -81,4 +103,5 @@ The Distiller will create learning records (assumptions, decisions, constraints,
 If you can't find the answer here, check:
 - [API Reference](/api-reference/introduction) — Full endpoint documentation
 - [Your Specialists guide](/guides/your-ai-agents) — Specialist troubleshooting
+- [Intuition guide](/guides/intuition) — How Alfred learns your preferences
 - [Monitoring guide](/guides/monitoring) — Health and diagnostics
