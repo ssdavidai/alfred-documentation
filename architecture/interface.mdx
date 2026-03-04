@@ -1,89 +1,165 @@
 ---
-title: "Layer 6 — Interface"
-description: "Every way you interact with Alfred: dashboard, OpenClaw, channels, Talk Mode, Ambient Mode, and more."
+title: "Interface Layer"
+description: "Every way you interact with Alfred: dashboard, channels, Talk Mode, Ambient Mode, and the API."
 icon: "display"
 ---
 
 <Note>
-This is **Layer 6** of Alfred's [six-layer architecture](/how-it-works). The Interface layer is where you and Alfred meet.
+Part of Alfred's [six-layer architecture](/how-it-works). The Interface layer is where you and Alfred meet.
 </Note>
 
-## Every way you interact with Alfred
+## Every interface, one pipeline
 
-Alfred exposes multiple interfaces, but they all feed into the same pipeline: content arrives, specialists process it, your vault grows. Here's every point of contact.
+Alfred gives you many ways to interact — but they all feed into the same pipeline. Content arrives, specialists process it, your vault grows. Whether you share a meeting note from the dashboard, mention a task on a phone call, or have a passing conversation captured by your wearable, Alfred treats it all the same.
 
-## Control UI — the alfred.black dashboard
+---
 
-The [Alfred Black dashboard](https://alfred.black) is your window into everything Alfred is doing:
+## The Dashboard
 
-- **Home** — Command Center with stat cards (health, vault, services, devices), specialist activity charts, knowledge graph, and activity feed
-- **Vault** — Browse and search records, filter by type, click through connections
-- **Streams** — View and manage data pipelines feeding Alfred
-- **Intuition** — See how Alfred is learning, route items awaiting your judgment, review active instincts
-- **Services** — Manage services, configure which LLM model each specialist uses
-- **Inbox** — Share content via file upload
-- **Devices** — Approve or reject OpenClaw pairing requests
+The [Alfred Black dashboard](https://alfred.black) is your window into everything Alfred is doing. Home shows the Command Center with health, vault stats, specialist activity, and a knowledge graph. Browse your vault, manage streams, review intuition, configure specialist models, and control services — all in one place.
 
-## OpenClaw TUI
+<Card title="Dashboard tour" icon="layout-dashboard" href="/guides/your-dashboard">
+  Full walkthrough of every dashboard section
+</Card>
 
-SSH into your instance and use the OpenClaw command-line interface directly. This gives you agent access to your vault through the same gateway your devices use — skills, sessions, and all.
+---
 
 ## OpenClaw Channels
 
-Connect Alfred to messaging platforms via OpenClaw's channel system:
+Connect Alfred to messaging platforms via OpenClaw's channel system. A message to Alfred on WhatsApp is processed the same way as content shared through the dashboard.
 
-- **WhatsApp** — Talk to Alfred from your phone
-- **iMessage** — Native Apple integration
-- **Telegram** — Bot-based access
-- **Discord** — Server or DM access
+| Channel | How it works |
+|---------|-------------|
+| **WhatsApp** | Talk to Alfred from your phone |
+| **iMessage** | Native Apple integration |
+| **Telegram** | Bot-based access |
+| **Discord** | Server or DM access |
 
-Each channel feeds into the same specialist pipeline. A message to Alfred on WhatsApp is processed the same way as content shared through the dashboard.
+---
 
-## Talk Mode — voice calls
+## Alfred Talk
 
-[Alfred Talk](/features/talk-mode) gives your Alfred a voice. Alfred can call you for briefings, reminders, and check-ins — and you can call Alfred's dedicated phone number any time you need something.
+Alfred Talk gives your Alfred a voice. Alfred can call you for briefings, reminders, and check-ins — and you can call Alfred's dedicated phone number any time you need something.
 
-Alfred speaks with the calm, warm, dry-witted composure of a proper butler — the Pennyworth persona. Everything said on a call is transcribed, structured, and added to your vault.
+This isn't a robotic assistant reading from a script. Alfred speaks as **Pennyworth** — calm, warm, precise without being cold. Occasionally dry-witted, never sarcastic. Unflappable in all circumstances.
 
-## Ambient Mode — continuous listening
+<AccordionGroup>
+<Accordion title="Alfred calls you" icon="phone-arrow-up-right">
+Alfred initiates voice calls when the moment calls for it:
 
-[Ambient Mode](/features/ambient-mode) connects an Omi wearable device to Alfred. Wear it throughout your day, and every conversation — meetings, phone calls, coffee chats, passing remarks — is captured, transcribed, and processed automatically.
+- **Morning briefings** — Your day ahead, summarised and delivered by voice
+- **Reminders** — Tasks due, meetings approaching, commitments to keep
+- **Onboarding touchpoints** — During your first days, Alfred checks in to make sure everything is working
+- **The Day 30 envelope** — A milestone moment in your Alfred experience, delivered personally
 
-You mention "I should call the accountant next week" while having coffee. Alfred hears it. A task appears. No manual entry.
+Alfred doesn't call arbitrarily. Voice calls are reserved for moments where a call is genuinely the right medium.
+</Accordion>
+
+<Accordion title="You call Alfred" icon="phone-arrow-down-left">
+Pick up the phone and dial Alfred's number any time. Ask questions, share updates, give instructions. Anything you share by voice flows through the same pipeline as text: the Curator processes it, records are created, your vault grows.
+</Accordion>
+
+<Accordion title="Setting up Alfred Talk" icon="sliders">
+Alfred Talk is enabled as an integration from your dashboard.
+
+1. Navigate to your dashboard and find the Integrations section
+2. Toggle Alfred Talk on — Alfred provisions your dedicated phone number automatically
+3. Follow the guided ElevenLabs voice synthesis setup
+4. Start talking
+
+| Component | Details |
+|-----------|---------|
+| **Dedicated phone number** | Included — no extra provisioning needed |
+| **ElevenLabs voice** | Guided setup; requires an ElevenLabs account |
+| **Inbound calls** | Call Alfred any time |
+| **Outbound calls** | Briefings, reminders, and key moments |
+</Accordion>
+</AccordionGroup>
+
+---
+
+## Ambient Mode
+
+Connect an [Omi](https://omi.me) wearable device to Alfred for continuous ambient listening. Wear it throughout your day, and every conversation — meetings, phone calls, coffee chats, passing remarks — is captured, transcribed, and processed automatically.
+
+You mention "I should call the accountant next week" while having coffee. Alfred hears it. A task appears. No manual entry. No forgotten follow-up.
+
+<AccordionGroup>
+<Accordion title="How Ambient Mode works" icon="signal">
+Ambient Mode runs as a realtime Stream, feeding a Temporal pipeline that turns raw audio into structured intelligence.
+
+1. Your Omi device captures ambient audio and transmits it via a persistent WebSocket connection
+2. The recording is transcribed with speaker identification
+3. The transcript enters your Inbox as a StreamEvent
+4. The Curator processes it — identifying people, projects, decisions, tasks, and commitments
+5. Your vault updates automatically
+
+A single conversation can produce tasks, new person records, decisions, commitments, and entity updates.
+</Accordion>
+
+<Accordion title="Setting up Ambient Mode" icon="sliders">
+1. Order your Omi wearable at [omi.me](https://omi.me)
+2. Navigate to your dashboard and find the Integrations section
+3. Toggle Ambient Mode on and follow the pairing instructions
+4. Wear and go — transcripts appear in your Inbox within moments
+
+| Component | Details |
+|-----------|---------|
+| **Omi device** | Required — order at [omi.me](https://omi.me) |
+| **Alfred instance** | Must be running and accessible |
+| **Integration toggle** | Enabled from the dashboard |
+</Accordion>
+
+<Accordion title="Privacy and control" icon="lock">
+You control what happens with ambient data:
+
+- **Pause any time** — disable the stream from your dashboard
+- **Your vault, your data** — all recordings and transcripts live on your dedicated instance
+- **Standard security** — encrypted at rest and in transit, processed only by your specialists
+
+If you're in a conversation you don't want recorded, simply remove the Omi device or pause the stream.
+</Accordion>
+</AccordionGroup>
+
+---
 
 ## Email (coming soon)
 
 Every Alfred instance will get a dedicated email address via Agentmail.to. Forward emails to Alfred, or have services send directly to your Alfred's address.
 
+---
+
+## The API
+
+For programmatic access, Alfred provides a complete REST API with 86 endpoints. Vault operations, worker control, workflow orchestration, intuition management, device pairing, scheduling, and instance administration — all available over your encrypted network.
+
+<Card title="API Reference" icon="code" href="/api-reference/introduction">
+  Full endpoint documentation
+</Card>
+
+---
+
 ## Device pairing
 
 Before any device can interact with your Alfred, it must be paired and approved:
 
-1. A device requests pairing through the OpenClaw gateway
-2. The request appears as pending in your dashboard
-3. You approve or reject it
-4. On approval, a cryptographically random device token is generated and returned once
-5. The device uses this token for all subsequent connections
+<Steps>
+  <Step title="A device requests pairing">
+    A client app initiates a pairing request through the OpenClaw gateway.
+  </Step>
+  <Step title="You review the request">
+    The request appears as pending in your dashboard.
+  </Step>
+  <Step title="Approve or reject">
+    Approval generates a cryptographically random device token, returned once. Rejection discards the request.
+  </Step>
+  <Step title="Device connects">
+    The device uses its token for all subsequent interactions.
+  </Step>
+</Steps>
 
 Tokens can be rotated periodically (every 90 days recommended) or revoked instantly if a device is lost or compromised.
 
-## The API
-
-For programmatic access, Alfred provides a complete REST API with 86 endpoints across vault operations, worker control, workflow orchestration, intuition management, device management, scheduling, and instance administration.
-
-All endpoints require Bearer token authentication and are accessible over your encrypted Tailscale network or via Cloudflare Tunnel.
-
-<Columns cols={2}>
-  <Card title="Alfred Talk" icon="phone" href="/features/talk-mode">
-    Voice calls with the Pennyworth persona
-  </Card>
-  <Card title="Ambient Mode" icon="microphone" href="/features/ambient-mode">
-    Continuous listening via Omi wearable
-  </Card>
-  <Card title="Your Dashboard" icon="layout-dashboard" href="/guides/your-dashboard">
-    Full dashboard tour
-  </Card>
-  <Card title="Device Pairing" icon="mobile" href="/guides/device-pairing">
-    Manage OpenClaw device access
-  </Card>
-</Columns>
+<Card title="Device Pairing guide" icon="mobile" href="/guides/device-pairing">
+  Full device lifecycle: pairing, approval, rotation, and revocation
+</Card>

@@ -1,35 +1,63 @@
 ---
-title: "Layer 5 — Kinetic"
+title: "Kinetic Layer"
 description: "Temporal workflow engine, Tasks, Chores, Rules, and the path from knowledge to action."
 icon: "gears"
 ---
 
 <Note>
-This is **Layer 5** of Alfred's [six-layer architecture](/how-it-works). The Kinetic layer turns knowledge into action through durable workflows.
+Part of Alfred's [six-layer architecture](/how-it-works). The Kinetic layer turns knowledge into action.
 </Note>
 
-## What the Kinetic Layer does
+## Alfred acts, not just remembers
 
-The Kinetic Layer is Alfred's execution engine. It orchestrates when and how work happens — from processing inbox files to running scheduled vault health scans to extracting knowledge on a cron schedule to routing inputs using learned instincts.
+Your vault holds what Alfred knows. But knowledge without action is just a filing cabinet. The Kinetic layer is where understanding becomes execution — handling the things that need doing so you don't have to.
 
 ## Temporal — the execution engine
 
-[Temporal](https://temporal.io) provides durable workflow orchestration. Unlike simple cron jobs, Temporal workflows are:
+[Temporal](https://temporal.io) provides durable workflow orchestration. Unlike simple cron jobs, Temporal workflows survive process restarts, automatically retry failed activities, log full execution history, and accept external signals. It runs as a Docker container on your encrypted volume.
 
-- **Durable** — workflows survive process restarts and server reboots
-- **Retriable** — failed activities are automatically retried with configurable backoff
-- **Observable** — every workflow execution is logged with full history
-- **Signalable** — running workflows can receive external signals to change behavior
+Every specialist, every intuition process, and every scheduled job runs as a Temporal workflow. You can monitor them from the Workflows section of your dashboard or via the API.
 
-Temporal runs as a Docker container with SQLite storage on the encrypted volume. You can monitor workflows from the Workflows section of your dashboard or via the API.
+## Tasks
 
-## Tasks, Chores & Rules
+Tasks are one-off action items Alfred creates, tracks, and executes on your behalf. Alfred identifies them everywhere:
 
-Beyond automated workflows, Alfred turns vault knowledge into proactive action:
+- **Conversations** — "I should call the accountant next week" becomes a task automatically
+- **Emails** — An invoice with a due date generates a payment reminder
+- **Ambient recordings** — A passing mention at coffee becomes a follow-up
+- **Your dashboard** — Create tasks directly when you know what needs doing
 
-- **Tasks** — One-off action items Alfred creates and tracks. Identified from conversations ("I should call the accountant next week"), emails, ambient recordings, or created directly via the dashboard
-- **Chores** — Recurring scheduled jobs: daily briefings, weekly grocery lists, monthly expense reports — each backed by a Temporal workflow running on a cron schedule
-- **Rules** — If/then automation in natural language. "When an invoice arrives by email, extract the amount and due date, then create a task three days before it's due."
+Each task is structured around four questions: **What** (the action), **When** (the deadline or trigger), **How** (a call, an email, a lookup), and **Why** (the context that prompted it).
+
+<Warning>
+Coming soon — Tasks are in active development.
+</Warning>
+
+## Chores
+
+Chores are recurring scheduled jobs Alfred runs automatically on a cadence you define. Standing instructions, handled without you lifting a finger.
+
+| Chore | Schedule | Delivery |
+|-------|----------|----------|
+| **Daily Briefing** | Every morning at 7am | SMS, email, or voice call |
+| **Weekly Grocery List** | Every Sunday at 10am | SMS or email |
+| **Monthly Expense Report** | First of each month | Email with attachment |
+
+Each chore is backed by a Temporal workflow running on a cron schedule. When the schedule fires, Alfred assembles the output — pulling from your vault, checking external sources, applying your preferences — and delivers the result through your preferred channel.
+
+<Warning>
+Coming soon — Chores are in active development.
+</Warning>
+
+## Rules
+
+Rules are if/then automation defined in natural language. Tell Alfred what to watch for and what to do about it.
+
+> "When an invoice arrives by email, extract the amount and due date, then create a task three days before it's due."
+
+> "If anyone mentions a new competitor in a meeting, create a record and notify me."
+
+Rules are evaluated continuously against incoming stream events and vault changes. When a condition matches, Alfred executes the action — creating a task, sending a notification, updating a record, or triggering a chore.
 
 ```mermaid
 graph LR
@@ -45,24 +73,24 @@ graph LR
 A single ambient recording can generate a vault record, trigger a rule, create a task, and schedule a chore — all without you doing anything beyond having the conversation.
 
 <Warning>
-Tasks, Chores, and Rules are coming soon. The Temporal engine and specialist workflows are fully operational today.
+Coming soon — Rules are in active development.
 </Warning>
 
-## Background schedules
+## The twelve background processes
 
-Alfred runs twelve background processes on automated schedules:
+Alfred runs twelve automated processes. You don't need to manage them — they take care of themselves.
 
-### Specialist processes
-
+<AccordionGroup>
+<Accordion title="Specialist processes" icon="gears">
 | Process | Schedule | What it does |
 |---------|----------|-------------|
 | Curator | Watches for new files | Reads inbox content and creates structured records |
 | Janitor | Periodic sweeps | Scans for and repairs structural issues |
 | Distiller | On-demand + scheduled | Surfaces latent knowledge from records |
 | Surveyor | On-demand + scheduled | Embeds, clusters, and discovers relationships |
+</Accordion>
 
-### Intuition processes
-
+<Accordion title="Intuition processes" icon="brain">
 | Process | Schedule | What it does |
 |---------|----------|-------------|
 | Event Processor | Every 2 minutes | Reads incoming stream events and writes vault records |
@@ -71,12 +99,21 @@ Alfred runs twelve background processes on automated schedules:
 | Learning | Every 5 minutes | Captures observations from your routing decisions |
 | Reflection | Daily at 2am | Reviews observations and refines instincts |
 | Judgment | Every 2 minutes | Routes inputs using instincts, escalates uncertain ones |
+</Accordion>
 
-All processes are managed by the Temporal Engine and can be monitored from the Workflows section of your dashboard.
+<Accordion title="Infrastructure processes" icon="server">
+| Process | Schedule | What it does |
+|---------|----------|-------------|
+| Health monitoring | Every 2 minutes | Checks service status, disk, memory, connectivity |
+| Encrypted backups | Daily at 3am | Restic backup to Hetzner Object Storage |
+</Accordion>
+</AccordionGroup>
+
+All processes are managed by the Temporal Engine and can be monitored from your dashboard.
 
 <Columns cols={2}>
-  <Card title="Tasks, Chores & Rules" icon="list-check" href="/features/automation">
-    The actions Alfred takes on your behalf
+  <Card title="Your Specialists" icon="gears" href="/guides/your-ai-agents">
+    Monitor and direct your specialists
   </Card>
   <Card title="Workflow API" icon="diagram-project" href="/api-reference/workflows/list">
     Full workflow management endpoints

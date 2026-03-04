@@ -46,13 +46,9 @@
               "architecture/infrastructure",
               "architecture/agent",
               "architecture/data",
-              "features/streams",
               "architecture/semantic",
               "architecture/kinetic",
-              "features/automation",
-              "architecture/interface",
-              "features/talk-mode",
-              "features/ambient-mode"
+              "architecture/interface"
             ]
           },
           {

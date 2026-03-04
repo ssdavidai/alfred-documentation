@@ -1,102 +1,72 @@
 ---
-title: "Layer 2 — Agent"
+title: "Agentic Layer"
 description: "OpenClaw runtime, specialist workers, scope enforcement, and sandboxing."
 icon: "robot"
 ---
 
 <Note>
-This is **Layer 2** of Alfred's [six-layer architecture](/how-it-works). The Agent layer hosts the specialists that do the work.
+Part of Alfred's [six-layer architecture](/how-it-works). The Agentic layer hosts the specialists that do the work.
 </Note>
+
+## Your team
+
+Alfred runs four specialists that work continuously on your vault. Each one has a defined role, a strict scope, and no ability to exceed its permissions — even if the underlying language model tries.
+
+| Specialist | What they do | When they work |
+|-----------|-------------|------|
+| **Curator** | Reads what you share and creates structured vault records | Automatically when new content arrives |
+| **Janitor** | Scans for broken links, missing metadata, orphaned records — and repairs them | Periodic sweeps |
+| **Distiller** | Surfaces assumptions, decisions, constraints, contradictions, and synthesized insights | On-demand or scheduled |
+| **Surveyor** | Embeds records as vectors, clusters by meaning, labels clusters, writes relationship links | On-demand or scheduled |
 
 ## OpenClaw — the agent runtime
 
-OpenClaw is Alfred's AI agent gateway. It manages sessions, skills, device pairing, and agent execution. Every specialist worker runs through OpenClaw, which provides a consistent interface to the underlying LLM backends.
+OpenClaw is Alfred's AI agent gateway. It manages sessions, skills, device pairing, and agent execution. Every specialist runs through OpenClaw, which provides a consistent interface to the LLM backends you've configured.
 
-OpenClaw binds to localhost and is accessible externally only via Cloudflare Tunnel (outbound-only from your server). It handles:
-- Agent session management and execution
-- Skill file loading and prompt construction
-- Device pairing and authentication
-- Plugin and hook execution
-
-## The four specialists
-
-Each specialist is a purpose-built AI worker with a defined role and strict permissions.
-
-| Specialist | Purpose | When they work |
-|-----------|---------|------|
-| **Curator** | Reads what you share and creates structured vault records with proper types, metadata, and wikilinks | Automatically when new content arrives |
-| **Janitor** | Scans the vault for broken links, missing metadata, orphaned records, and other structural issues — then fixes them | Periodic sweeps |
-| **Distiller** | Reads your records and surfaces the knowledge hiding between the lines: assumptions, decisions, constraints, contradictions, and synthesized insights | On-demand or scheduled |
-| **Surveyor** | Embeds records as vectors, clusters them by meaning, labels the clusters, and writes relationship links back to your vault | On-demand or scheduled |
-
-Each specialist:
-1. Receives work (inbox file, scan trigger, extraction request)
-2. Builds a prompt from bundled skill files + vault context
-3. Invokes an AI agent backend through OpenClaw
-4. The agent reads/writes vault files via `alfred vault` CLI commands
-5. Changes are tracked in an append-only mutation log
+OpenClaw binds to localhost and is reachable externally only via Cloudflare Tunnel (outbound-only from your server — your IP is never exposed).
 
 ## Scope enforcement
 
-Every specialist operates within strictly defined permissions. These rules are enforced **in code** before every vault operation — not by the language model, but by the vault CLI itself.
+Each specialist operates within strictly defined permissions, enforced **in code** before every vault operation. The language model cannot bypass these rules.
 
-| Specialist | Create | Read | Edit | Move | Delete |
-|-----------|--------|------|------|------|--------|
-| **Curator** | Entity types | All | All | Inbox only | Never |
-| **Janitor** | Never | All | All | No | Yes |
-| **Distiller** | Learning types only | All | Never | No | Never |
+| Specialist | Create | Read | Edit | Delete |
+|-----------|--------|------|------|--------|
+| **Curator** | Entity types | All | All | Never |
+| **Janitor** | Never | All | All | Yes |
+| **Distiller** | Learning types only | All | Never | Never |
 
-- The **Curator** can create and edit records but can never delete anything — preventing data loss during intake
-- The **Janitor** can edit and remove broken records but cannot create new ones — limiting its blast radius to fixes only
-- The **Distiller** can only create learning records (assumption, decision, constraint, contradiction, synthesis) — it cannot modify your existing records
-
-A specialist that attempts an unauthorized action receives a scope error and the operation is blocked.
+The Curator can never delete your records. The Janitor can never create new ones. The Distiller can only create learning records. These aren't suggestions in a prompt — they're hard gates in code.
 
 ## The vault CLI gate
 
-Agents never touch the filesystem directly. All vault operations go through the `alfred vault` CLI, a mediation layer that enforces rules before any read or write touches your data:
+Agents never touch the filesystem directly. Every vault operation goes through the `alfred vault` CLI, which mediates all access:
 
-```
-You → OpenClaw → Language Model → alfred vault CLI → Your Vault
-                                        ↑
-                              Scope check, path validation,
-                              schema validation, mutation log
-```
+- **Scope checking** — is this specialist allowed to perform this operation?
+- **Path validation** — is this file inside the vault boundary? (blocks `../`, symlinks, escapes)
+- **Schema validation** — is this a valid record type with correct frontmatter?
+- **Mutation logging** — every create, edit, delete, and move is recorded in an append-only audit trail
 
-The gate enforces:
-- **Type validation** — records must match a known type with valid frontmatter
-- **Scope checking** — the calling agent's scope determines what operations are allowed
-- **Path validation** — every file path is resolved and verified to be within the vault boundary. Attempts to reference `../`, symlinks, or paths outside the vault are rejected
-- **Schema validation** — record types, status values, and required fields are checked against a fixed set
-- **Mutation logging** — every create, edit, delete, and move is logged to an append-only audit trail
+Even if an agent's prompt is manipulated, it cannot perform unauthorized operations.
 
 ## Prompt injection defense
-
-Prompt injection — where malicious content in your data tricks the language model into doing something unintended — is defended against at multiple layers.
 
 <Note>
 No AI system can guarantee 100% immunity to prompt injection. Alfred's approach is **defense in depth** — even if the language model is tricked, the damage it can do is bounded by technical enforcement that the model cannot override.
 </Note>
 
-| Layer | Type | What it does |
-|-------|------|-------------|
-| **Scope enforcement** | Code | Operations outside the specialist's scope are blocked |
-| **Path validation** | Code | File access outside the vault boundary is rejected |
-| **Schema validation** | Code | Invalid record types and status values are rejected |
-| **Mutation logging** | Code | Every change is recorded in an append-only audit trail |
-| **Skill instructions** | Prompt | Each specialist receives explicit constraints in its prompt |
+| Layer | Enforcement | What it does |
+|-------|-------------|-------------|
+| Scope | Code | Operations outside the specialist's scope are blocked |
+| Path validation | Code | File access outside the vault boundary is rejected |
+| Schema validation | Code | Invalid record types and status values are rejected |
+| Mutation logging | Code | Every change is recorded in an append-only audit trail |
+| Skill instructions | Prompt | Each specialist receives explicit behavioral constraints |
 
-Layers 1 through 4 are **technical controls enforced in code**. The language model cannot bypass them regardless of what instructions it receives.
+Layers 1 through 4 are technical controls the language model cannot bypass. Layer 5 adds behavioral guidance on top.
 
 ## Third-party access
 
-Alfred instances connect only to:
-- **Configured LLM providers** (you choose which models each specialist uses from your dashboard)
-- **Hetzner S3** (for encrypted backups)
-- **Tailscale** (for mesh network connectivity)
-- **Cloudflare** (for tunnel connectivity)
-
-No third-party plugins (ClawHub installation is disabled by default), no arbitrary API access, no browser extensions. The attack surface is deliberately minimal.
+Your Alfred connects only to configured LLM providers, Hetzner S3 (for backups), Tailscale, and Cloudflare. No third-party plugins (ClawHub installation is disabled by default), no arbitrary API access, no browser extensions. The attack surface is deliberately minimal.
 
 <Columns cols={3}>
   <Card title="Your Specialists" icon="gears" href="/guides/your-ai-agents">

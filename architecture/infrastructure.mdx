@@ -1,56 +1,51 @@
 ---
-title: "Layer 1 — Infrastructure"
+title: "Infrastructure Layer"
 description: "Your dedicated machine: encryption, network isolation, and container hardening."
 icon: "server"
 ---
 
 <Note>
-This is **Layer 1** of Alfred's [six-layer architecture](/how-it-works). Infrastructure is the foundation everything else runs on.
+Part of Alfred's [six-layer architecture](/how-it-works). Infrastructure is the foundation everything else runs on.
 </Note>
 
-## Your dedicated machine
+## Your Alfred is yours alone
 
-Every Alfred Black subscriber gets their own Hetzner Cloud server (cx53: 8 vCPU, 32GB RAM). No shared databases, no multi-tenant containers, no commingled data. Your instance is yours alone.
+Every Alfred Black subscriber gets a **dedicated, isolated server**. Your data never shares hardware, databases, or services with anyone else.
 
 | Property | Detail |
 |----------|--------|
-| **Server** | Dedicated Hetzner Cloud instance (cx53) |
+| **Server** | Dedicated Hetzner Cloud instance (cx53: 8 vCPU, 32GB RAM) |
 | **Storage** | LUKS2 full-disk encryption (AES-256-XTS) |
 | **Network** | Private Tailscale mesh (WireGuard-based VPN) |
 | **Exposure** | Zero public-facing ports — no inbound access from the internet |
 
-## Encryption at rest
+Your Alfred is not a container on a shared cluster. It's a dedicated machine, encrypted at rest, accessible only through a private network.
 
-All persistent data is stored on a **LUKS2-encrypted volume** using AES-256-XTS. The encryption key is a 64-character random string, generated per instance during provisioning.
+## Encryption
 
-The encrypted volume contains:
-- Your Obsidian vault (`/mnt/encrypted/vault/`)
-- Alfred worker state
-- OpenClaw state
-- Secrets (API keys, provider credentials)
-- Restic backup metadata
+<AccordionGroup>
+<Accordion title="At rest — LUKS2 full-disk encryption">
+Your vault and all associated data are stored on a LUKS2-encrypted volume using AES-256-XTS. The encryption key is a 64-character random string, generated uniquely per instance during provisioning.
 
-<Tip>
+The encrypted volume contains your Obsidian vault, Alfred worker state, OpenClaw state, secrets (API keys, provider credentials), and Restic backup metadata.
+
 The LUKS passphrase is backed up to the control plane for disaster recovery. Even if the server is lost, your data can be restored from encrypted backups.
-</Tip>
+</Accordion>
 
-## Encryption in transit
-
-Three layers of transport encryption protect data in motion:
-
+<Accordion title="In transit — three layers of transport encryption">
 - **Tailscale** — End-to-end encrypted mesh network using the WireGuard protocol. All traffic between your browser/apps and your Alfred travels through this encrypted tunnel.
-- **HTTPS** — TLS 1.3 via Cloudflare for browser connections to your dashboard, and via Tailscale Serve for direct API access.
+- **HTTPS** — TLS 1.3 via Cloudflare for browser connections, and via Tailscale Serve for direct API access.
 - **Cloudflare Tunnel** — Outbound-only encrypted channel for OpenClaw device connectivity. Your server's IP is never exposed.
+</Accordion>
+
+<Accordion title="API key storage — SHA-256, never stored in plain text">
+When you create an API key, the full key (`alf_...`) is shown to you once. A SHA-256 hash is computed and stored. The original key is discarded — it cannot be recovered. Authentication compares hashes, never raw keys.
+</Accordion>
+</AccordionGroup>
 
 ## Network isolation
 
-Your Alfred has **zero public ports** for application services.
-
-**Cloud firewall** (Hetzner, applied at server creation):
-- Inbound: Tailscale WireGuard (UDP 41641) and ICMP only
-- SSH restricted to pre-authorized IP ranges
-
-**Service binding** — all services listen on `127.0.0.1` only:
+Your Alfred has **zero public ports** for application services. All services listen on `127.0.0.1` only:
 
 | Service | Port | External Access |
 |---------|------|-----------------|
@@ -58,7 +53,7 @@ Your Alfred has **zero public ports** for application services.
 | OpenClaw Gateway | 18789 | Cloudflare Tunnel (outbound-only) |
 | Temporal Engine | 7233 | Tailscale Serve (HTTPS) |
 
-No service listens on a public interface. External access is only possible through Tailscale (for the SaaS proxy) or Cloudflare Tunnel (for OpenClaw device connectivity).
+A Hetzner Cloud firewall permits only Tailscale WireGuard (UDP 41641) and ICMP inbound. SSH is restricted to pre-authorized IP ranges. No service listens on a public interface.
 
 ## Container hardening
 
@@ -68,43 +63,26 @@ Docker containers run with defense-in-depth hardening:
 |-----------|--------|
 | **Privilege escalation** | `no-new-privileges: true` on all containers |
 | **Capabilities** | `cap_drop: ALL` — all Linux capabilities removed |
-| **Memory limits** | 2GB per container — prevents memory exhaustion |
+| **Memory limits** | 2GB per container — prevents exhaustion |
 | **PID limits** | 256 processes per container — prevents fork bombs |
 | **Network** | All containers bound to localhost only |
 
 ## Health monitoring
 
-The SaaS layer checks your Alfred's health every 2 minutes:
-
-- Service status (running, degraded, down)
-- Disk and memory usage
-- Container health
-- Tailscale connectivity
-
-Health checks are authenticated and travel over the encrypted Tailscale network. Results power your dashboard's Command Center view.
+The SaaS layer checks your Alfred's health every 2 minutes over the encrypted Tailscale network. It monitors service status, disk and memory usage, container health, and Tailscale connectivity. Results power your dashboard's Command Center.
 
 ## Backup strategy
 
-Automated daily backups protect against data loss:
-
-- **Tool**: Restic with AES-256 encryption
-- **Backend**: Hetzner S3 (Object Storage)
-- **Schedule**: Daily at 3:00 AM
-- **Retention**: 7 daily, 4 weekly, 12 monthly snapshots
-- **Consistency**: Containers are stopped during backup
-
-Backups are encrypted independently of LUKS — even if the S3 bucket is compromised, backup data cannot be read without the Restic password.
+Automated daily backups at 3:00 AM via Restic with AES-256 encryption to Hetzner Object Storage. Retention: 7 daily, 4 weekly, 12 monthly snapshots. Containers are stopped during backup for consistency. Even if the S3 bucket is compromised, backup data cannot be read without the Restic password.
 
 ## Data lifecycle
 
 | Event | What happens |
 |-------|-------------|
-| **Subscription starts** | Dedicated server provisioned, LUKS volume created, secrets generated and uploaded via SSH |
+| **Subscription starts** | Dedicated server provisioned, encrypted volume created, secrets uploaded via SSH |
 | **Active subscription** | Continuous operation, daily encrypted backups, health monitoring |
-| **Subscription cancelled** | Data preserved for 30 days. Resubscribing restores access immediately |
-| **After 30 days** | Environment permanently decommissioned and all data destroyed |
-
-### Data portability
+| **Subscription cancelled** | Data preserved for 30 days — resubscribing restores access immediately |
+| **After 30 days** | Environment permanently decommissioned, all data destroyed |
 
 Your vault is an Obsidian-compatible collection of Markdown files. You can pair a device to access your vault directly and maintain your own local copies at any time.
 

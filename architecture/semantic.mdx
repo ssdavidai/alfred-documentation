@@ -1,36 +1,72 @@
 ---
-title: "Layer 4 — Semantic"
+title: "Semantic Layer"
 description: "Your structured knowledge: the vault, record types, and the learning cycle."
 icon: "brain"
 ---
 
 <Note>
-This is **Layer 4** of Alfred's [six-layer architecture](/how-it-works). The Semantic layer is where raw data becomes structured knowledge.
+Part of Alfred's [six-layer architecture](/how-it-works). The Semantic layer is where raw data becomes structured knowledge.
 </Note>
 
-## The vault — structured knowledge
+## Your vault
 
-The vault is an Obsidian-compatible collection of Markdown files with YAML frontmatter. Every piece of knowledge Alfred manages is a `.md` file with a defined type, structured metadata, and wikilinks to related records.
+The vault is where Alfred keeps everything it knows about your world. It's a living map — an Obsidian-compatible collection of Markdown files with YAML frontmatter, all connected through wikilinks. Every person, project, task, decision, and insight lives here.
 
-The vault lives on the LUKS-encrypted volume, organized into directories by record type. You can browse it from your dashboard, access it via the API, or open it directly in Obsidian.
+Unlike a folder of notes, your vault is **structured** (every record has a type and metadata), **connected** (records link to each other), and **growing** (Alfred continuously adds and refines records as you share content).
 
 ## 22 record types across four layers
 
-### Standing entities (7)
+<AccordionGroup>
+<Accordion title="Standing entities (7) — the stable elements of your world" icon="building">
+Records for people, organizations, and resources that persist and accumulate connections over time.
 
-The stable elements of your world: `person`, `org`, `project`, `location`, `account`, `asset`, `process`. These persist and accumulate connections over time.
+| Type | What it represents |
+|------|-------------------|
+| `person` | People and contacts |
+| `org` | Organizations and companies |
+| `project` | Projects and initiatives |
+| `location` | Physical or virtual locations |
+| `account` | Accounts and subscriptions |
+| `asset` | Physical or digital resources |
+| `process` | Defined processes and workflows |
+</Accordion>
 
-### Activity records (7)
+<Accordion title="Activity records (7) — what happened" icon="calendar">
+Events, work, and interactions — capturing what occurred and linking to the people and things involved.
 
-What happened: `conversation`, `note`, `task`, `event`, `session`, `input`, `run`. These capture events, work, and interactions, linking to the people and things involved.
+| Type | What it represents |
+|------|-------------------|
+| `conversation` | Meetings, discussions, dialogue |
+| `note` | Observations and freeform content |
+| `task` | Action items and todos |
+| `event` | One-time occurrences |
+| `session` | Time-bounded work periods |
+| `input` | Incoming items being attended to |
+| `run` | Execution runs and batch operations |
+</Accordion>
 
-### Learning types (5)
+<Accordion title="Learning types (5) — what we know" icon="flask">
+Created by the Distiller from your records — the knowledge hiding between the lines.
 
-What we know — created by the Distiller from your records: `assumption`, `decision`, `constraint`, `contradiction`, `synthesis`. These surface the knowledge hiding between the lines.
+| Type | What it represents |
+|------|-------------------|
+| `assumption` | Implicit assumptions found in your records |
+| `decision` | Choices made, with rationale |
+| `constraint` | Limitations and boundaries |
+| `contradiction` | Conflicts between different records |
+| `synthesis` | Insights connecting multiple records |
+</Accordion>
 
-### Intuition types (3)
+<Accordion title="Intuition types (3) — how Alfred learns" icon="brain">
+Created by Alfred's intuition system as it learns your preferences over time.
 
-How Alfred learns — created by Alfred's intuition system: `observation`, `instinct`, `reflection`. These grow over time as Alfred learns your preferences and develops the judgment to handle routine decisions on your behalf.
+| Type | What it represents |
+|------|-------------------|
+| `observation` | A routing decision Alfred observed and recorded |
+| `instinct` | A learned routing pattern, distilled from multiple observations |
+| `reflection` | A nightly report on what Alfred learned and refined |
+</Accordion>
+</AccordionGroup>
 
 ## How records connect
 
@@ -40,14 +76,14 @@ Every record can reference other records through wikilinks. When the Curator cre
 
 1. The **Curator** creates records: 3 people, 1 project, 2 tasks, 1 decision, and the conversation itself — all cross-linked
 2. The **Janitor** verifies all links are valid and metadata is consistent
-3. The **Distiller** later surfaces an assumption ("we're assuming the API will be ready by March") and a constraint ("budget is capped at $50k") — both linked back to the source records
+3. The **Distiller** later surfaces an assumption ("we're assuming the API will be ready by March") and a constraint ("budget is capped at $50k")
 4. The **Surveyor** clusters these records with existing ones, revealing that this meeting's topics overlap with three other recent discussions
 
 Your vault grows richer with everything you share.
 
-## Intelligence — learning from your patterns
+## Intuition — Alfred learns how you work
 
-Beyond the Distiller's knowledge extraction, Alfred develops **intuition** — the accumulated understanding of how you work.
+Over time, Alfred develops **intuition** — the accumulated understanding of your preferences. This isn't a feature you configure. It emerges naturally from how you use Alfred.
 
 ```mermaid
 graph LR
@@ -57,19 +93,21 @@ graph LR
     D --> E[Instincts form]
     E --> F[Alfred exercises judgment]
     F --> G[Routine items handled]
-    F --> H[Uncertain items escalated to you]
+    F --> H[Uncertain items escalated]
     H --> A
 ```
 
-- **Observations** — When you route an input, Alfred records the decision and the signals that characterized it
-- **Reflection** — Every night at 2am, Alfred reviews observations and distills them into instincts
-- **Judgment** — When new inputs arrive, Alfred scores them against its instincts: handle it, or ask you?
+**Observation** — When you route an input, Alfred records the decision and the signals that characterized it.
+
+**Reflection** — Every night at 2am, Alfred reviews observations and distills them into instincts — learned patterns for how to handle recurring types of input.
+
+**Judgment** — When new inputs arrive, Alfred scores them against its instincts. Confident? Handle it. Uncertain? Ask you.
 
 Alfred starts cautious, asking about everything. As evidence accumulates, it gradually handles more on its own — but always errs on the side of asking when uncertain. This is **discretion** — a good butler's most important quality.
 
 <Columns cols={3}>
   <Card title="Your Vault" icon="vault" href="/vault/understanding-your-vault">
-    How your records, connections, and world fit together
+    How records, connections, and your world fit together
   </Card>
   <Card title="Record Types" icon="shapes" href="/vault/record-types">
     Detailed reference for all 22 record types
