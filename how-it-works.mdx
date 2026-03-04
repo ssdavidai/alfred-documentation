@@ -1,5 +1,5 @@
 ---
-title: "How Alfred Works — The Six Layers"
+title: "How It Works"
 description: "Alfred is organized in six layers, from bare metal to the interfaces you touch every day."
 icon: "layer-group"
 ---
@@ -8,7 +8,7 @@ Alfred Black is a full-stack private intelligence service. Every subscriber gets
 
 ```mermaid
 graph TB
-    L6["<b>Interface</b><br/>Dashboard · Channels · Talk · Ambient"]
+    L6["<b>Interface</b><br/>Dashboard · Terminal · Channels · Talk · Ambient"]
     L5["<b>Kinetic</b><br/>Temporal · Tasks · Chores · Rules"]
     L4["<b>Semantic</b><br/>Vault · 22 Record Types · Intuition"]
     L3["<b>Data</b><br/>Streams · Events · Session Logs"]
@@ -45,7 +45,7 @@ Every subscriber gets their own Hetzner Cloud server. Data encrypted at rest wit
 
 **Your team of specialists.**
 
-OpenClaw hosts four specialist workers — Curator, Janitor, Distiller, and Surveyor — each with strictly enforced scope permissions. They interact with your vault only through a controlled CLI gate; they never touch the filesystem directly.
+OpenClaw hosts five specialist workers — Curator, Janitor, Distiller, Surveyor, and Clerk — each with strictly enforced scope permissions. They interact with your vault only through a controlled CLI gate; they never touch the filesystem directly.
 
 | Specialist | What they do | When they work |
 |-----------|-------------|------|
@@ -53,6 +53,7 @@ OpenClaw hosts four specialist workers — Curator, Janitor, Distiller, and Surv
 | **Janitor** | Scans for and repairs structural issues in your vault | Periodic sweeps |
 | **Distiller** | Surfaces assumptions, decisions, constraints, and insights | On-demand or scheduled |
 | **Surveyor** | Embeds records, clusters by meaning, discovers relationships | On-demand or scheduled |
+| **Clerk** | Stateless LLM worker dispatched for analytical tasks — classification, extraction, summarization | On-demand by other specialists |
 
 <Card title="Agentic Layer" icon="robot" href="/architecture/agent">
   OpenClaw runtime, specialist roles, scope enforcement, and prompt injection defense.
@@ -92,10 +93,10 @@ Temporal is the workflow engine. It orchestrates the specialists, the intuition 
 
 **Your points of contact.**
 
-Every way you interact with Alfred — the dashboard, OpenClaw channels (WhatsApp, iMessage, Telegram, Discord), voice calls via Talk Mode, continuous listening via Ambient Mode, and the REST API. Every interface feeds into the same pipeline.
+Every way you interact with Alfred — the dashboard, terminal access to OpenClaw, messaging channels (WhatsApp, iMessage, Telegram, Discord), voice calls via Talk Mode, continuous listening via Ambient Mode, and the REST API. Every interface feeds into the same pipeline.
 
 <Card title="Interface Layer" icon="display" href="/architecture/interface">
-  Dashboard, channels, Talk Mode, Ambient Mode, device pairing, and the API.
+  Dashboard, terminal, channels, Talk Mode, Ambient Mode, device pairing, and the API.
 </Card>
 
 ---
@@ -128,6 +129,6 @@ You can check on your specialists, trigger a run, and view their history from yo
     Temporal, Tasks, Chores, Rules
   </Card>
   <Card title="Interface" icon="display" href="/architecture/interface">
-    Dashboard, channels, Talk, Ambient
+    Dashboard, terminal, channels, Talk, Ambient
   </Card>
 </Columns>

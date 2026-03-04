@@ -10,7 +10,7 @@ Part of Alfred's [six-layer architecture](/how-it-works). The Agentic layer host
 
 ## Your team
 
-Alfred runs four specialists that work continuously on your vault. Each one has a defined role, a strict scope, and no ability to exceed its permissions — even if the underlying language model tries.
+Alfred runs five specialists that work continuously on your vault. Each one has a defined role, a strict scope, and no ability to exceed its permissions — even if the underlying language model tries.
 
 | Specialist | What they do | When they work |
 |-----------|-------------|------|
@@ -18,6 +18,7 @@ Alfred runs four specialists that work continuously on your vault. Each one has 
 | **Janitor** | Scans for broken links, missing metadata, orphaned records — and repairs them | Periodic sweeps |
 | **Distiller** | Surfaces assumptions, decisions, constraints, contradictions, and synthesized insights | On-demand or scheduled |
 | **Surveyor** | Embeds records as vectors, clusters by meaning, labels clusters, writes relationship links | On-demand or scheduled |
+| **Clerk** | Stateless LLM worker dispatched by other specialists for analytical tasks — classifying inputs, extracting entities, writing summaries | On-demand by other specialists |
 
 ## OpenClaw — the agent runtime
 
