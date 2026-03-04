@@ -1,0 +1,68 @@
+---
+title: "Layer 3 — Data"
+description: "Streams capture events from the world around you and deliver them to Alfred automatically."
+icon: "wave-pulse"
+---
+
+<Note>
+This is **Layer 3** of Alfred's [six-layer architecture](/how-it-works). The Data layer captures your world and feeds it into the vault.
+</Note>
+
+## What the Data Layer does
+
+The Data Layer is responsible for getting information into Alfred. You can share content manually — but you don't have to. Streams are data pipelines that capture events from external sources and deliver them to Alfred's Inbox automatically. The Curator processes each event, creating and updating vault records just as if you'd shared the content yourself.
+
+## Three source types
+
+Streams come in three flavours, depending on how the source delivers data.
+
+### Scheduled Pull
+
+A Temporal workflow polls an external API on an interval you define — Gmail, calendar events, health data, OpenClaw session logs.
+
+### Webhook Push
+
+An external service POSTs events directly to your dedicated webhook URL — payment confirmations from Polar, GitHub commits, Stripe invoices, or any service that supports webhooks.
+
+### Realtime
+
+A persistent WebSocket connection maintains a continuous feed — like the Omi wearable streaming ambient audio and transcripts.
+
+## The StreamEvent envelope
+
+Every event from every stream arrives in a standard envelope:
+
+```json
+{
+  "stream_id": "stream_gmail_abc123",
+  "stream_type": "scheduled_pull",
+  "tenant_id": "tenant_xyz",
+  "received_at": "2026-03-01T14:32:00Z",
+  "source_ref": "msg_18f3a2b4c5d6e7f8",
+  "payload": { ... },
+  "summary": "Email from Alice Chen re: Q1 launch timeline"
+}
+```
+
+The `source_ref` field ensures Alfred never processes the same event twice, even if a stream delivers it more than once.
+
+## Default stream: OpenClaw Session Logs
+
+Every Alfred comes with one stream already active — **OpenClaw Session Logs**. This stream captures every conversation between you and Alfred, plus all subagent runs, and processes them for decisions, entities, tasks, and patterns.
+
+Your conversations with Alfred aren't ephemeral. They become part of your vault — searchable, connected, and available to your specialists for deeper analysis.
+
+## What happens next
+
+Once events land in your Inbox, the standard specialist pipeline takes over. The Curator reads and structures. The Janitor verifies. The Distiller surfaces insights. Your vault grows richer, automatically.
+
+Streams are the front door — the rest of Alfred's team handles everything behind it.
+
+<Columns cols={2}>
+  <Card title="Streams" icon="wave-pulse" href="/features/streams">
+    Full details on stream types, management, and configuration
+  </Card>
+  <Card title="Ambient Mode" icon="microphone" href="/features/ambient-mode">
+    Continuous listening via the Omi wearable — Alfred's realtime stream
+  </Card>
+</Columns>

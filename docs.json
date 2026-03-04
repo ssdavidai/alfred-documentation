@@ -36,8 +36,23 @@
             "group": "Getting Started",
             "pages": [
               "introduction",
-              "quickstart",
-              "how-it-works"
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Architecture",
+            "pages": [
+              "how-it-works",
+              "architecture/infrastructure",
+              "architecture/agent",
+              "architecture/data",
+              "features/streams",
+              "architecture/semantic",
+              "architecture/kinetic",
+              "features/automation",
+              "architecture/interface",
+              "features/talk-mode",
+              "features/ambient-mode"
             ]
           },
           {
@@ -46,15 +61,6 @@
               "vault/understanding-your-vault",
               "vault/record-types",
               "vault/vault-schema"
-            ]
-          },
-          {
-            "group": "Features",
-            "pages": [
-              "features/streams",
-              "features/automation",
-              "features/talk-mode",
-              "features/ambient-mode"
             ]
           },
           {

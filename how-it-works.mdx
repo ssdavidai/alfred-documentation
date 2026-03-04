@@ -1,150 +1,165 @@
 ---
-title: "How Alfred Works"
-description: "What happens behind the scenes when you share something with Alfred."
-icon: "diagram-project"
+title: "How Alfred Works — The Six Layers"
+description: "Alfred is organized in six layers, from bare metal to the interfaces you touch every day."
+icon: "layer-group"
 ---
 
-## Behind the scenes
-
-When you hand something to Alfred — a meeting note, a conversation, a rough idea — a team of specialists takes over. Each one reads, structures, verifies, and connects your content until what started as raw text becomes part of a living, interconnected vault.
+Alfred Black is a full-stack private intelligence service. Every subscriber gets a dedicated machine — no shared infrastructure, no multi-tenant databases, no commingled data. The entire system is organized in six layers, each with a clear responsibility.
 
 ```mermaid
-graph LR
-    A[Inbox] --> B[Curator]
-    B --> C[Vault Records]
-    C --> D[Janitor]
-    D --> E[Clean Vault]
-    E --> F[Distiller]
-    F --> G[Learning Records]
-    E --> H[Surveyor]
-    H --> I[Clusters & Relationships]
-    E --> J[Intuition]
-    J --> K[Observations & Instincts]
+graph TB
+    L6["<b>6 — Interface</b><br/>Dashboard · OpenClaw · Channels · Talk · Ambient"]
+    L5["<b>5 — Kinetic</b><br/>Temporal · Tasks · Chores · Rules"]
+    L4["<b>4 — Semantic</b><br/>Vault · 22 Record Types · Intuition"]
+    L3["<b>3 — Data</b><br/>Streams · StreamEvents · Session Logs"]
+    L2["<b>2 — Agent</b><br/>OpenClaw · Specialists · Scope Enforcement"]
+    L1["<b>1 — Infrastructure</b><br/>Dedicated Server · Encryption · Tailscale"]
+
+    L6 --> L5
+    L5 --> L4
+    L4 --> L3
+    L3 --> L2
+    L2 --> L1
+
+    style L1 fill:#d49a5b,color:#fff
+    style L2 fill:#e0a94e,color:#fff
+    style L3 fill:#f4ac3b,color:#000
+    style L4 fill:#f7c06a,color:#000
+    style L5 fill:#fad28e,color:#000
+    style L6 fill:#fde4b5,color:#000
 ```
 
-## Your specialists
+---
 
-### Curator — reads what you share
+## Layer 1 — Infrastructure
 
-The Curator watches for new content. When something arrives, it reads the raw text and creates structured records: people, projects, tasks, decisions, and more. Each record is linked to every other relevant record.
+**Your dedicated machine.**
 
-**Example:** You share meeting notes mentioning "Alice from Acme discussed the Q1 launch timeline." The Curator creates a `person` record for Alice, links it to an `org` record for Acme and a `project` record for Q1 Launch, and creates the `conversation` record for the meeting itself.
+Every Alfred subscriber gets their own Hetzner Cloud server (cx53: 8 vCPU, 32GB RAM). Your data is encrypted at rest with LUKS2 (AES-256-XTS). All services bind to localhost — zero public ports. External access is exclusively through your private Tailscale mesh network, which provides end-to-end WireGuard encryption.
 
-### Janitor — keeps your vault in order
+No shared infrastructure between subscribers. Your data never touches another subscriber's machine.
 
-The Janitor periodically walks through your entire vault looking for structural problems: broken links between records, missing metadata, orphaned records with no connections. When it finds issues, it repairs them quietly.
+<Card title="Infrastructure deep dive" icon="server" href="/architecture/infrastructure">
+  Dedicated servers, encryption, network isolation, container hardening, and data lifecycle.
+</Card>
 
-### Distiller — surfaces what's hidden
+---
 
-The Distiller reads your records and finds the knowledge hiding between the lines: assumptions your team is making, decisions that were taken (and why), constraints you're operating under, contradictions across different sources, and synthesized insights that connect multiple records.
+## Layer 2 — Agent
 
-### Surveyor — maps your connected world
+**Your team of specialists.**
 
-The Surveyor takes a different approach. Instead of reading individual records, it works across your entire vault: **Embed** (represent each record as a vector), **Cluster** (group records by meaning), **Label** (name the clusters), and **Write** (add cluster tags and relationship links back to your vault). The result is a bird's-eye view of how everything connects.
+OpenClaw is the AI agent runtime. It hosts four specialist workers — Curator, Janitor, Distiller, and Surveyor — each with strictly enforced scope permissions. Agents interact with your vault only through the `alfred vault` CLI gate; they never touch the filesystem directly.
 
-### Intuition — learns how you work
+| Specialist | Role | When they work |
+|-----------|------|------|
+| **Curator** | Reads what you share and creates structured vault records | Automatically when new content arrives |
+| **Janitor** | Scans for and repairs structural issues in your vault | Periodic sweeps |
+| **Distiller** | Surfaces assumptions, decisions, constraints, and insights | On-demand or scheduled |
+| **Surveyor** | Embeds records, clusters by meaning, discovers relationships | On-demand or scheduled |
 
-Over time, Alfred develops **intuition** — the accumulated understanding of your preferences. When you route inputs, make organizational decisions, or categorize content, Alfred observes the pattern. Those observations are refined into **instincts** during nightly reflection — learned routing patterns that let Alfred handle routine decisions on your behalf.
+<Card title="Agent deep dive" icon="robot" href="/architecture/agent">
+  OpenClaw runtime, specialist roles, scope enforcement, and prompt injection defense.
+</Card>
 
-Alfred starts cautious, asking about everything. As evidence accumulates, it gradually handles more on its own — but always errs on the side of asking when uncertain. This is **discretion** — a good butler's most important quality.
+---
 
-## Record types
+## Layer 3 — Data
 
-Alfred manages 22 types of records organized into four layers:
+**Your world, flowing in.**
 
-### The who and what — Standing entities
-
-The stable elements of your world:
-
-| Type | What it represents |
-|------|-------------------|
-| `person` | People and contacts |
-| `org` | Organizations and companies |
-| `project` | Projects and initiatives |
-| `location` | Physical or virtual locations |
-| `account` | Accounts and subscriptions |
-| `asset` | Physical or digital resources |
-| `process` | Defined processes and workflows |
-
-### What happened — Activity records
-
-Events, work, and interactions:
-
-| Type | What it represents |
-|------|-------------------|
-| `conversation` | Meetings, discussions, dialogue |
-| `note` | Observations and freeform content |
-| `task` | Action items and todos |
-| `event` | One-time occurrences |
-| `session` | Time-bounded work periods |
-| `input` | Incoming items being attended to |
-| `run` | Execution runs and batch operations |
-
-### What we know — Learning records
-
-Created by the Distiller from your records:
-
-| Type | What it represents |
-|------|-------------------|
-| `assumption` | Implicit assumptions found in your records |
-| `decision` | Choices made, with rationale |
-| `constraint` | Limitations and boundaries |
-| `contradiction` | Conflicts between different records |
-| `synthesis` | Insights connecting multiple records |
-
-### How Alfred learns — Intuition records
-
-Created by Alfred's intuition system as it learns your preferences:
-
-| Type | What it represents |
-|------|-------------------|
-| `observation` | A routing decision Alfred observed and recorded |
-| `instinct` | A learned routing pattern, distilled from multiple observations |
-| `reflection` | A nightly report on what Alfred learned and refined |
-
-## How records connect
-
-Every record can reference other records. When the Curator creates a person mentioned in a conversation, both records automatically link to each other. Over time, these connections build a rich, navigable map of your world.
-
-**Example:** You share notes from a planning meeting:
-
-1. The **Curator** creates records: 3 people, 1 project, 2 tasks, 1 decision, and the conversation itself
-2. All records are cross-linked: people to conversation, tasks to project, decision to conversation
-3. The **Janitor** verifies all links are valid and metadata is consistent
-4. The **Distiller** later surfaces an assumption ("we're assuming the API will be ready by March") and a constraint ("budget is capped at $50k") — both linked back to the source records
-5. The **Surveyor** clusters these records with existing ones, revealing that this meeting's topics overlap with three other recent discussions
-
-Your vault grows richer with everything you share.
-
-## Streams — your world, flowing in
-
-You don't have to hand everything to Alfred manually. [Streams](/features/streams) are data pipelines that capture events from external sources — your email, calendar, payment providers, and ambient recording devices — and deliver them to Alfred's Inbox automatically. The Curator processes each event the same way it handles anything you share directly.
+You don't have to hand everything to Alfred manually. [Streams](/features/streams) are data pipelines that capture events from external sources — your email, calendar, payment providers, and ambient recording devices — and deliver them to Alfred's Inbox automatically. Every event arrives in a standard StreamEvent envelope. The Curator processes each one, creating and updating vault records just as if you'd shared the content yourself.
 
 Alfred also comes with a default stream: **OpenClaw Session Logs**, which captures every conversation you have with Alfred and processes it for decisions, entities, tasks, and patterns.
 
+<Card title="Data deep dive" icon="wave-pulse" href="/architecture/data">
+  Stream types, the StreamEvent envelope, and how events flow into your vault.
+</Card>
+
+---
+
+## Layer 4 — Semantic
+
+**Your structured knowledge.**
+
+The vault is an Obsidian-compatible collection of Markdown files with YAML frontmatter. Alfred manages 22 record types organized into four layers: standing entities (person, org, project, etc.), activity records (conversation, task, event, etc.), learning types (assumption, decision, constraint, contradiction, synthesis), and intuition types (observation, instinct, reflection).
+
+Records connect through wikilinks, forming a growing knowledge graph. Over time, Alfred develops **intuition** — the accumulated understanding of your preferences. Observations of how you route inputs are refined into instincts during nightly reflection, letting Alfred handle routine decisions on your behalf.
+
+<Card title="Semantic deep dive" icon="brain" href="/architecture/semantic">
+  Vault structure, record types, relationships, and the learning cycle.
+</Card>
+
+---
+
+## Layer 5 — Kinetic
+
+**Your actions in motion.**
+
+Temporal is the workflow orchestration engine. It manages durable workflows with automatic retries, cron schedules, and signal handling. Workers run as Temporal activities — the Curator's inbox processing, the Janitor's periodic sweeps, the Distiller's knowledge extraction, and Alfred's six intuition processes are all orchestrated as Temporal workflows.
+
+Beyond the specialists, Tasks, Chores, and Rules (coming soon) will turn vault knowledge into proactive action: one-off tasks created from conversations, recurring chores delivered on schedule, and if/then rules that respond to incoming events.
+
+<Card title="Kinetic deep dive" icon="gears" href="/architecture/kinetic">
+  Temporal engine, workflow orchestration, schedules, and the path from knowledge to action.
+</Card>
+
+---
+
+## Layer 6 — Interface
+
+**Your points of contact.**
+
+Every way you interact with Alfred — the dashboard at alfred.black, the OpenClaw TUI via SSH, channels like WhatsApp and iMessage and Telegram and Discord, voice calls via Alfred Talk, continuous listening via Ambient Mode, and email (coming soon). Every interface feeds into the same pipeline: content arrives, specialists process it, your vault grows.
+
+<Card title="Interface deep dive" icon="display" href="/architecture/interface">
+  Dashboard, OpenClaw, channels, Talk Mode, Ambient Mode, and device pairing.
+</Card>
+
+---
+
 ## Always working
 
-Your specialists and intuition processes run continuously in the background:
+Alfred doesn't wait for you to ask. Background processes run continuously:
 
-- **Curator** attends to new inbox items within seconds of arrival — whether shared manually or delivered by a Stream
-- **Janitor** runs periodic health scans automatically
-- **Distiller** can be triggered on-demand or scheduled
-- **Surveyor** can be triggered on-demand or scheduled to re-cluster and discover new relationships
-- **Intuition** observes, learns, and routes on automated schedules — no intervention needed
+| Process | Frequency | Layer |
+|---------|-----------|-------|
+| Curator attends to inbox | Seconds after arrival | Agent |
+| Janitor health scans | Periodic sweeps | Agent |
+| Distiller knowledge extraction | On-demand + scheduled | Agent |
+| Surveyor clustering | On-demand + scheduled | Agent |
+| Event processing | Every 2 minutes | Kinetic |
+| Session tracking | Every 5 minutes | Kinetic |
+| Daily digest | Daily at 6pm | Kinetic |
+| Learning from routing | Every 5 minutes | Kinetic |
+| Nightly reflection | Daily at 2am | Kinetic |
+| Judgment and routing | Every 2 minutes | Kinetic |
+| Health monitoring | Every 2 minutes | Infrastructure |
+| Encrypted backups | Daily at 3am | Infrastructure |
 
 You can check on your specialists, trigger a run, and view their history from your dashboard or via the API.
 
+---
+
+## Explore each layer
+
 <Columns cols={3}>
-  <Card title="Your Vault" icon="vault" href="/vault/understanding-your-vault">
-    Understand how your vault works
+  <Card title="Infrastructure" icon="server" href="/architecture/infrastructure">
+    Dedicated servers, encryption, network isolation
   </Card>
-  <Card title="Streams" icon="wave-pulse" href="/features/streams">
-    Data pipelines that feed Alfred automatically
+  <Card title="Agent" icon="robot" href="/architecture/agent">
+    OpenClaw runtime, specialists, scope enforcement
   </Card>
-  <Card title="Your Specialists" icon="gears" href="/guides/your-ai-agents">
-    Monitor and direct your specialists
+  <Card title="Data" icon="wave-pulse" href="/architecture/data">
+    Streams, events, session logs
   </Card>
-  <Card title="Intuition" icon="brain" href="/guides/intuition">
-    How Alfred learns your preferences
+  <Card title="Semantic" icon="brain" href="/architecture/semantic">
+    Vault, record types, intuition
+  </Card>
+  <Card title="Kinetic" icon="gears" href="/architecture/kinetic">
+    Temporal, workflows, schedules
+  </Card>
+  <Card title="Interface" icon="display" href="/architecture/interface">
+    Dashboard, channels, Talk, Ambient
   </Card>
 </Columns>
