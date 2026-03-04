@@ -62,11 +62,11 @@ curl -s https://alfred.black/api/v1/vault/schema \
   -H "Authorization: Bearer alf_your_key_here" | jq .known_types
 ```
 
-This returns all 19 record types — from `person` and `project` to `assumption` and `decision`. These are the building blocks of your world.
+This returns all 22 record types — from `person` and `project` to `assumption` and `decision`. These are the building blocks of your world.
 
 ## Step 4: Share your first content
 
-Hand Alfred a meeting note. You can do this from your dashboard (**Inbox** page) or via the API:
+Hand Alfred a meeting note. You can do this from your dashboard (click **Upload to Vault** on the Home page) or via the API:
 
 ```bash
 curl -X POST https://alfred.black/api/v1/vault/inbox \
