@@ -68,6 +68,7 @@ graph LR
     E --> F[Tasks]
     E --> G[Chores]
     E --> H[Notifications]
+    I[Judgment] -->|routing context| C
 ```
 
 A single ambient recording can generate a vault record, trigger a rule, create a task, and schedule a chore — all without you doing anything beyond having the conversation.
@@ -84,7 +85,7 @@ Alfred runs twelve automated processes. You don't need to manage them — they t
 <Accordion title="Specialist processes" icon="gears">
 | Process | Schedule | What it does |
 |---------|----------|-------------|
-| Curator | Watches for new files | Reads inbox content and creates structured records |
+| Curator | Watches for new files | Reads inbox content and creates structured records; accepts routing context from Judgment |
 | Janitor | Periodic sweeps | Scans for and repairs structural issues |
 | Distiller | On-demand + scheduled | Surfaces latent knowledge from records |
 | Surveyor | On-demand + scheduled | Embeds, clusters, and discovers relationships |
@@ -98,7 +99,7 @@ Alfred runs twelve automated processes. You don't need to manage them — they t
 | Daily Digest | Daily at 6pm | Summarizes the day's activity |
 | Learning | Every 5 minutes | Captures observations from your routing decisions |
 | Reflection | Daily at 2am | Reviews observations and refines instincts |
-| Judgment | Every 2 minutes | Routes inputs using instincts, escalates uncertain ones |
+| Judgment | Every 2 minutes | Routes inputs using instincts and triggers Curator processing; escalates uncertain ones |
 </Accordion>
 
 <Accordion title="Infrastructure processes" icon="server">

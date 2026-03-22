@@ -92,16 +92,20 @@ graph LR
     C --> D[Nightly reflection]
     D --> E[Instincts form]
     E --> F[Alfred exercises judgment]
-    F --> G[Routine items handled]
-    F --> H[Uncertain items escalated]
-    H --> A
+    F --> G{Confident?}
+    G -->|Yes| H[Curator processes]
+    G -->|No| I[Escalated to you]
+    H --> J[Structured vault records]
+    I --> A
 ```
 
 **Observation** — When you route an input, Alfred records the decision and the signals that characterized it.
 
 **Reflection** — Every night at 2am, Alfred reviews observations and distills them into instincts — learned patterns for how to handle recurring types of input.
 
-**Judgment** — When new inputs arrive, Alfred scores them against its instincts. Confident? Handle it. Uncertain? Ask you.
+**Judgment** — When new inputs arrive, Alfred scores them against its instincts. Confident? It hands the input to the Curator with routing context (destination, assignee, process). Uncertain? It asks you.
+
+When Judgment routes an input, the **Curator** receives the raw content along with routing metadata — which project it belongs to, who it's assigned to, and which process applies. The Curator then creates structured records, extracts entities, and interlinks everything with wikilinks. The resulting observation captures both the routing decision *and* the Curator's output (entities found, links created), giving the learning loop richer signal for future instinct refinement.
 
 Alfred starts cautious, asking about everything. As evidence accumulates, it gradually handles more on its own — but always errs on the side of asking when uncertain. This is **discretion** — a good butler's most important quality.
 

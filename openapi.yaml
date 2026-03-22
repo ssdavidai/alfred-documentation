@@ -2648,13 +2648,114 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  /api/v1/curator/route-and-process:
+    post:
+      operationId: routeAndProcess
+      summary: Route and Process via Curator
+      description: >
+        Route an input to a vault destination and trigger the Curator for structured
+        processing. The Curator creates notes, extracts entities, and interlinks records
+        using the routing context (destination, assignee, process). If the Curator is
+        unavailable, falls back to a raw file move. An enriched observation is always
+        written, capturing both the routing decision and the Curator's output.
+      tags:
+        - Intuition
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - input_path
+                - destination
+              properties:
+                input_path:
+                  type: string
+                  description: "Vault-relative path to the input file (e.g., `input/email-abc.md`)"
+                destination:
+                  type: string
+                  description: "Target vault destination (e.g., `project/Billing`)"
+                routing_context:
+                  type: object
+                  description: Routing metadata from the Judgment engine
+                  properties:
+                    assigned_to:
+                      type: string
+                      description: "Person or role to assign to (e.g., `person/David`)"
+                    process:
+                      type: string
+                      description: "Process to apply (e.g., `invoice-handling`)"
+                    instinct_name:
+                      type: string
+                      description: Name of the instinct that matched
+                    confidence_score:
+                      type: number
+                      format: float
+                      description: "Match confidence score (0.0–1.0)"
+            example:
+              input_path: input/vendor-invoice-march.md
+              destination: project/Billing
+              routing_context:
+                assigned_to: person/David
+                process: invoice-handling
+                instinct_name: Invoice Processing
+                confidence_score: 0.87
+      responses:
+        "200":
+          description: Input routed and processed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  processed:
+                    type: boolean
+                    description: Whether the Curator successfully processed the input
+                  note_path:
+                    type: string
+                    nullable: true
+                    description: Path to the note created by the Curator
+                  entities_created:
+                    type: array
+                    items:
+                      type: string
+                    description: Entity records created during processing
+                  entities_linked:
+                    type: array
+                    items:
+                      type: string
+                    description: Entity records linked during processing
+                  observation_path:
+                    type: string
+                    description: Path to the observation record written
+              example:
+                processed: true
+                note_path: note/2026/03/vendor-invoice-march.md
+                entities_created:
+                  - org/Vendor Corp.md
+                entities_linked:
+                  - person/David.md
+                  - project/Billing.md
+                observation_path: observation/route-vendor-invoice-march-2026-03-22T08-30-00-000Z.md
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
   /api/v1/learning/route:
     post:
       operationId: routeInput
       summary: Route an Input
       description: >
-        Manually route an input to a vault destination. Creates an observation
-        from the routing decision, strengthening Alfred's instincts.
+        Manually route an input to a vault destination. Triggers the Curator for
+        structured processing (creating notes, extracting entities, interlinking).
+        Falls back to a raw file move if the Curator is unavailable. Creates an
+        enriched observation from the routing decision.
       tags:
         - Intuition
       requestBody:
@@ -2669,7 +2770,7 @@ paths:
               properties:
                 input_id:
                   type: string
-                  description: The unique identifier of the input to route
+                  description: Vault-relative path to the input to route
                 destination:
                   type: string
                   description: "Vault destination path (e.g., `project/client-onboarding`)"
@@ -2681,27 +2782,43 @@ paths:
               schema:
                 type: object
                 properties:
-                  routed:
-                    type: boolean
-                    description: Whether the input was successfully routed
-                  observation_created:
-                    type: boolean
-                    description: Whether an observation was created from this routing
-                  destination:
+                  message:
                     type: string
-                    description: The vault destination the input was routed to
-                required:
-                  - routed
-                  - observation_created
-                  - destination
+                  processed:
+                    type: boolean
+                    description: Whether the Curator successfully processed the input
+                  note_path:
+                    type: string
+                    nullable: true
+                    description: Path to the note created by the Curator
+                  entities_created:
+                    type: array
+                    items:
+                      type: string
+                    description: Entity records created during processing
+                  entities_linked:
+                    type: array
+                    items:
+                      type: string
+                    description: Entity records linked during processing
+                  observation:
+                    type: string
+                    description: Path to the observation record
               example:
-                routed: true
-                observation_created: true
-                destination: project/client-onboarding
+                message: "Routed input/email-abc.md to project/client-onboarding"
+                processed: true
+                note_path: note/2026/03/client-onboarding-update.md
+                entities_created:
+                  - person/Jane Doe.md
+                entities_linked:
+                  - project/client-onboarding.md
+                observation: observation/route-email-abc-2026-03-22T08-30-00-000Z.md
         "400":
           $ref: "#/components/responses/ValidationError"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/InternalError"
 
