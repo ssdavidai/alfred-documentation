@@ -14,10 +14,10 @@ The vault is where Alfred keeps everything it knows about your world. It's a liv
 
 Unlike a folder of notes, your vault is **structured** (every record has a type and metadata), **connected** (records link to each other), and **growing** (Alfred continuously adds and refines records as you share content).
 
-## 22 record types across four layers
+## 26 record types across five layers
 
 <AccordionGroup>
-<Accordion title="Standing entities (7) — the stable elements of your world" icon="building">
+<Accordion title="Standing entities (8) — the stable elements of your world" icon="building">
 Records for people, organizations, and resources that persist and accumulate connections over time.
 
 | Type | What it represents |
@@ -29,20 +29,31 @@ Records for people, organizations, and resources that persist and accumulate con
 | `account` | Accounts and subscriptions |
 | `asset` | Physical or digital resources |
 | `process` | Defined processes and workflows |
+| `matter` | An ongoing concern grouping related errands |
 </Accordion>
 
-<Accordion title="Activity records (7) — what happened" icon="calendar">
-Events, work, and interactions — capturing what occurred and linking to the people and things involved.
+<Accordion title="Activity records (9) — what happened" icon="calendar">
+Events, work, interactions, and execution results — capturing what occurred and linking to the people and things involved.
 
 | Type | What it represents |
 |------|-------------------|
 | `conversation` | Meetings, discussions, dialogue |
 | `note` | Observations and freeform content |
-| `task` | Action items and todos |
+| `task` | Execution primitives — errands carried out by Alfred or by you |
+| `triage` | Items Alfred couldn't confidently classify — needs your review |
 | `event` | One-time occurrences |
 | `session` | Time-bounded work periods |
 | `input` | Incoming items being attended to |
 | `run` | Execution runs and batch operations |
+| `ledger_entry` | Completion records — what happened when an errand finished |
+</Accordion>
+
+<Accordion title="Execution types (1) — how work gets done" icon="book-open">
+Methodologies that teach Alfred how to approach different kinds of work.
+
+| Type | What it represents |
+|------|-------------------|
+| `skill` | A reasoning methodology — plain English instructions for a type of work |
 </Accordion>
 
 <Accordion title="Learning types (5) — what we know" icon="flask">
@@ -96,6 +107,9 @@ graph LR
     G -->|Yes| H[Curator processes]
     G -->|No| I[Escalated to you]
     H --> J[Structured vault records]
+    H -->|Execution block?| K[Task created]
+    K --> L[Task Runner executes]
+    L --> M[Consequentials]
     I --> A
 ```
 
@@ -114,7 +128,7 @@ Alfred starts cautious, asking about everything. As evidence accumulates, it gra
     How records, connections, and your world fit together
   </Card>
   <Card title="Record Types" icon="shapes" href="/vault/record-types">
-    Detailed reference for all 22 record types
+    Detailed reference for all 26 record types
   </Card>
   <Card title="Intuition" icon="brain" href="/guides/intuition">
     How Alfred learns your preferences

@@ -21,8 +21,11 @@ graph LR
     C --> D[Nightly reflection]
     D --> E[Instincts form]
     E --> F[Alfred exercises judgment]
-    F --> G[Routine items handled]
+    F --> G[Route + create task]
     F --> H[Uncertain items escalated to you]
+    G --> I[Task Runner executes]
+    I --> J[Consequentials]
+    J --> B
     H --> A
 ```
 
@@ -60,13 +63,30 @@ This is where **discretion** comes in — a good butler's most important quality
 
 | Experience | Discretion | What Alfred does |
 |-----------|-----------|-----------------|
-| Fewer than 5 observations | Very cautious | "I've barely seen this before, sir. Your guidance?" |
-| 5-9 observations | Cautious | "I believe I know, but I'd rather confirm." |
-| 10-19 observations | Moderate | "I'm fairly certain this goes here." |
-| 20-49 observations | Confident | "I've seen this many times. Handling it." |
-| 50+ observations | Routine | "This is routine. Already done." |
+| Fewer than 10 observations | Very cautious | "I've barely seen this before, sir. Your guidance?" — `requires_approval` forced on any tasks |
+| 10-19 observations | Cautious | "I believe I know, but I'd rather confirm." |
+| 20-49 observations | Moderate | "I'm fairly certain this goes here." |
+| 50+ observations, score > 0.75 | Confident | "This is routine." — tasks may auto-execute without approval |
 
 Alfred starts by asking about everything. As observations accumulate and instincts form, it gradually handles more on its own — but always errs on the side of asking when uncertain.
+
+### 4. From intuition to action
+
+Instincts don't just route — they can **execute**. When an instinct includes an execution block, Judgment does two things at once: routes the input to the Curator for record creation *and* creates a task for the Task Runner to carry out.
+
+The execution block on an instinct specifies:
+- **tier** — how much power the task gets (1 = read-only, 2 = read-write, 3 = full)
+- **skill_entry** — which methodology to follow
+- **budget_turns** — how many turns the agent gets
+- **requires_approval** — whether you need to approve before execution begins
+
+<Note>
+  New instincts (fewer than 10 observations) always force `requires_approval=true` on their tasks, regardless of the execution block's setting. Alfred won't act autonomously until it has enough experience to be confident. This is the **discretion gate**.
+</Note>
+
+The Task Runner picks up the task, assembles context (the skill methodology, the related matter, relevant observations), and executes via `sessions_spawn`. When it finishes, it writes a ledger entry and handles any consequentials — follow-up errands that flow naturally from the completed work.
+
+This closes the loop from observation to action: you teach Alfred by routing, Alfred learns through reflection, and eventually Alfred both routes *and* acts — with appropriate caution.
 
 ## The cold start
 
@@ -149,7 +169,7 @@ curl -s /api/v1/learning/reflections \
 
 ## The background processes
 
-Intuition runs on six automated processes. You don't need to manage them — they run on schedules and take care of themselves.
+Intuition runs on seven automated processes. You don't need to manage them — they run on schedules and take care of themselves.
 
 | Process | Schedule | What it does |
 |---------|----------|-------------|
@@ -159,8 +179,9 @@ Intuition runs on six automated processes. You don't need to manage them — the
 | **Learning** | Every 5 minutes | Captures observations from your routing decisions |
 | **Reflection** | Daily at 2am | Reviews observations and refines instincts |
 | **Judgment** | Every 2 minutes | Routes inputs using instincts, escalates uncertain ones to you |
+| **Task Runner** | Every 2 minutes | Picks up queued tasks, follows skill methodologies, executes errands, writes ledger entries |
 
-All six processes are managed by the Temporal Engine and can be monitored from the Workflows section of your dashboard.
+All seven processes are managed by the Temporal Engine and can be monitored from the Workflows section of your dashboard.
 
 ## Teaching Alfred directly
 
@@ -192,7 +213,7 @@ curl -X POST /api/v1/learning/enable \
 ```
 </CodeGroup>
 
-Disabling pauses all six processes but preserves your existing observations and instincts. Re-enabling picks up where Alfred left off.
+Disabling pauses all seven processes but preserves your existing observations and instincts. Re-enabling picks up where Alfred left off.
 
 ## Troubleshooting
 

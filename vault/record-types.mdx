@@ -1,12 +1,12 @@
 ---
 title: "Record Types"
-description: "Detailed reference for all 22 vault record types — the building blocks of your world."
+description: "Detailed reference for all 26 vault record types — the building blocks of your world."
 icon: "shapes"
 ---
 
 ## Overview
 
-Alfred manages 22 distinct record types organized into four layers: **Standing Entities** (7) for the stable elements of your world, **Activity Records** (7) for what happens, **Learning Types** (5) for the deeper knowledge the Distiller surfaces, and **Intuition Types** (3) for the patterns Alfred learns from how you work.
+Alfred manages 26 distinct record types organized into five layers: **Standing Entities** (8) for the stable elements of your world, **Activity Records** (9) for what happens, **Execution Types** (1) for how work gets done, **Learning Types** (5) for the deeper knowledge the Distiller surfaces, and **Intuition Types** (3) for the patterns Alfred learns from how you work.
 
 ## Standing Entities
 
@@ -98,11 +98,23 @@ Records representing the people, organizations, and resources in your world.
 **Key fields:** name, status, owner (link to person), tags
 </Accordion>
 
+<Accordion title="matter — Ongoing Concerns" icon="folder-open">
+**What it represents:** An ongoing concern that groups related errands — a thread of activity Alfred tracks on your behalf. The Hetzner matter, the invoice matter, the onboarding matter.
+
+**When it's created:** The Curator creates matter records when a recurring concern is identified across multiple inputs, or when you explicitly tell Alfred to track something as an ongoing matter.
+
+**Example:** Several emails and tasks relate to migrating infrastructure to Hetzner. Alfred groups them under a matter record, linking related errands, people, and decisions so the full picture is always one click away.
+
+**Status values:** `active`, `resolved`, `archived`
+
+**Key fields:** name, status, related (links to grouped records), tags
+</Accordion>
+
 </AccordionGroup>
 
 ## Activity Records
 
-Records capturing events, work, and interactions.
+Records capturing events, work, interactions, and execution results.
 
 <AccordionGroup>
 
@@ -134,16 +146,44 @@ Records capturing events, work, and interactions.
 **Key fields:** name, status, tags
 </Accordion>
 
-<Accordion title="task — Tasks and Action Items" icon="check">
-**What it represents:** Individual tasks, action items, or todos.
+<Accordion title="task — Execution Primitives" icon="check">
+**What it represents:** A unit of work — an errand to be carried out, either by Alfred or by you. Tasks are the execution backbone of the Kinetic layer.
 
-**When it's created:** The Curator creates task records when action items are identified in your content.
+**When it's created:** The Curator creates tasks from action items in your content. Instincts with execution blocks create tasks automatically when Judgment matches them. You can also create tasks directly from your dashboard.
 
-**Example:** Meeting notes say "Bob will start the database indexing task." Alfred creates a task record, assigns Bob as owner, and links it to the project.
+**Example:** An instinct fires on a new vendor invoice. Judgment creates a task: "Process invoice from Acme Corp," assigns it to Alfred at tier 1, and links the skill `skill/invoice-processing` as the methodology. The Task Runner picks it up, follows the skill, and marks it done — creating a ledger entry with what happened.
 
-**Status values:** `todo`, `active`, `blocked`, `done`, `cancelled`
+**Status values:** `queued`, `active`, `blocked`, `done`, `cancelled`
 
-**Key fields:** name, status, owner (link to person), project (link to project), depends_on, blocked_by, tags
+**Key fields:** name, status, owner (`alfred` or `human`), tier (1–3), skill_entry (link to skill), matter (link to matter), source_event, source_instinct, agent_id, budget_turns, requires_approval, depends_on, blocked_by, tags
+
+<Note>
+  Tasks owned by `alfred` are executed automatically by the Task Runner. Tasks owned by `human` appear on your dashboard for you to handle. See the [Kinetic layer](/architecture/kinetic) for how execution works.
+</Note>
+</Accordion>
+
+<Accordion title="triage — Needs Human Review" icon="hand">
+**What it represents:** An item Alfred couldn't confidently classify — it needs your review before it can be properly filed.
+
+**When it's created:** When the Curator encounters content it can't confidently route to a specific record type. Rather than guessing, Alfred sets it aside as a triage item for your attention.
+
+**Example:** You share a screenshot with no clear context. Alfred can't tell if it's a task, a note, or part of a conversation — so it creates a triage record and surfaces it on your dashboard for review.
+
+**Status values:** `unprocessed`, `reviewed`, `resolved`
+
+**Key fields:** subject, status, tags
+</Accordion>
+
+<Accordion title="ledger_entry — Completion Records" icon="receipt">
+**What it represents:** A factual record of what happened when an errand completed. Timestamped and traceable — the paper trail for Alfred's work.
+
+**When it's created:** The Task Runner creates a ledger entry whenever a task reaches `done` status. It captures what was accomplished, which artifacts were produced, and how the work connected to the broader matter.
+
+**Example:** After processing the Acme Corp invoice, Alfred writes a ledger entry: "Extracted amount ($4,200), due date (April 15), created payment reminder task. Linked to matter/acme-billing."
+
+**Status values:** _(no status constraint)_
+
+**Key fields:** name, task (link to completed task), matter (link to matter), artifacts, tags
 </Accordion>
 
 <Accordion title="event — Events" icon="calendar">
@@ -194,6 +234,30 @@ Records capturing events, work, and interactions.
 **Status values:** `active`, `completed`, `blocked`, `cancelled`
 
 **Key fields:** name, status, outputs (links to results), tags
+</Accordion>
+
+</AccordionGroup>
+
+## Execution Types
+
+Records that define how work gets done.
+
+<AccordionGroup>
+
+<Accordion title="skill — Reasoning Methodologies" icon="book-open">
+**What it represents:** A plain-English methodology file that teaches Alfred how to approach a type of work. Skills describe reasoning patterns, not data — they're the "how" behind task execution.
+
+**When it's created:** You author skill files when you want Alfred to follow a specific methodology for a recurring type of work. Skills can also be generated by the Distiller when it identifies a repeatable process in your vault.
+
+**Example:** You write a skill called "Invoice Processing" that describes how to extract amounts, validate line items, and create payment reminders. When a task references this skill, the Task Runner follows the methodology step by step.
+
+**Status values:** _(no status constraint)_
+
+**Key fields:** name, domain (`input_processing`, `execution`, `propagation`, `preference`, `process`), tier (1–3), related_skills (links to other skills), tags
+
+<Note>
+  Skill files live in the `skill/` folder of your vault. They're plain English — no code required.
+</Note>
 </Accordion>
 
 </AccordionGroup>
@@ -322,8 +386,8 @@ Records created by Alfred's intuition system as it learns your preferences and r
 
 - Type identifiers use lowercase, singular form (e.g., `person`, not `Person` or `people`)
 - Record names use title case with spaces (e.g., "Alice Smith")
-- Two types (`conversation`, `input`) use `subject` as their title field instead of `name`
+- Three types (`conversation`, `input`, `triage`) use `subject` as their title field instead of `name`
 
 <Tip>
-  Use the `GET /api/v1/vault/schema` endpoint to retrieve the complete, up-to-date schema programmatically.
+  Use the `GET /api/v1/vault/schema` endpoint to retrieve the complete, up-to-date schema programmatically — including all 26 types and their valid statuses.
 </Tip>
