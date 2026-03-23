@@ -20,18 +20,42 @@ Every specialist, every intuition process, and every scheduled job runs as a Tem
 
 ## Tasks
 
-Tasks are one-off action items Alfred creates, tracks, and executes on your behalf. Alfred identifies them everywhere:
+Tasks are the execution primitives of the Kinetic layer — errands Alfred carries out on your behalf. They originate from everywhere:
 
-- **Conversations** — "I should call the accountant next week" becomes a task automatically
-- **Emails** — An invoice with a due date generates a payment reminder
-- **Ambient recordings** — A passing mention at coffee becomes a follow-up
-- **Your dashboard** — Create tasks directly when you know what needs doing
+- **Instincts** — when Judgment matches an instinct with an execution block, it creates a task automatically
+- **Conversations** — "I should call the accountant next week" becomes a task
+- **Your dashboard** — create tasks directly when you know what needs doing
+- **Consequentials** — completing one task can spawn follow-up errands
 
-Each task is structured around four questions: **What** (the action), **When** (the deadline or trigger), **How** (a call, an email, a lookup), and **Why** (the context that prompted it).
+Each task has an **owner** (`alfred` or `human`), a **tier** that governs its power, and optionally a **skill** — a methodology file that tells Alfred how to approach the work.
 
-<Warning>
-Coming soon — Tasks are in active development.
-</Warning>
+### Tiers
+
+| Tier | Profile | Capabilities | Turn budget |
+|------|---------|-------------|-------------|
+| **1** | Fast and cheap | Read-only vault access | 10 turns |
+| **2** | Capable | Read and write vault access | 25 turns |
+| **3** | Full power | Everything — vault, tools, external | 50 turns |
+
+### The Task Runner
+
+The Task Runner is a Temporal workflow that runs every 2 minutes, picking up tasks with `status=queued` and `owner=alfred`. For each task, it follows a pipeline:
+
+1. **Check prerequisites** — verify `depends_on` and `blocked_by` are clear
+2. **Mark active** — set the task to `active` so it's visible in your dashboard
+3. **Assemble context** — gather the skill methodology, related matter, and relevant observations
+4. **Execute** — run the work via `sessions_spawn`, bounded by the tier's turn budget
+5. **Write artifacts** — create or update vault records as the skill directs
+6. **Mark done** — close the task and write a ledger entry recording what happened
+7. **Handle consequentials** — spawn any follow-up errands that flow from the completed work
+
+Tasks owned by `human` skip the runner entirely — they appear on your dashboard for you to handle at your discretion.
+
+### Skills as methodology
+
+When a task references a skill, the Task Runner doesn't just execute blindly — it follows the skill's reasoning methodology. Skills are plain English files in your vault's `skill/` folder that describe how to approach a type of work: what to look for, what questions to ask, what patterns to follow, what to produce.
+
+This means Alfred's execution is transparent and auditable. You can read the skill, understand the methodology, and refine it over time.
 
 ## Chores
 
@@ -65,21 +89,25 @@ graph LR
     B --> C[Curator]
     C --> D[Vault Records]
     D --> E[Rules Engine]
-    E --> F[Tasks]
     E --> G[Chores]
     E --> H[Notifications]
     I[Judgment] -->|routing context| C
+    I -->|execution block| J[Task created]
+    J --> K[Task Runner]
+    K -->|skill + context| L[Execution]
+    L --> M[Ledger entry]
+    L -->|consequentials| J
 ```
 
-A single ambient recording can generate a vault record, trigger a rule, create a task, and schedule a chore — all without you doing anything beyond having the conversation.
+A single input can be routed by Judgment, processed by the Curator, trigger a task via an instinct's execution block, and spawn follow-up errands — all without you doing anything beyond sharing the content.
 
 <Warning>
 Coming soon — Rules are in active development.
 </Warning>
 
-## The twelve background processes
+## The thirteen background processes
 
-Alfred runs twelve automated processes. You don't need to manage them — they take care of themselves.
+Alfred runs thirteen automated processes. You don't need to manage them — they take care of themselves.
 
 <AccordionGroup>
 <Accordion title="Specialist processes" icon="gears">
@@ -100,6 +128,7 @@ Alfred runs twelve automated processes. You don't need to manage them — they t
 | Learning | Every 5 minutes | Captures observations from your routing decisions |
 | Reflection | Daily at 2am | Reviews observations and refines instincts |
 | Judgment | Every 2 minutes | Routes inputs using instincts and triggers Curator processing; escalates uncertain ones |
+| Task Runner | Every 2 minutes | Picks up queued tasks, assembles context with skills, executes via sessions_spawn, writes ledger entries |
 </Accordion>
 
 <Accordion title="Infrastructure processes" icon="server">

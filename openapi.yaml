@@ -586,16 +586,20 @@ paths:
                   - org
                   - project
                   - task
+                  - triage
                   - event
                   - note
                   - location
                   - process
                   - account
                   - asset
+                  - matter
                   - conversation
                   - input
                   - run
                   - session
+                  - skill
+                  - ledger_entry
                   - decision
                   - assumption
                   - constraint
@@ -603,7 +607,9 @@ paths:
                   - synthesis
                 status_by_type:
                   project: [active, paused, completed, abandoned, proposed]
-                  task: [todo, active, blocked, done, cancelled]
+                  task: [queued, active, blocked, done, cancelled]
+                  triage: [unprocessed, reviewed, resolved]
+                  matter: [active, resolved, archived]
                 required_fields: [type, created]
         "401":
           $ref: "#/components/responses/Unauthorized"

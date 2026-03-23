@@ -82,7 +82,7 @@ Each record type has its own set of valid status values:
 | `person` | `active`, `inactive` |
 | `org` | `active`, `inactive` |
 | `project` | `active`, `paused`, `completed`, `abandoned`, `proposed` |
-| `task` | `todo`, `active`, `blocked`, `done`, `cancelled` |
+| `task` | `queued`, `active`, `blocked`, `done`, `cancelled` |
 | `event` | _(no status constraint)_ |
 | `note` | `draft`, `active`, `review`, `final` |
 | `location` | `active`, `inactive` |
@@ -93,6 +93,10 @@ Each record type has its own set of valid status values:
 | `input` | `unprocessed`, `processed`, `deferred` |
 | `run` | `active`, `completed`, `blocked`, `cancelled` |
 | `session` | `active`, `completed` |
+| `triage` | `unprocessed`, `reviewed`, `resolved` |
+| `skill` | _(no status constraint)_ |
+| `matter` | `active`, `resolved`, `archived` |
+| `ledger_entry` | _(no status constraint)_ |
 | `assumption` | `active`, `challenged`, `invalidated`, `confirmed` |
 | `decision` | `draft`, `final`, `superseded`, `reversed` |
 | `constraint` | `active`, `expired`, `waived`, `superseded` |
