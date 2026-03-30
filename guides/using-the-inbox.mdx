@@ -6,9 +6,31 @@ icon: "inbox"
 
 ## Overview
 
-The inbox is how you share content with Alfred. Hand it meeting notes, conversation exports, research, ideas — any raw text. The Curator reads each item within seconds, creating structured vault records and linking them together automatically.
+Most data reaches Alfred automatically through **Streams** — integrations with Gmail, Notion, Omi, and other services that feed events into your vault continuously. You don't need to copy-paste or upload anything for these sources. The flow is:
 
-## Ways to share content
+1. **Stream event arrives** (e.g., a new Gmail thread, a Notion page update, an Omi recording)
+2. The **Event Processor** reads and classifies it
+3. The **Curator** creates structured vault records and links them together
+4. Records appear in your vault within seconds
+
+During onboarding, a **100-day Gmail backfill** runs automatically — populating your vault with recent email history so Alfred has meaningful context from day one.
+
+For sources that aren't connected as streams, you can still share content manually through the inbox. This is useful for ad-hoc data like one-off meeting notes, pasted research, or documents from tools you haven't integrated yet.
+
+## Automatic sources (Streams)
+
+The following integrations feed events into your vault without any manual effort:
+
+- **Gmail** — emails, threads, and attachments (100-day backfill + continuous sync)
+- **Notion** — pages and database entries as they change
+- **Omi** — ambient recordings and transcriptions
+- **OpenClaw sessions** — chat sessions with Alfred's agents are captured as stream events via the `alfred-inbox` hook
+
+Connect and manage streams from the [Streams page](/guides/streams-and-integrations) on your dashboard.
+
+## Manual sharing (ad-hoc data)
+
+For content that doesn't come through a stream, share it manually:
 
 ### From the dashboard
 

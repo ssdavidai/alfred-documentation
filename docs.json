@@ -62,8 +62,10 @@
           {
             "group": "Guides",
             "pages": [
+              "guides/welcome-pack",
               "guides/billing",
               "guides/your-dashboard",
+              "guides/streams-and-integrations",
               "guides/using-the-inbox",
               "guides/browsing-your-vault",
               "guides/your-ai-agents",
@@ -73,7 +75,8 @@
               "guides/recipes",
               "guides/intuition",
               "guides/monitoring",
-              "guides/security"
+              "guides/security",
+              "guides/your-first-30-days"
             ]
           },
           {

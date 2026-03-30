@@ -1,136 +1,112 @@
 ---
 title: "Quickstart"
-description: "Share your first piece of content with Alfred and watch your vault come to life."
+description: "Sign up, sit back, and meet your Alfred. No configuration required."
 icon: "rocket"
 ---
 
-import AuthHeader from "/snippets/auth-header.mdx";
-import BaseUrl from "/snippets/base-url.mdx";
+## You don't need to do anything.
 
-## Before you begin
+No API keys. No terminal commands. No configuration files. You sign up, and Alfred handles the rest — from provisioning your dedicated server to reading your first hundred days of email to writing your welcome briefing.
 
-You'll need:
+The entire onboarding takes about ten minutes of your time. Alfred works for hours behind the scenes.
 
-- An **Alfred Black account** with an active subscription at [alfred.black](https://alfred.black)
-- An **API key** (you'll create one in a moment)
-- `curl` or any HTTP client
+<Note>
+Alfred Black is a zero-config platform. Every new member gets a dedicated VPS (Hetzner cx53, 32GB RAM) provisioned automatically. You never touch infrastructure.
+</Note>
 
-## Step 1: Create an API key
+---
 
-Go to your [Alfred Black dashboard](https://alfred.black), navigate to **Settings > API Keys**, click **Create**, give it a name, and copy the key. It starts with `alf_` and is shown only once.
+<Steps>
+  <Step title="Sign up with Google">
+    Go to [alfred.black](https://alfred.black) and click **Sign up with Google**. Alfred uses Google OAuth to authenticate you and request access to your Gmail. The consent screen will ask for email read permissions — this is how Alfred begins learning about your world.
 
-<Warning>
-  Copy your API key immediately — you won't be able to see it again. Store it somewhere safe.
-</Warning>
+    No invite codes. No waitlists. One click.
+  </Step>
 
-## Step 2: Make sure Alfred is ready
+  <Step title="Alfred provisions your dedicated instance">
+    The moment you sign up, Alfred begins spinning up a dedicated VPS just for you. The dashboard shows a "Preparing your Alfred" animation while this happens — typically five to ten minutes.
 
-Confirm your key works and your Alfred is healthy:
+    <Tip>
+    You can watch the provisioning progress in real time. Every Alfred instance is isolated — your data never shares a server with anyone else's.
+    </Tip>
 
-<CodeGroup>
-```bash cURL
-curl -s https://alfred.black/api/v1/admin/health \
-  -H "Authorization: Bearer alf_your_key_here" | jq .
-```
+    Behind the scenes: a Hetzner cx53 with 32GB of RAM is being configured, your vault database is being created, and your specialist workers are being initialised.
+  </Step>
 
-```javascript JavaScript
-const res = await fetch('https://alfred.black/api/v1/admin/health', {
-  headers: { 'Authorization': 'Bearer alf_your_key_here' }
-});
-console.log(await res.json());
-```
+  <Step title="The 100-day Gmail backfill begins">
+    Once your instance is live, Alfred starts reading your Gmail — going back 100 days. This is not a shallow scan. Alfred fetches full email content and extracts facts from every message, day by day.
 
-```python Python
-import requests
+    The dashboard shows your progress:
 
-res = requests.get(
-    'https://alfred.black/api/v1/admin/health',
-    headers={'Authorization': 'Bearer alf_your_key_here'}
-)
-print(res.json())
-```
-</CodeGroup>
+    > **Day 34 of 100 — 1,247 facts discovered**
 
-You should see a JSON response with health status information. If Alfred reports healthy, you're ready.
+    People, organisations, projects, decisions, commitments, deadlines — Alfred is building a structured understanding of your life from the raw material of your inbox.
 
-## Step 3: See what Alfred knows
+    <Note>
+    The backfill runs in the background. You do not need to keep the dashboard open. Alfred will keep working whether you watch or not.
+    </Note>
+  </Step>
 
-Take a look at your vault schema — the types of records Alfred manages for you:
+  <Step title="Pattern analysis and personalisation">
+    As the backfill completes, Alfred's specialists begin deeper work:
 
-```bash
-curl -s https://alfred.black/api/v1/vault/schema \
-  -H "Authorization: Bearer alf_your_key_here" | jq .known_types
-```
+    - **Pattern analysis** — identifying recurring themes, relationships, and rhythms in your communication
+    - **Personalisation** — generating your `USER.md` (who you are, what you care about) and `SOUL.md` (how Alfred should speak to you, what tone fits)
+    - **Automation suggestions** — spotting opportunities where Alfred can handle things without being asked
+    - **First Brief composition** — drafting your butler-quality welcome letter
+  </Step>
 
-This returns all 22 record types — from `person` and `project` to `assumption` and `decision`. These are the building blocks of your world.
+  <Step title="Your First Brief appears">
+    When Alfred is ready, your First Brief appears on screen. This is not a system notification or a generic welcome message. It is a personal letter — written by Alfred, about you, based on everything just learned from your email.
 
-## Step 4: Share your first content
+    It will mention people by name. It will reference real projects. It will surface something you forgot about. This is Alfred introducing itself by demonstrating that it already knows you.
 
-Hand Alfred a meeting note. You can do this from your dashboard (click **Upload to Vault** on the Home page) or via the API:
+    <Tip>
+    The First Brief is the moment most members realise this is different from anything they have used before. Take a moment to read it properly.
+    </Tip>
+  </Step>
 
-```bash
-curl -X POST https://alfred.black/api/v1/vault/inbox \
-  -H "Authorization: Bearer alf_your_key_here" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "filename": "standup-2026-02-26.md",
-    "content": "# Daily Standup - Feb 26\n\nAttendees: Alice, Bob, Carol\n\n## Alice\n- Finished the auth migration (project: Platform v2)\n- Blocked on API rate limiting design\n- Decision: use token bucket algorithm\n\n## Bob\n- Reviewed PR #847 for Carol\n- Starting database indexing task\n\n## Carol\n- PR #847 ready for merge\n- Meeting with Design team tomorrow about dashboard redesign"
-  }'
-```
+  <Step title="Continue to your Dashboard">
+    Click **Continue to Dashboard** to enter your Alfred. The first thing you see is the **Vault Nebula** — a real-time visualisation of your knowledge graph. People, organisations, projects, and facts, all connected and floating in space.
 
-## Step 5: See what the Curator prepared
+    Your Gmail stream is now active, pulling new email every five minutes. Your vault will grow continuously from here.
+  </Step>
 
-Wait a few seconds for the Curator to read your notes, then see what Alfred created:
+  <Step title="Add more integrations">
+    From the **Integrations** page, you can connect additional sources:
 
-<CodeGroup>
-```bash List people
-curl -s https://alfred.black/api/v1/vault/list/person \
-  -H "Authorization: Bearer alf_your_key_here" | jq .
-```
+    - **Notion** — paste your API token and Alfred begins indexing your workspace
+    - **Omi** — pair your wearable device for ambient audio capture and real-time conversation transcription
+    - **More coming** — each integration adds a new stream of facts flowing into your vault
 
-```bash List tasks
-curl -s https://alfred.black/api/v1/vault/list/task \
-  -H "Authorization: Bearer alf_your_key_here" | jq .
-```
+    Every new source deepens Alfred's understanding. The more Alfred knows, the more Alfred can do.
+  </Step>
+</Steps>
 
-```bash List decisions
-curl -s https://alfred.black/api/v1/vault/list/decision \
-  -H "Authorization: Bearer alf_your_key_here" | jq .
-```
-</CodeGroup>
+---
 
-The Curator will have created records for the people mentioned, any tasks, decisions, and projects — all linked together. From a single meeting note, your vault already holds a web of connected knowledge.
+## What just happened?
 
-## Step 6: Check your specialists
+In roughly ten minutes of your time, Alfred:
 
-See which specialists are working:
+1. Provisioned a dedicated server for you
+2. Read 100 days of your email
+3. Extracted thousands of structured facts
+4. Built a knowledge graph of your world
+5. Analysed your patterns and relationships
+6. Wrote you a personalised welcome briefing
+7. Activated a real-time Gmail stream
+8. Started working — permanently
 
-```bash
-curl -s https://alfred.black/api/v1/workers/status \
-  -H "Authorization: Bearer alf_your_key_here"
-```
+You didn't configure anything. You didn't write a single API call. You signed up, and Alfred did the rest.
 
-## Step 7: Ask the Janitor to look things over
-
-Have the Janitor scan your vault for anything that needs attention:
-
-```bash
-curl -X POST https://alfred.black/api/v1/workers/janitor/scan \
-  -H "Authorization: Bearer alf_your_key_here" | jq .
-```
-
-If anything needs fixing:
-
-```bash
-curl -X POST https://alfred.black/api/v1/workers/janitor/fix \
-  -H "Authorization: Bearer alf_your_key_here" | jq .
-```
+---
 
 ## What's next?
 
 <Columns cols={2}>
-  <Card title="Using the Inbox" icon="inbox" href="/guides/using-the-inbox">
-    The best ways to share content with Alfred
+  <Card title="Your First 30 Days" icon="route" href="/guides/your-first-30-days">
+    What to expect as Alfred learns your world week by week
   </Card>
   <Card title="Browsing Your Vault" icon="vault" href="/guides/browsing-your-vault">
     Explore and search the records Alfred creates for you
@@ -139,6 +115,6 @@ curl -X POST https://alfred.black/api/v1/workers/janitor/fix \
     Understand the Curator, Janitor, Distiller, and Surveyor
   </Card>
   <Card title="API Reference" icon="code" href="/api-reference/introduction">
-    Full endpoint documentation
+    Full endpoint documentation for developers
   </Card>
 </Columns>

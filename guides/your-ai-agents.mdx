@@ -167,6 +167,23 @@ The Surveyor takes a different approach from the other specialists. Instead of r
   The Surveyor has its own dedicated pipeline and is configured separately via the Surveyor settings in your dashboard.
 </Note>
 
+## OpenClaw session management
+
+Background workers and Clerk subagents create OpenClaw sessions as they carry out tasks. These sessions accumulate over time and are **auto-cleaned** — Alfred periodically prunes completed sessions to keep the session list manageable.
+
+### The alfred-inbox hook
+
+The `alfred-inbox` hook captures completed OpenClaw chat sessions as stream events. When a session ends, the hook packages the conversation and feeds it into the Event Processor, which classifies it and writes relevant vault records. This means your conversations with Alfred's agents contribute to your vault automatically — decisions made, tasks discussed, and context shared all become searchable records.
+
+### Manual cleanup
+
+If you need to clean up sessions manually:
+
+```bash
+curl -X POST /api/v1/openclaw/sessions/cleanup \
+  -H "Authorization: Bearer alf_your_key_here"
+```
+
 ## Troubleshooting
 
 **Inbox not being attended to?**

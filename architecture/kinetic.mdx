@@ -1,6 +1,6 @@
 ---
 title: "Kinetic Layer"
-description: "Temporal workflow engine, Tasks, Chores, Rules, and the path from knowledge to action."
+description: "Temporal workflow engine, Matters, Errands, Triage, Chores, Rules, and the path from knowledge to action."
 icon: "gears"
 ---
 
@@ -18,16 +18,45 @@ Your vault holds what Alfred knows. But knowledge without action is just a filin
 
 Every specialist, every intuition process, and every scheduled job runs as a Temporal workflow. You can monitor them from the Workflows section of your dashboard or via the API.
 
-## Tasks
+## Matters
 
-Tasks are the execution primitives of the Kinetic layer — errands Alfred carries out on your behalf. They originate from everywhere:
+Matters are standing concerns that group related work. Think of a matter as an ongoing area of attention — "Kitchen renovation", "Q2 product launch", or "Tax preparation". A matter doesn't have a status lifecycle of its own; it exists as long as it's relevant and collects the errands that belong to it.
 
-- **Instincts** — when Judgment matches an instinct with an execution block, it creates a task automatically
-- **Conversations** — "I should call the accountant next week" becomes a task
-- **Your dashboard** — create tasks directly when you know what needs doing
-- **Consequentials** — completing one task can spawn follow-up errands
+When the Curator or Judgment identifies work that relates to an existing matter, new errands are automatically grouped under it. This gives you a single place to see everything associated with a concern, rather than a flat list of unrelated tasks.
 
-Each task has an **owner** (`alfred` or `human`), a **tier** that governs its power, and optionally a **skill** — a methodology file that tells Alfred how to approach the work.
+## Errands
+
+Errands are the execution units of the Kinetic layer — actionable tasks Alfred carries out on your behalf. They originate from everywhere:
+
+- **Instincts** — when Judgment matches an instinct with an execution block, it creates an errand automatically
+- **Conversations** — "I should call the accountant next week" becomes an errand
+- **Your dashboard** — create errands directly when you know what needs doing
+- **Triage** — items you promote from the triage queue become errands
+- **Consequentials** — completing one errand can spawn follow-up errands
+
+Each errand has an **owner** (`alfred` or `human`), a **tier** that governs its power, and optionally a **skill** — a methodology file that tells Alfred how to approach the work. Errands belong to a Matter when one exists.
+
+### Status lifecycle
+
+Every errand moves through a defined lifecycle:
+
+`todo` → `active` → `blocked` → `done`
+
+- **todo** — queued and waiting for the Task Runner (or you) to pick it up
+- **active** — currently being worked on
+- **blocked** — waiting on a dependency, another errand, or external input
+- **done** — completed, with a ledger entry recording what happened
+
+## Triage
+
+Not everything that arrives deserves immediate processing. When the Curator encounters an item it's uncertain about — ambiguous intent, low confidence, or potentially sensitive — it routes the item to the **Triage queue** instead of acting on it.
+
+Triage items sit in your dashboard waiting for a human decision:
+
+- **Promote** — convert to an errand (optionally assigning it to a matter)
+- **Dismiss** — discard the item; Alfred learns from the dismissal
+
+This keeps Alfred from acting on things it shouldn't while ensuring nothing important falls through the cracks.
 
 ### Tiers
 
@@ -39,23 +68,33 @@ Each task has an **owner** (`alfred` or `human`), a **tier** that governs its po
 
 ### The Task Runner
 
-The Task Runner is a Temporal workflow that runs every 2 minutes, picking up tasks with `status=queued` and `owner=alfred`. For each task, it follows a pipeline:
+The Task Runner is a Temporal workflow that runs every 2 minutes, picking up errands with `status=todo` and `owner=alfred`. For each errand, it follows a pipeline:
 
 1. **Check prerequisites** — verify `depends_on` and `blocked_by` are clear
-2. **Mark active** — set the task to `active` so it's visible in your dashboard
+2. **Mark active** — set the errand to `active` so it's visible in your dashboard
 3. **Assemble context** — gather the skill methodology, related matter, and relevant observations
-4. **Execute** — run the work via `sessions_spawn`, bounded by the tier's turn budget
+4. **Execute** — run the work via OpenClaw `sessions_spawn` with full tool access, bounded by the tier's turn budget
 5. **Write artifacts** — create or update vault records as the skill directs
-6. **Mark done** — close the task and write a ledger entry recording what happened
+6. **Mark done** — close the errand and write a ledger entry recording what happened
 7. **Handle consequentials** — spawn any follow-up errands that flow from the completed work
 
-Tasks owned by `human` skip the runner entirely — they appear on your dashboard for you to handle at your discretion.
+Errands owned by `human` skip the runner entirely — they appear on your dashboard for you to handle at your discretion.
 
 ### Skills as methodology
 
-When a task references a skill, the Task Runner doesn't just execute blindly — it follows the skill's reasoning methodology. Skills are plain English files in your vault's `skill/` folder that describe how to approach a type of work: what to look for, what questions to ask, what patterns to follow, what to produce.
+When an errand references a skill, the Task Runner doesn't just execute blindly — it follows the skill's reasoning methodology. Skills are plain English files in your vault's `skill/` folder that describe how to approach a type of work: what to look for, what questions to ask, what patterns to follow, what to produce.
 
 This means Alfred's execution is transparent and auditable. You can read the skill, understand the methodology, and refine it over time.
+
+## Ledger entries
+
+Every completed errand produces a **ledger entry** — a consequential record that captures what was done, what was produced, and what follow-up errands (if any) were spawned. Ledger entries are stored as vault records, making them searchable and linkable.
+
+Ledger entries serve three purposes:
+
+- **Audit trail** — you can always see exactly what Alfred did and why
+- **Continuity** — follow-up errands reference the ledger entry that created them, maintaining a chain of causation
+- **Learning** — the Distiller and Reflection processes use ledger entries to refine instincts over time
 
 ## Chores
 
@@ -88,18 +127,22 @@ graph LR
     A[Streams] --> B[Inbox]
     B --> C[Curator]
     C --> D[Vault Records]
+    C -->|uncertain| T[Triage]
+    T -->|promote| J
+    T -->|dismiss| X[Dropped]
     D --> E[Rules Engine]
     E --> G[Chores]
     E --> H[Notifications]
     I[Judgment] -->|routing context| C
-    I -->|execution block| J[Task created]
+    I -->|execution block| J[Errand created]
+    J -->|grouped under| MA[Matter]
     J --> K[Task Runner]
-    K -->|skill + context| L[Execution]
+    K -->|sessions_spawn| L[Execution]
     L --> M[Ledger entry]
     L -->|consequentials| J
 ```
 
-A single input can be routed by Judgment, processed by the Curator, trigger a task via an instinct's execution block, and spawn follow-up errands — all without you doing anything beyond sharing the content.
+A single input can be routed by Judgment, processed by the Curator, triaged for human review, trigger an errand via an instinct's execution block, and spawn follow-up errands — all without you doing anything beyond sharing the content.
 
 <Warning>
 Coming soon — Rules are in active development.
@@ -128,7 +171,7 @@ Alfred runs thirteen automated processes. You don't need to manage them — they
 | Learning | Every 5 minutes | Captures observations from your routing decisions |
 | Reflection | Daily at 2am | Reviews observations and refines instincts |
 | Judgment | Every 2 minutes | Routes inputs using instincts and triggers Curator processing; escalates uncertain ones |
-| Task Runner | Every 2 minutes | Picks up queued tasks, assembles context with skills, executes via sessions_spawn, writes ledger entries |
+| Task Runner | Every 2 minutes | Picks up queued errands, assembles context with skills, executes via OpenClaw sessions_spawn, writes ledger entries |
 </Accordion>
 
 <Accordion title="Infrastructure processes" icon="server">

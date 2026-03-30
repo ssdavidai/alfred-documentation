@@ -54,7 +54,7 @@ Your vault organizes knowledge into four layers:
 
 ### Who and what — Standing entities
 
-Records for the stable elements of your world: people, organizations, projects, locations, accounts, assets, and processes. These persist and accumulate connections over time.
+Records for the stable elements of your world: people, organizations, projects, locations, accounts, assets, processes, and **matters** (ongoing concerns that group related errands). These persist and accumulate connections over time.
 
 ### What happened — Activity records
 
@@ -70,7 +70,13 @@ Records created by Alfred's intuition system: observations of your routing decis
 
 ## How your vault grows
 
-Every time you share something with Alfred:
+Your vault grows from two sources: **streams** (automatic) and **manual sharing** (ad-hoc).
+
+**Streams** are the primary growth engine. Gmail, Notion, Omi, and other integrations continuously feed events into the Event Processor, which classifies them and hands them to the Curator for record creation. During onboarding, a **100-day Gmail backfill** runs automatically — creating an initial vault structure from your recent email history so Alfred has meaningful context from day one.
+
+**Manual sharing** supplements streams with ad-hoc content — meeting notes, pasted research, documents from tools you haven't integrated yet.
+
+In both cases, the pipeline is the same:
 
 1. The Curator identifies people, projects, and events, creating or updating records
 2. New records are linked to existing ones where relevant
@@ -81,6 +87,10 @@ Every time you share something with Alfred:
 
 A single meeting note might create 5-10 new records and dozens of connections. Over weeks and months, your vault becomes an increasingly rich and valuable map of your world — and Alfred becomes increasingly capable of managing it on your behalf.
 
+## Vault Nebula
+
+The **Vault Nebula** is the visualization on your dashboard homepage. Each CSS cloud represents a cluster of related records discovered by the Surveyor — sized by record count and colored by theme. It gives you an ambient, at-a-glance picture of what Alfred is tracking across your world.
+
 ## Accessing your vault
 
 You can browse and search your vault in two ways:
@@ -90,7 +100,7 @@ You can browse and search your vault in two ways:
 
 <Columns cols={2}>
   <Card title="Record Types" icon="shapes" href="/vault/record-types">
-    See all 19 record types in detail
+    See all 26+ record types in detail
   </Card>
   <Card title="Record Format" icon="database" href="/vault/vault-schema">
     Understand the structure of records

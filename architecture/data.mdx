@@ -40,8 +40,9 @@ A Temporal workflow polls an external API on an interval you define. Alfred reac
 
 | Source | What it captures | Typical interval |
 |--------|-----------------|-----------------|
-| **Gmail** | New emails and threads | Every 5 minutes |
+| **Gmail** | New emails and threads (full email content, not just metadata) | Every 5 minutes |
 | **Calendar** | Upcoming and past events | Every 15 minutes |
+| **Notion** | Pages, databases, and block-level content (API token auth) | Every 15 minutes |
 | **Health data** | Activity, sleep, vitals | Every 30 minutes |
 | **OpenClaw sessions** | Your Alfred conversations and subagent runs | Every 5 minutes |
 </Accordion>
@@ -64,11 +65,32 @@ A long-lived WebSocket connection maintains a continuous feed for sources that p
 
 | Source | What it captures |
 |--------|-----------------|
-| **Omi** | Ambient audio recordings and transcripts from your wearable device |
+| **Omi** | Ambient audio from your wearable — speech detection, local transcription, quality-gated stream events |
 
 Realtime streams stay connected as long as your Alfred is running, automatically reconnecting if the connection drops.
+
+### Omi audio pipeline
+
+Omi delivers raw PCM audio over a persistent WebSocket. Alfred processes it through a local pipeline:
+
+1. **RMS energy speech detection** — audio frames are evaluated against an RMS energy threshold of 300. Silence is discarded immediately.
+2. **Speech grouping** — consecutive speech segments are grouped together. A gap of 60 seconds or more starts a new group.
+3. **Local transcription** — each speech group is transcribed by `whisper-large-v3` running locally (int8 quantization, CPU-only, 4GB RAM via the `learn` container).
+4. **Quality gate** — transcripts must pass language confidence > 0.5 and contain at least 5 words, otherwise they are dropped.
+5. **Stream events** — passing transcripts are emitted as standard StreamEvents into the Inbox.
+
+Audio is retained for 48 hours, then automatically purged.
 </Accordion>
 </AccordionGroup>
+
+### Notion integration
+
+Notion is connected via an **API token** (internal integration), not OAuth. Alfred polls the Notion API every 15 minutes and:
+
+- Fetches all accessible pages and databases
+- Retrieves **block-level content** for full page fidelity (not just page titles or properties)
+- Parses database schemas to understand property types, relations, and rollups
+- Emits each changed page as a StreamEvent with the full block tree in the payload
 
 ## The StreamEvent envelope
 
@@ -116,6 +138,18 @@ Your conversations with Alfred aren't ephemeral. They become part of your vault 
 <Tip>
 OpenClaw Session Logs are enabled by default for all tenants. You can pause the stream from your dashboard if you prefer conversations to remain unprocessed.
 </Tip>
+
+### OpenClaw session capture
+
+OpenClaw sessions are captured via the `alfred-inbox` hook, which writes session data directly to a shared volume at `/alfred-data/streams/`. This ensures every conversation and subagent run is persisted as a stream event regardless of polling schedules.
+
+## Gmail backfill
+
+When you connect Gmail, Alfred performs a one-time backfill that ingests full email content as stream events — not just metadata or extracted facts. Every email body, attachment reference, and thread context is captured, giving the Curator the same rich material it would receive from a freshly arrived message.
+
+## Stream event counts
+
+Stream event counts displayed on your dashboard are computed directly from JSONL files stored on your tenant's encrypted volume. There is no separate database — the JSONL files are the source of truth.
 
 ## Managing streams
 
