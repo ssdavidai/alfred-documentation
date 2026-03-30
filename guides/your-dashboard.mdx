@@ -28,9 +28,13 @@ Additional pages are accessible from the Home page:
 
 Admin users also see an **Admin** section with analytics, user management, instance management, and provisioning tools.
 
-## Home (Command Center)
+## Home — Vault Nebula
 
-The Home page gives you a snapshot of your entire Alfred at a glance.
+The Home page opens with the **Vault Nebula** — a CSS cloud visualization where each cloud represents a cluster of related vault records discovered by the Surveyor. Clouds are sized by record count and colored by cluster theme, giving you an ambient, data-driven map of your world at a glance.
+
+### First Brief
+
+On your very first login, before the Nebula has data, Alfred displays a **First Brief** — a short welcome message that explains what's happening behind the scenes (Gmail backfill, vault initialization) and what to expect in the next few hours as your vault populates.
 
 ### Stat cards
 
@@ -71,6 +75,24 @@ A chronological feed of recent vault mutations — records created, edited, move
 ### Vault composition
 
 A chart at the bottom of the page showing the distribution of record types in your vault. Useful for understanding the shape of your world.
+
+## Streams / Integrations
+
+The Streams page shows all data pipelines feeding your vault. From here you can:
+
+- **Connect integrations** — Gmail, Notion, Omi, GitHub, Polar, and custom webhooks
+- **View stream health** — see event counts, last sync time, and error states for each stream
+- **Manage credentials** — update or rotate integration tokens
+
+For a full guide, see [Streams & Integrations](/guides/streams-and-integrations).
+
+## Matters
+
+The Matters page lists your active ongoing concerns — threads of related work Alfred is tracking on your behalf. Each matter shows its linked errands, people, and decisions. You can drill into any matter to see the full timeline.
+
+## Triage
+
+The Triage page surfaces items Alfred couldn't confidently classify. Each item shows a summary and suggested routing. Review, reclassify, or dismiss items here. Routing a triage item teaches Alfred for next time via the intuition system.
 
 ## Vault
 
@@ -200,6 +222,10 @@ Links to the Polar customer portal where you can manage your subscription, updat
 Create and manage API keys for accessing the Alfred API. Each key provides full access to your API endpoints. Keys use the `alf_` prefix format and are shown only once at creation time.
 
 See the [API Keys](/guides/api-keys) guide for usage examples and best practices.
+
+### Terminal
+
+Navigate to **Settings → Terminal** to open a web-based terminal with a proper PTY. This gives you full TUI support — you can run interactive CLI tools like `htop`, `vim`, or the OpenClaw CLI directly in the browser. The terminal connects to your Alfred instance over a secure WebSocket.
 
 <Columns cols={2}>
   <Card title="Your Specialists" icon="gears" href="/guides/your-ai-agents">

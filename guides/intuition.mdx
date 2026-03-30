@@ -33,8 +33,9 @@ graph LR
 
 Every time you route an input, categorize something, or make an organizational decision, Alfred takes note. These notes are called **observations** — records of what you did and why it made sense.
 
-Alfred doesn't guess. It watches. Observations come from two sources:
+Alfred doesn't guess. It watches. Observations come from three sources:
 
+- **Stream events** — events from Gmail, Notion, Omi, and other integrations are classified by the Event Processor and fed into the observation pipeline automatically
 - **Your conversations** — when you tell Alfred to file something under a project, route an email to a category, or organize an input, the routing decision is captured automatically
 - **Your explicit instructions** — you can add an `alfred_instructions` field to any vault record to teach Alfred directly
 
@@ -85,6 +86,8 @@ The execution block on an instinct specifies:
 </Note>
 
 The Task Runner picks up the task, assembles context (the skill methodology, the related matter, relevant observations), and executes via `sessions_spawn`. When it finishes, it writes a ledger entry and handles any consequentials — follow-up errands that flow naturally from the completed work.
+
+Tasks are organized around **Matters** (ongoing concerns) and executed as **Errands** (discrete units of work). Items the system can't confidently classify are routed to **Triage** for your review — and your triage decisions feed back into the observation pipeline, teaching Alfred for next time.
 
 This closes the loop from observation to action: you teach Alfred by routing, Alfred learns through reflection, and eventually Alfred both routes *and* acts — with appropriate caution.
 
@@ -173,13 +176,13 @@ Intuition runs on seven automated processes. You don't need to manage them — t
 
 | Process | Schedule | What it does |
 |---------|----------|-------------|
-| **Event Processor** | Every 2 minutes | Reads incoming stream events, classifies them, and writes vault records |
+| **Event Processor** | Every 2 minutes | Reads incoming stream events from Gmail, Notion, Omi, and other integrations, classifies them, and writes vault records |
 | **Session Tracker** | Every 5 minutes | Groups related records into sessions |
 | **Daily Digest** | Daily at 6pm | Summarizes the day's activity |
 | **Learning** | Every 5 minutes | Captures observations from your routing decisions |
 | **Reflection** | Daily at 2am | Reviews observations and refines instincts |
 | **Judgment** | Every 2 minutes | Routes inputs using instincts, escalates uncertain ones to you |
-| **Task Runner** | Every 2 minutes | Picks up queued tasks, follows skill methodologies, executes errands, writes ledger entries |
+| **Task Runner** | Every 2 minutes | Picks up queued tasks (Matters and Errands), follows skill methodologies, executes work, writes ledger entries, and creates consequential follow-up errands |
 
 All seven processes are managed by the Temporal Engine and can be monitored from the Workflows section of your dashboard.
 

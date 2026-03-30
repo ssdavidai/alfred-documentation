@@ -1,0 +1,216 @@
+---
+title: "Streams & Integrations"
+description: "Connect apps and services to feed data into Alfred's intelligence pipeline"
+icon: "radio"
+---
+
+## Overview
+
+Universal Streams are how Alfred automatically ingests data from the services you already use. Connect your email, notes, wearable devices, code repositories, and more — Alfred continuously pulls or receives data, processes it through the event pipeline, and creates structured vault records without any manual effort.
+
+Once connected, each integration becomes a live stream of context that Alfred draws on to help you.
+
+## How Streams Work
+
+Every stream uses one of three transport types:
+
+- **Pull** — Alfred fetches data on a schedule (e.g., Gmail every 5 minutes, Notion every 15 minutes)
+- **Push** — An external service sends data to Alfred via webhook (e.g., GitHub, Polar, Omi)
+- **System** — Internal Alfred activity that generates events automatically (e.g., OpenClaw conversations)
+
+The architecture follows a consistent pipeline regardless of transport:
+
+1. Raw data arrives (pulled or pushed) and is stored as JSONL files on your tenant
+2. The **event processor** classifies each event by type and extracts structured fields
+3. The **Curator** creates or updates vault records, linking entities together
+4. Deduplication via `source_ref` ensures the same event is never processed twice
+
+<Note>
+  Pull-based streams are powered by **StreamPullerWorkflow**, which runs on Temporal schedules. This gives you reliable, exactly-once processing with automatic retries if something goes wrong.
+</Note>
+
+## Gmail
+
+Alfred connects to your Gmail account via OAuth2 and pulls new messages every 5 minutes.
+
+### Authentication
+
+Gmail uses Google OAuth2. During onboarding, you are prompted to connect your Google account automatically. You can also connect it later from the **Integrations** page in Settings.
+
+### What gets synced
+
+- Full email content (not just metadata) — subject, body, recipients, and timestamps
+- A **100-day backfill** runs during onboarding to give Alfred historical context
+- New messages are fetched every **5 minutes** via StreamPullerWorkflow
+
+### Processing pipeline
+
+Emails flow through the standard pipeline: event processor classifies the message, the Curator creates vault records for people, conversations, decisions, and tasks found within the content.
+
+<Tip>
+  The 100-day backfill means Alfred understands your recent context from day one. You do not need to manually import old emails.
+</Tip>
+
+## Notion
+
+Alfred connects to your Notion workspace using an Internal Integration Token. Unlike Gmail, this is not an OAuth flow — you create the integration yourself and share specific pages with it.
+
+### Setup
+
+1. Go to [notion.so/profile/integrations](https://www.notion.so/profile/integrations)
+2. Create a new Internal Integration and copy the token
+3. In Alfred, go to **Integrations** and add the Notion integration with your token
+4. In Notion, share the pages you want Alfred to access with your integration
+
+<Warning>
+  Alfred can only see pages that have been explicitly shared with the integration. If you add new pages later, remember to share them too.
+</Warning>
+
+### What gets synced
+
+- Page content fetched via the Notion blocks API
+- Database schemas and properties
+- New and updated content pulled every **15 minutes**
+- All requests use the required `Notion-Version: 2022-06-28` header
+
+## Omi Ambient
+
+Omi is a wearable device that streams ambient audio to Alfred for local transcription. This integration is fully privacy-focused — audio is transcribed on Alfred's infrastructure with no external API calls.
+
+### How it works
+
+1. The Omi device streams raw **PCM16 audio** to Alfred via a webhook
+2. **RMS energy speech detection** identifies speech segments and discards silence
+3. Speech segments are grouped by **60-second gaps** between utterances
+4. Transcription runs locally using **whisper-large-v3** (int8 quantization, CPU)
+5. Transcribed text is emitted as stream events and processed into vault records
+
+### Webhook URL
+
+Configure your Omi device to send audio to:
+
+```
+https://{tenant}.alfred.black/api/v1/streams/omi/audio?token={webhookToken}&uid=omi-device
+```
+
+Replace `{tenant}` with your Alfred tenant subdomain and `{webhookToken}` with the token shown on your Integrations page.
+
+### Quality and retention
+
+- A **quality gate** filters out low-confidence results: language confidence must exceed 0.5 and word count must be at least 5
+- Raw audio is retained for **48 hours**, then automatically purged
+- No audio is sent to any external transcription service
+
+<Note>
+  Because transcription runs entirely on Alfred's infrastructure using a local Whisper model, your ambient audio never leaves the platform. See the <a href="/guides/security">Security</a> page for more details.
+</Note>
+
+## GitHub Webhooks
+
+Alfred receives push events from GitHub repositories via webhooks with HMAC signature verification.
+
+### Setup
+
+1. In your GitHub repository, go to **Settings → Webhooks**
+2. Add a new webhook using the URL shown on your Alfred Integrations page
+3. Set the content type to `application/json`
+4. Enter the webhook secret provided by Alfred for HMAC signature verification
+5. Select the events you want to forward
+
+<Tip>
+  Start with push events, pull request events, and issue events for the richest context. Alfred processes all of them into structured vault records.
+</Tip>
+
+## Polar Payments
+
+Polar payment and subscription events are delivered to Alfred via webhooks with HMAC signature verification.
+
+### Setup
+
+1. In your Polar dashboard, configure a webhook pointing to the URL shown on your Alfred Integrations page
+2. Use the provided secret for HMAC signature verification
+3. Select the payment and subscription event types you want to forward
+
+Alfred processes these events to track payment activity, subscription changes, and customer lifecycle data in your vault.
+
+## Custom Webhooks
+
+Any service that can send HTTP POST requests with a JSON body can integrate with Alfred using a custom webhook.
+
+### How it works
+
+- POST any JSON payload to the webhook URL shown on your Integrations page
+- Alfred uses a **passthrough parser** — the raw payload is stored as a stream event
+- The event processor classifies the content and the Curator creates appropriate vault records
+
+```bash
+curl -X POST https://{tenant}.alfred.black/api/v1/streams/webhook/{streamId} \
+  -H "Content-Type: application/json" \
+  -d '{
+    "source": "my-internal-tool",
+    "event": "deploy_completed",
+    "details": "Deployed v2.4.1 to production"
+  }'
+```
+
+<Tip>
+  Custom webhooks are a quick way to get data from internal tools, CI/CD pipelines, or any service with outgoing webhook support into Alfred without building a dedicated integration.
+</Tip>
+
+## OpenClaw Sessions (System)
+
+Every conversation you have with Alfred — whether through Telegram, the web dashboard, or any other interface — is automatically captured as a system stream.
+
+### How it works
+
+- The **alfred-inbox hook** buffers messages during a conversation
+- Messages are flushed after **10 turns** or **5 minutes of idle time**, whichever comes first
+- Flushed conversations are processed by the event processor and the Curator creates conversation records in your vault
+
+This happens automatically. There is nothing to configure — every interaction with Alfred contributes to your knowledge base.
+
+<Note>
+  OpenClaw session capture means Alfred remembers what you have discussed. Decisions made, tasks assigned, and ideas explored during conversations are extracted and linked to relevant vault records.
+</Note>
+
+## Managing Integrations
+
+All integrations are managed from the **Streams** page in your Alfred dashboard.
+
+### Connecting a new integration
+
+1. Click **Connect Integration**
+2. For **OAuth sources** (like Gmail), you are redirected to the provider's consent screen to authorize access
+3. For **API key sources** (like Notion), a dialog appears where you enter the token
+4. For **push sources** (like GitHub, Polar, Omi), Alfred generates a webhook URL for you to configure in the external service
+
+### Monitoring your streams
+
+Each connected integration shows:
+
+- **Event count** — total events received
+- **Last event time** — when the most recent event arrived
+- **Status** — whether the stream is active, paused, or in error
+
+### Controls
+
+- **Pause** — temporarily stop pulling or accepting events from a stream
+- **Resume** — restart a paused stream
+- **Delete** — permanently remove the integration and stop all data ingestion
+
+<Warning>
+  Deleting an integration stops future data ingestion but does not remove vault records that were already created from previous events.
+</Warning>
+
+### Copying webhook URLs
+
+For push-based integrations, use the **copy** button next to the webhook URL. Omi displays your full tenant-specific URL with the authentication token pre-filled.
+
+<Columns cols={2}>
+  <Card title="Using the Inbox" icon="inbox" href="/guides/using-the-inbox">
+    Manually share content with Alfred
+  </Card>
+  <Card title="Security" icon="shield" href="/guides/security">
+    How Alfred protects your data across all integrations
+  </Card>
+</Columns>

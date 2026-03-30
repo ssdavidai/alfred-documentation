@@ -8,8 +8,8 @@ Alfred Black is a full-stack private intelligence service. Every subscriber gets
 
 ```mermaid
 graph TB
-    L6["<b>Interface</b><br/>Dashboard · Terminal · Channels · Talk · Ambient"]
-    L5["<b>Kinetic</b><br/>Temporal · Tasks · Chores · Rules"]
+    L6["<b>Interface</b><br/>Dashboard · Terminal · Vault Nebula · Channels · Talk · Ambient"]
+    L5["<b>Kinetic</b><br/>Temporal · Matters · Errands · Triage · Chores · Rules"]
     L4["<b>Semantic</b><br/>Vault · 22 Record Types · Intuition"]
     L3["<b>Data</b><br/>Streams · Events · Session Logs"]
     L2["<b>Agentic</b><br/>OpenClaw · Specialists · Scope"]
@@ -83,17 +83,17 @@ The vault is an Obsidian-compatible collection of Markdown files. Alfred manages
 
 **Your actions in motion.**
 
-Temporal is the workflow engine. It orchestrates the specialists, the intuition processes, and (coming soon) Tasks, Chores, and Rules — one-off actions, recurring jobs, and if/then automation that turn vault knowledge into proactive service.
+Temporal is the workflow engine. It orchestrates every specialist, intuition process, and action Alfred takes. The Kinetic layer is built around three core concepts: **Matters** (standing concerns that group related work, like "Kitchen renovation"), **Errands** (actionable tasks with an owner and status lifecycle), and **Triage** (items the Curator flagged for your review before processing — you promote them to tasks or dismiss them). Together they turn vault knowledge into proactive service.
 
 <Card title="Kinetic Layer" icon="gears" href="/architecture/kinetic">
-  Temporal engine, Tasks, Chores, Rules, and the twelve background processes.
+  Temporal engine, Matters, Errands, Triage, Chores, Rules, and the thirteen background processes.
 </Card>
 
 ## Interface Layer
 
 **Your points of contact.**
 
-Every way you interact with Alfred — the dashboard, terminal access to OpenClaw, messaging channels (WhatsApp, iMessage, Telegram, Discord), voice calls via Talk Mode, continuous listening via Ambient Mode, and the REST API. Every interface feeds into the same pipeline.
+Every way you interact with Alfred — the dashboard, **Vault Nebula** (a 3D visualization of your knowledge graph), a **Terminal proxy** with full PTY support for direct CLI access to OpenClaw, messaging channels (WhatsApp, iMessage, Telegram, Discord), voice calls via Talk Mode, continuous listening via Ambient Mode, and the REST API. Every interface feeds into the same pipeline.
 
 <Card title="Interface Layer" icon="display" href="/architecture/interface">
   Dashboard, terminal, channels, Talk Mode, Ambient Mode, device pairing, and the API.
@@ -126,9 +126,9 @@ You can check on your specialists, trigger a run, and view their history from yo
     Vault, record types, intuition
   </Card>
   <Card title="Kinetic" icon="gears" href="/architecture/kinetic">
-    Temporal, Tasks, Chores, Rules
+    Temporal, Matters, Errands, Triage, Chores, Rules
   </Card>
   <Card title="Interface" icon="display" href="/architecture/interface">
-    Dashboard, terminal, channels, Talk, Ambient
+    Dashboard, Vault Nebula, Terminal, Channels, Talk, Ambient
   </Card>
 </Columns>

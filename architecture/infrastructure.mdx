@@ -63,9 +63,21 @@ Docker containers run with defense-in-depth hardening:
 |-----------|--------|
 | **Privilege escalation** | `no-new-privileges: true` on all containers |
 | **Capabilities** | `cap_drop: ALL` — all Linux capabilities removed |
-| **Memory limits** | 2GB per container — prevents exhaustion |
+| **Memory limits** | 2GB per container default; `learn` container runs at 4GB for the Whisper model |
 | **PID limits** | 256 processes per container — prevents fork bombs |
 | **Network** | All containers bound to localhost only |
+
+## Whisper model
+
+The `whisper-large-v3` model (~3GB) is baked directly into the `learn` container's Docker image. This means zero-config deployment — no model downloads at runtime, no external model registries, no startup delays. The `learn` container has a `mem_limit` of 4GB to accommodate the model in memory.
+
+## Terminal proxy
+
+The Terminal proxy provides direct CLI access to OpenClaw from your dashboard. It uses the **Docker Engine exec API** with real PTY allocation, supporting proper `SIGWINCH` signals for terminal resize events. This gives you a native terminal experience — full-screen editors, interactive prompts, and correct line wrapping all work as expected.
+
+## Temporal schedule creation
+
+Temporal schedules are created using the `--type` flag (not `--workflow-type`). All scheduled workflows — specialist runs, intuition processes, stream polling — are registered through this mechanism during provisioning.
 
 ## Health monitoring
 

@@ -8,6 +8,18 @@ icon: "shapes"
 
 Alfred manages 26 distinct record types organized into five layers: **Standing Entities** (8) for the stable elements of your world, **Activity Records** (9) for what happens, **Execution Types** (1) for how work gets done, **Learning Types** (5) for the deeper knowledge the Distiller surfaces, and **Intuition Types** (3) for the patterns Alfred learns from how you work.
 
+### The Matter / Errand / Triage lifecycle
+
+Three record types form the core execution lifecycle:
+
+- **Matter** — an ongoing concern that groups related errands (e.g., "Hetzner migration," "Q2 launch"). Matters persist until resolved.
+- **Task (Errand)** — a discrete unit of work belonging to a matter. The `owner` field determines who acts: `alfred` means the Task Runner executes automatically; `human` means the item appears on your dashboard for you to handle.
+- **Triage** — an item Alfred couldn't confidently classify. Triage items surface on your dashboard for human review. When you reclassify them, the routing decision feeds back into the intuition system.
+
+### Stream events as record sources
+
+Stream events from Gmail, Notion, Omi, and other integrations create **activity records** automatically. An incoming email becomes a conversation record; a Notion page update becomes a note; an Omi recording becomes a session. The Event Processor classifies each event and the Curator structures it — no manual sharing required.
+
 ## Standing Entities
 
 Records representing the people, organizations, and resources in your world.
@@ -181,9 +193,11 @@ Records capturing events, work, interactions, and execution results.
 
 **Example:** After processing the Acme Corp invoice, Alfred writes a ledger entry: "Extracted amount ($4,200), due date (April 15), created payment reminder task. Linked to matter/acme-billing."
 
+**Consequentials:** Ledger entries can spawn follow-up errands — called **consequentials**. When a completed task reveals additional work (e.g., "invoice processed, but payment reminder needs scheduling"), the Task Runner creates a new errand linked to the same matter. This chains work naturally without manual intervention.
+
 **Status values:** _(no status constraint)_
 
-**Key fields:** name, task (link to completed task), matter (link to matter), artifacts, tags
+**Key fields:** name, task (link to completed task), matter (link to matter), artifacts, consequentials (links to follow-up tasks), tags
 </Accordion>
 
 <Accordion title="event — Events" icon="calendar">
