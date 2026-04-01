@@ -227,6 +227,38 @@ See the [API Keys](/guides/api-keys) guide for usage examples and best practices
 
 Navigate to **Settings → Terminal** to open a web-based terminal with a proper PTY. This gives you full TUI support — you can run interactive CLI tools like `htop`, `vim`, or the OpenClaw CLI directly in the browser. The terminal connects to your Alfred instance over a secure WebSocket.
 
+### SSH Access
+
+Settings → Terminal now includes a **"Download SSH Key"** button. This downloads a `.pem` private key file that lets you SSH directly into your tenant for full CLI access.
+
+To connect after downloading:
+
+**macOS / Linux:**
+```bash
+chmod 600 ~/Downloads/your-key.pem
+ssh -i ~/Downloads/your-key.pem deploy@<your-hostname>
+```
+
+**Windows (PowerShell):**
+```powershell
+icacls .\your-key.pem /inheritance:r /grant:r "$($env:USERNAME):(R)"
+ssh -i .\your-key.pem deploy@<your-hostname>
+```
+
+<Tip>
+SSH access is useful for running interactive commands like `openclaw configure` that require a real terminal session. Your SSH key is generated per-tenant during provisioning and stored encrypted on the platform.
+</Tip>
+
+### Claude Subscription
+
+Go to **Settings → Credentials** and add `ANTHROPIC_API_KEY` with your Claude setup token. This enables Claude models (Sonnet 4.6, Haiku 4.5) powered by your Claude Pro or Team subscription — instead of pay-per-token API credits.
+
+To generate your setup token, run `claude setup-token` on your local machine. The token links your Claude subscription to your Alfred instance.
+
+<Note>
+This is separate from a standard Anthropic API key. The setup token uses your existing Claude Pro/Team subscription, so you are not billed per token.
+</Note>
+
 <Columns cols={2}>
   <Card title="Your Specialists" icon="gears" href="/guides/your-ai-agents">
     Understand what each specialist does

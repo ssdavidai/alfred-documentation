@@ -326,6 +326,35 @@ The SaaS layer checks your Alfred's health every 2 minutes:
 
 Health checks are authenticated and travel over the encrypted Tailscale network. Results are stored for your dashboard's Command Center view.
 
+## SSH access
+
+Each tenant has SSH keys generated during provisioning. Users can download their private key from the dashboard to connect directly to their Alfred instance.
+
+### Downloading your key
+
+Navigate to **Settings → Terminal** and click **"Download SSH Key"**. This downloads a `.pem` file containing your private key.
+
+### Connecting
+
+```bash
+ssh -i <key>.pem deploy@<your-hostname>
+```
+
+Set correct file permissions before connecting — `chmod 600` on macOS/Linux, or `icacls` on Windows (see the [Dashboard guide](/guides/your-dashboard#ssh-access) for full instructions).
+
+### Key security
+
+| Property | Detail |
+|----------|--------|
+| **Generation** | Keys are generated per-tenant during instance provisioning |
+| **Storage** | Private keys are stored encrypted on the platform and delivered over HTTPS |
+| **Isolation** | Keys are never shared between tenants — each instance has its own key pair |
+| **Access level** | SSH provides full access to the tenant VPS as the `deploy` user |
+
+<Warning>
+SSH gives you full access to your Alfred's server. You can run any command, modify configuration, and access your vault directly on disk. Use responsibly — changes made via SSH are not tracked in the dashboard audit log.
+</Warning>
+
 ## Data lifecycle
 
 ### During your subscription

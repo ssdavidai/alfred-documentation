@@ -143,6 +143,31 @@ OpenClaw Session Logs are enabled by default for all tenants. You can pause the 
 
 OpenClaw sessions are captured via the `alfred-inbox` hook, which writes session data directly to a shared volume at `/alfred-data/streams/`. This ensures every conversation and subagent run is persisted as a stream event regardless of polling schedules.
 
+## Email processing at scale
+
+When Alfred processes your email — whether during the initial backfill or ongoing stream ingestion — it uses a pipeline designed for efficiency at volume.
+
+### Domain-clustered batch processing
+
+Emails are grouped by sender domain before processing. All emails from `github.com` become one batch, all emails from `stripe.com` become another, and so on. Each inbox file contains up to **100 emails**.
+
+The format varies by domain type:
+
+- **Service domains** (automated senders like GitHub, Stripe, Linear) get **compact format** — subject line and snippet only. This reduces token usage without losing signal.
+- **Personal domains** (human senders) get **full body text**, giving the Curator the context it needs to extract relationships, commitments, and decisions.
+
+### Parallel curator
+
+The Curator processes inbox files concurrently using `asyncio.gather` with a semaphore. The concurrency level is configurable via `watcher.max_concurrent` in `config.yaml` (default: 4 workers).
+
+### Performance characteristics
+
+As a benchmark: **1,600 emails** produce approximately **78 inbox files**. With 4 concurrent workers, the Curator processes the full batch in roughly **2.5 hours**. Actual times vary depending on email complexity and the model selected for the Curator specialist.
+
+<Tip>
+If you want faster processing during the initial backfill, you can increase `watcher.max_concurrent` via the Terminal — but higher concurrency uses more memory and may increase LLM costs.
+</Tip>
+
 ## Gmail backfill
 
 When you connect Gmail, Alfred performs a one-time backfill that ingests full email content as stream events — not just metadata or extracted facts. Every email body, attachment reference, and thread context is captured, giving the Curator the same rich material it would receive from a freshly arrived message.
