@@ -21,7 +21,7 @@ Adds a file to the Janitor's ignore list, preventing it from being flagged in fu
 <RequestExample>
 
 ```bash With Reason
-curl -X POST /api/v1/workers/janitor/ignore \
+curl -X POST https://alfred.black/api/v1/workers/janitor/ignore \
   -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
   -d '{
@@ -31,7 +31,7 @@ curl -X POST /api/v1/workers/janitor/ignore \
 ```
 
 ```bash Without Reason
-curl -X POST /api/v1/workers/janitor/ignore \
+curl -X POST https://alfred.black/api/v1/workers/janitor/ignore \
   -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
   -d '{

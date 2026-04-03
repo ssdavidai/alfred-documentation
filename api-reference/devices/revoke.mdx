@@ -21,7 +21,7 @@ Revokes specific role-based access for a paired device without fully removing it
 <RequestExample>
 
 ```bash cURL
-curl -X POST /api/v1/devices/dev_x9y8z7w6v5/revoke \
+curl -X POST https://alfred.black/api/v1/devices/dev_x9y8z7w6v5/revoke \
   -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
   -d '{

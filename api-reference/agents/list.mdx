@@ -51,12 +51,12 @@ Use [Get Agent](/api-reference/agents/get-agent) to retrieve the full model stat
 <RequestExample>
 
 ```bash cURL
-curl -X GET /api/v1/admin/agents \
+curl -X GET https://alfred.black/api/v1/admin/agents \
   -H "Authorization: Bearer alf_your_key_here"
 ```
 
 ```javascript JavaScript
-const response = await fetch('/api/v1/admin/agents', {
+const response = await fetch('https://alfred.black/api/v1/admin/agents', {
   method: 'GET',
   headers: {
     'Authorization': 'Bearer alf_your_key_here'

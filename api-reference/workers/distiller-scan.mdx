@@ -15,13 +15,13 @@ Scans your vault records to identify candidates for knowledge extraction. The Di
 <RequestExample>
 
 ```bash Scan All Records
-curl -X POST /api/v1/workers/distiller/scan \
+curl -X POST https://alfred.black/api/v1/workers/distiller/scan \
   -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json"
 ```
 
 ```bash Scan Specific Project
-curl -X POST /api/v1/workers/distiller/scan \
+curl -X POST https://alfred.black/api/v1/workers/distiller/scan \
   -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
   -d '{

@@ -21,13 +21,13 @@ Triggers the Curator to process inbox files as a one-time batch operation. Each 
 <RequestExample>
 
 ```bash Process All Files
-curl -X POST /api/v1/workers/process \
+curl -X POST https://alfred.black/api/v1/workers/process \
   -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json"
 ```
 
 ```bash Process Limited Files
-curl -X POST /api/v1/workers/process \
+curl -X POST https://alfred.black/api/v1/workers/process \
   -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
   -d '{
@@ -37,7 +37,7 @@ curl -X POST /api/v1/workers/process \
 ```
 
 ```bash Dry Run
-curl -X POST /api/v1/workers/process \
+curl -X POST https://alfred.black/api/v1/workers/process \
   -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
   -d '{

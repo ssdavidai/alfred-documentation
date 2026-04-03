@@ -25,7 +25,7 @@ Rotates the authentication token for a paired device. After rotation, the device
 <RequestExample>
 
 ```bash With Scope
-curl -X POST /api/v1/devices/dev_a1b2c3d4e5/rotate \
+curl -X POST https://alfred.black/api/v1/devices/dev_a1b2c3d4e5/rotate \
   -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
   -d '{
@@ -35,7 +35,7 @@ curl -X POST /api/v1/devices/dev_a1b2c3d4e5/rotate \
 ```
 
 ```bash Role Only
-curl -X POST /api/v1/devices/dev_a1b2c3d4e5/rotate \
+curl -X POST https://alfred.black/api/v1/devices/dev_a1b2c3d4e5/rotate \
   -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
   -d '{

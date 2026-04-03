@@ -13,7 +13,7 @@ Clears multiple devices at once. You can clear only pending pairing requests or 
 <RequestExample>
 
 ```bash Clear Pending Only
-curl -X POST /api/v1/devices/clear \
+curl -X POST https://alfred.black/api/v1/devices/clear \
   -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
   -d '{
@@ -22,7 +22,7 @@ curl -X POST /api/v1/devices/clear \
 ```
 
 ```bash Clear All
-curl -X POST /api/v1/devices/clear \
+curl -X POST https://alfred.black/api/v1/devices/clear \
   -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json"
 ```

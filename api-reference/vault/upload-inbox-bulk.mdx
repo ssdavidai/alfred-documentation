@@ -35,7 +35,7 @@ Uploads multiple files to your inbox in a single request. The Curator agent will
 <RequestExample>
 
 ```bash cURL
-curl -X POST /api/v1/vault/inbox/bulk \
+curl -X POST https://alfred.black/api/v1/vault/inbox/bulk \
   -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
   -d '{
@@ -57,7 +57,7 @@ curl -X POST /api/v1/vault/inbox/bulk \
 ```
 
 ```javascript JavaScript
-const response = await fetch('/api/v1/vault/inbox/bulk', {
+const response = await fetch('https://alfred.black/api/v1/vault/inbox/bulk', {
   method: 'POST',
   headers: {
     'Authorization': 'Bearer alf_your_key_here',

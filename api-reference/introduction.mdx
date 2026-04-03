@@ -9,7 +9,7 @@ icon: "code"
 The Alfred API gives you full programmatic access to your vault, specialists, workflows, and service management. Everything you can do in the dashboard, you can do via the API.
 
 <Note>
-  The base path for all API endpoints is `/api/v1`. Authenticate every request with your API key.
+  The base URL for all API endpoints is `https://alfred.black/api/v1`. Authenticate every request with your API key.
 </Note>
 
 ## Authentication
@@ -17,7 +17,7 @@ The Alfred API gives you full programmatic access to your vault, specialists, wo
 Every request requires a Bearer token in the `Authorization` header:
 
 ```bash
-curl /api/v1/vault/context \
+curl https://alfred.black/api/v1/vault/context \
   -H "Authorization: Bearer alf_your_key_here"
 ```
 
@@ -28,7 +28,7 @@ Create API keys in your [dashboard](https://alfred.black) under **Settings > API
 All requests that send data must use `application/json` as the `Content-Type`:
 
 ```bash
-curl -X POST /api/v1/vault/inbox \
+curl -X POST https://alfred.black/api/v1/vault/inbox \
   -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
   -d '{"filename": "notes.md", "content": "..."}'

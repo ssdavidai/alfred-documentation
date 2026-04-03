@@ -15,13 +15,13 @@ Scans your vault for extraction candidates and then runs the Distiller agent to 
 <RequestExample>
 
 ```bash Extract All Candidates
-curl -X POST /api/v1/workers/distiller/run \
+curl -X POST https://alfred.black/api/v1/workers/distiller/run \
   -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json"
 ```
 
 ```bash Extract from Specific Project
-curl -X POST /api/v1/workers/distiller/run \
+curl -X POST https://alfred.black/api/v1/workers/distiller/run \
   -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
   -d '{

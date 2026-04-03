@@ -39,7 +39,7 @@ Returns status `201 Created`.
 <RequestExample>
 
 ```bash cURL
-curl -X POST /api/v1/vault/records \
+curl -X POST https://alfred.black/api/v1/vault/records \
   -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
   -d '{
@@ -55,7 +55,7 @@ curl -X POST /api/v1/vault/records \
 ```
 
 ```javascript JavaScript
-const response = await fetch('/api/v1/vault/records', {
+const response = await fetch('https://alfred.black/api/v1/vault/records', {
   method: 'POST',
   headers: {
     'Authorization': 'Bearer alf_your_key_here',

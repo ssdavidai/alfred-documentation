@@ -15,13 +15,13 @@ Starts your AI agents. You can optionally start only specific agents by providin
 <RequestExample>
 
 ```bash Start All Agents
-curl -X POST /api/v1/workers/up \
+curl -X POST https://alfred.black/api/v1/workers/up \
   -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json"
 ```
 
 ```bash Start Specific Agents
-curl -X POST /api/v1/workers/up \
+curl -X POST https://alfred.black/api/v1/workers/up \
   -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
   -d '{

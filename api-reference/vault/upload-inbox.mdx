@@ -33,7 +33,7 @@ Uploads a single file to your inbox. The Curator agent will automatically proces
 <RequestExample>
 
 ```bash cURL
-curl -X POST /api/v1/vault/inbox \
+curl -X POST https://alfred.black/api/v1/vault/inbox \
   -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
   -d '{
@@ -43,7 +43,7 @@ curl -X POST /api/v1/vault/inbox \
 ```
 
 ```javascript JavaScript
-const response = await fetch('/api/v1/vault/inbox', {
+const response = await fetch('https://alfred.black/api/v1/vault/inbox', {
   method: 'POST',
   headers: {
     'Authorization': 'Bearer alf_your_key_here',

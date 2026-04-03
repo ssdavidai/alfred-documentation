@@ -21,7 +21,7 @@ Approves a pending device pairing request, allowing the device to connect to you
 <RequestExample>
 
 ```bash cURL
-curl -X POST /api/v1/devices/req_7k9m3p2q1/approve \
+curl -X POST https://alfred.black/api/v1/devices/req_7k9m3p2q1/approve \
   -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
   -d '{
@@ -30,7 +30,7 @@ curl -X POST /api/v1/devices/req_7k9m3p2q1/approve \
 ```
 
 ```bash Without Options
-curl -X POST /api/v1/devices/req_7k9m3p2q1/approve \
+curl -X POST https://alfred.black/api/v1/devices/req_7k9m3p2q1/approve \
   -H "Authorization: Bearer alf_your_key_here"
 ```
 

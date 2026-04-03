@@ -64,12 +64,12 @@ For OpenClaw agents (`main`, `vault-curator`, `vault-janitor`, `vault-distiller`
 <RequestExample>
 
 ```bash cURL
-curl -X GET /api/v1/admin/agents/vault-curator \
+curl -X GET https://alfred.black/api/v1/admin/agents/vault-curator \
   -H "Authorization: Bearer alf_your_key_here"
 ```
 
 ```javascript JavaScript
-const response = await fetch('/api/v1/admin/agents/vault-curator', {
+const response = await fetch('https://alfred.black/api/v1/admin/agents/vault-curator', {
   method: 'GET',
   headers: {
     'Authorization': 'Bearer alf_your_key_here'

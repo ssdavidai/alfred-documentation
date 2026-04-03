@@ -49,28 +49,28 @@ Updates the default model for a specific agent. For OpenClaw agents (main, vault
 <RequestExample>
 
 ```bash cURL — Set Curator model
-curl -X PATCH /api/v1/admin/agents/vault-curator/model \
+curl -X PATCH https://alfred.black/api/v1/admin/agents/vault-curator/model \
   -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
   -d '{"model": "anthropic/claude-sonnet-4"}'
 ```
 
 ```bash cURL — Set Surveyor labeler model
-curl -X PATCH /api/v1/admin/agents/surveyor/model \
+curl -X PATCH https://alfred.black/api/v1/admin/agents/surveyor/model \
   -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
   -d '{"model": "x-ai/grok-4.1-fast"}'
 ```
 
 ```bash cURL — Set Surveyor embedder model
-curl -X PATCH /api/v1/admin/agents/surveyor/model \
+curl -X PATCH https://alfred.black/api/v1/admin/agents/surveyor/model \
   -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
   -d '{"model": "nomic-embed-text", "field": "embedder_model"}'
 ```
 
 ```javascript JavaScript
-const response = await fetch('/api/v1/admin/agents/vault-curator/model', {
+const response = await fetch('https://alfred.black/api/v1/admin/agents/vault-curator/model', {
   method: 'PATCH',
   headers: {
     'Authorization': 'Bearer alf_your_key_here',

@@ -39,12 +39,12 @@ Returns the complete vault schema including all record types, valid status value
 <RequestExample>
 
 ```bash cURL
-curl -X GET /api/v1/vault/schema \
+curl -X GET https://alfred.black/api/v1/vault/schema \
   -H "Authorization: Bearer alf_your_key_here"
 ```
 
 ```javascript JavaScript
-const response = await fetch('/api/v1/vault/schema', {
+const response = await fetch('https://alfred.black/api/v1/vault/schema', {
   method: 'GET',
   headers: {
     'Authorization': 'Bearer alf_your_key_here'

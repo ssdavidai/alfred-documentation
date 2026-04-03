@@ -29,7 +29,7 @@ Moves a record to a new location — use this to rename a record or change its t
 <RequestExample>
 
 ```bash cURL
-curl -X POST /api/v1/vault/move \
+curl -X POST https://alfred.black/api/v1/vault/move \
   -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
   -d '{
@@ -39,7 +39,7 @@ curl -X POST /api/v1/vault/move \
 ```
 
 ```javascript JavaScript
-const response = await fetch('/api/v1/vault/move', {
+const response = await fetch('https://alfred.black/api/v1/vault/move', {
   method: 'POST',
   headers: {
     'Authorization': 'Bearer alf_your_key_here',

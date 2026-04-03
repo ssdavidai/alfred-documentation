@@ -27,12 +27,12 @@ Include the API key as a Bearer token in every request:
 
 <CodeGroup>
 ```bash cURL
-curl /api/v1/vault/context \
+curl https://alfred.black/api/v1/vault/context \
   -H "Authorization: Bearer alf_your_key_here"
 ```
 
 ```javascript JavaScript
-const response = await fetch('/api/v1/vault/context', {
+const response = await fetch('https://alfred.black/api/v1/vault/context', {
   headers: {
     'Authorization': 'Bearer alf_your_key_here'
   }
@@ -67,7 +67,7 @@ const data = response.data;
 - **Store keys in environment variables** — never hardcode them in source code
   ```bash
   export ALFRED_API_KEY="alf_your_key_here"
-  curl /api/v1/vault/context -H "Authorization: Bearer $ALFRED_API_KEY"
+  curl https://alfred.black/api/v1/vault/context -H "Authorization: Bearer $ALFRED_API_KEY"
   ```
 - **Rotate periodically** — create a new key and revoke the old one every few months
 - **Use descriptive names** — name keys after their purpose so you know which to revoke
@@ -102,7 +102,7 @@ Missing or invalid authentication returns a 401 status:
 Use the health endpoint to verify your credentials:
 
 ```bash
-curl /api/v1/admin/health \
+curl https://alfred.black/api/v1/admin/health \
   -H "Authorization: Bearer alf_your_key_here"
 ```
 
