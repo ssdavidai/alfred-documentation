@@ -178,15 +178,16 @@ Intuition runs on seven automated processes. You don't need to manage them — t
 
 | Process | Schedule | What it does |
 |---------|----------|-------------|
-| **Event Processor** | Every 2 minutes | Reads incoming stream events from Gmail, Notion, Omi, and other integrations, classifies them, and writes vault records |
-| **Session Tracker** | Every 5 minutes | Groups related records into sessions |
-| **Daily Digest** | Daily at 6pm | Summarizes the day's activity |
-| **Learning** | Every 5 minutes | Captures observations from your routing decisions |
+| **Event Processor** | Every 15 minutes | Reads incoming stream events, creates vault records via zero-LLM templates |
+| **Hourly Enrichment** | Every 1 hour | Batched LLM call to add entities, tags, and priorities to recent event records |
+| **Session Tracker** | Every 15 minutes | Groups related records into sessions |
+| **Daily Digest** | Daily at 6pm | Summarises the day's activity |
+| **Learning** | Every 15 minutes | Captures observations from conversations and stream events |
 | **Reflection** | Daily at 2am | Reviews observations and refines instincts |
-| **Judgment** | Every 2 minutes | Routes inputs using instincts, escalates uncertain ones to you |
-| **Task Runner** | Every 2 minutes | Picks up queued tasks (Matters and Errands), follows skill methodologies, executes work, writes ledger entries, and creates consequential follow-up errands |
+| **Judgment** | Every 15 minutes | Routes inputs using instincts; creates execution tasks |
+| **Task Runner** | Every 15 minutes | Picks up queued errands, spawns ephemeral agents for execution on connected apps |
 
-All seven processes are managed by the Temporal Engine and can be monitored from the Workflows section of your dashboard.
+All processes are managed by the Temporal Engine and can be monitored from the Workflows section of your dashboard.
 
 ## Teaching Alfred directly
 

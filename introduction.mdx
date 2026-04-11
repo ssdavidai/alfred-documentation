@@ -48,11 +48,11 @@ Your homepage is the **Vault Nebula** — a data-driven cloud visualization wher
 ## How it works
 
 <Steps>
-  <Step title="Hand something to Alfred">
-    Share meeting notes, conversations, or documents through your dashboard or the API. Any raw text. Alfred takes it from there.
+  <Step title="Data flows in automatically">
+    Connected apps stream data continuously — emails, calendar events, messages, notifications. Alfred also accepts manual uploads (meeting notes, documents, PDFs) via the dashboard or API.
   </Step>
-  <Step title="The Curator reads and structures it">
-    The Curator — Alfred's intake specialist — reads your content, identifies every person, project, task, and decision, then creates structured records in your vault. All linked together automatically.
+  <Step title="Vault records are created instantly">
+    Stream events become structured vault records immediately using zero-LLM Python templates — no waiting for AI processing. Manual uploads go through the Curator for deeper analysis. An hourly enrichment pass adds entities, tags, and context to all recent records in a single batched LLM call.
   </Step>
   <Step title="The Janitor keeps everything in order">
     The Janitor continuously scans for broken links, inconsistencies, and structural issues — fixing them before you ever notice.
@@ -72,7 +72,7 @@ Your homepage is the **Vault Nebula** — a data-driven cloud visualization wher
 
 | Specialist | What they do | When they work |
 |-------|-------------|-------------|
-| **Curator** | Reads what you share and creates structured vault records | Automatically when new content arrives |
+| **Curator** | Processes manual inbox uploads into structured vault records | When files are dropped into the inbox |
 | **Janitor** | Scans for and repairs structural issues in your vault | Periodic sweeps and on-demand |
 | **Distiller** | Surfaces assumptions, decisions, constraints, and insights | On-demand or scheduled |
 | **Surveyor** | Embeds records, clusters by meaning, discovers relationships | On-demand or scheduled |

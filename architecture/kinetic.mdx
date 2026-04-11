@@ -68,7 +68,7 @@ This keeps Alfred from acting on things it shouldn't while ensuring nothing impo
 
 ### The Task Runner
 
-The Task Runner is a Temporal workflow that runs every 2 minutes, picking up errands with `status=todo` and `owner=alfred`. For each errand, it follows a pipeline:
+The Task Runner is a Temporal workflow that runs every 15 minutes, picking up errands with `status=todo` and `owner=alfred`. For each errand, it follows a pipeline:
 
 1. **Check prerequisites** — verify `depends_on` and `blocked_by` are clear
 2. **Mark active** — set the errand to `active` so it's visible in your dashboard
