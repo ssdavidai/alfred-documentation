@@ -113,25 +113,27 @@ Every event from every stream arrives in a standard envelope:
 
 ```json
 {
-  "stream_id": "stream_gmail_abc123",
-  "stream_type": "scheduled_pull",
-  "tenant_id": "tenant_xyz",
-  "received_at": "2026-03-01T14:32:00Z",
-  "source_ref": "msg_18f3a2b4c5d6e7f8",
-  "payload": { ... },
-  "summary": "Email from Alice Chen re: Q1 launch timeline"
+  "id": "ba0865d5-72fe-4bd9-863f-dd7adb57bb79",
+  "stream_id": "composio-googlecalendar-googlecalendar-events-list",
+  "stream_type": "composio",
+  "received_at": "2026-04-10T18:55:07.020Z",
+  "source_ref": "composio:_74q38db26hgm",
+  "raw": { ... },
+  "summary": "alfredOS devlog #1",
+  "metadata": { "event_type": "item", "parser": "composio" }
 }
 ```
 
 | Field | Purpose |
 |-------|---------|
+| `id` | Unique UUID for this event |
 | `stream_id` | Identifies which stream produced this event |
-| `stream_type` | `scheduled_pull`, `webhook_push`, or `realtime` |
-| `tenant_id` | Your tenant identifier |
+| `stream_type` | `composio`, `scheduled`, `webhook`, `system`, or `media` |
 | `received_at` | When Alfred received the event |
 | `source_ref` | Unique reference from the source, used for deduplication |
-| `payload` | The raw event data from the external source |
-| `summary` | Optional human-readable summary of the event |
+| `raw` | The raw event data from the external source |
+| `summary` | Human-readable summary of the event |
+| `metadata` | Structured fields extracted by the parser (event_type, from, to, etc.) |
 
 The `source_ref` field ensures Alfred never processes the same event twice, even if a stream delivers it more than once.
 
@@ -139,7 +141,7 @@ The `source_ref` field ensures Alfred never processes the same event twice, even
 
 Every Alfred comes with one stream already active — **OpenClaw Session Logs**.
 
-This stream captures every conversation between you and Alfred, plus all subagent runs that happen behind the scenes. A Temporal schedule polls for new session data every 5 minutes and delivers it to your Inbox.
+This stream captures every conversation between you and Alfred, plus all subagent runs that happen behind the scenes. Sessions are captured via the `alfred-inbox` hook, which writes session data directly to the stream pipeline as they complete — no polling needed.
 
 Alfred processes these sessions to extract:
 
@@ -158,34 +160,11 @@ OpenClaw Session Logs are enabled by default for all tenants. You can pause the 
 
 OpenClaw sessions are captured via the `alfred-inbox` hook, which writes session data directly to a shared volume at `/alfred-data/streams/`. This ensures every conversation and subagent run is persisted as a stream event regardless of polling schedules.
 
-## Email processing at scale
+## Gmail onboarding backfill
 
-When Alfred processes your email — whether during the initial backfill or ongoing stream ingestion — it uses a pipeline designed for efficiency at volume.
+During onboarding, Alfred performs a one-time backfill that reads 100 days of your Gmail. Full email content (not just metadata) is used to extract facts, patterns, and your behavioral profile. This backfill uses the legacy Google OAuth token from signup — it runs before Composio streams are configured.
 
-### Domain-clustered batch processing
-
-Emails are grouped by sender domain before processing. All emails from `github.com` become one batch, all emails from `stripe.com` become another, and so on. Each inbox file contains up to **100 emails**.
-
-The format varies by domain type:
-
-- **Service domains** (automated senders like GitHub, Stripe, Linear) get **compact format** — subject line and snippet only. This reduces token usage without losing signal.
-- **Personal domains** (human senders) get **full body text**, giving the Curator the context it needs to extract relationships, commitments, and decisions.
-
-### Parallel curator
-
-The Curator processes inbox files concurrently using `asyncio.gather` with a semaphore. The concurrency level is configurable via `watcher.max_concurrent` in `config.yaml` (default: 4 workers).
-
-### Performance characteristics
-
-As a benchmark: **1,600 emails** produce approximately **78 inbox files**. With 4 concurrent workers, the Curator processes the full batch in roughly **2.5 hours**. Actual times vary depending on email complexity and the model selected for the Curator specialist.
-
-<Tip>
-If you want faster processing during the initial backfill, you can increase `watcher.max_concurrent` via the Terminal — but higher concurrency uses more memory and may increase LLM costs.
-</Tip>
-
-## Gmail backfill
-
-When you connect Gmail, Alfred performs a one-time backfill that ingests full email content as stream events — not just metadata or extracted facts. Every email body, attachment reference, and thread context is captured, giving the Curator the same rich material it would receive from a freshly arrived message.
+After onboarding, ongoing Gmail ingestion switches to the Composio stream, which polls incrementally every 5 minutes (only new emails since last pull).
 
 ## Stream event counts
 
@@ -199,7 +178,7 @@ Navigate to your [dashboard](https://alfred.black/dashboard/streams) to see all 
 |---------|---------------|
 | **Status dot** | Green = active, Red = error, Dim = paused |
 | **Stream name** | The name you gave this stream |
-| **Type badge** | Scheduled Pull, Webhook Push, or Realtime |
+| **Type badge** | Composio, Scheduled, Webhook, or System |
 | **Last event** | When the most recent event was received |
 
 Every stream supports **Pause**, **Resume**, **Edit**, and **Delete**. For webhook streams, you'll also see a copyable webhook URL.

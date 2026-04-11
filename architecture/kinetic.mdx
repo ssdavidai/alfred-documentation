@@ -187,7 +187,7 @@ Alfred runs automated processes on schedules you don't need to manage. They take
 | Process | Schedule | What it does |
 |---------|----------|-------------|
 | Event Processor | Every 15 minutes | Creates vault records from stream events (zero LLM) |
-| Stream Pullers | Every 2–10 min per stream | Polls connected apps via Composio for new data |
+| Stream Pullers | Per-stream schedule (2–10 min) | Polls connected apps via Composio for new data (per-stream Temporal schedules, not a global workflow) |
 | Hourly Enrichment | Every 1 hour | Batched LLM call to add entities, tags, priorities to new records |
 | Session Tracker | Every 15 minutes | Groups related records into sessions |
 | Daily Digest | Daily at 6pm | Summarises the day's activity |
@@ -206,13 +206,13 @@ Alfred runs automated processes on schedules you don't need to manage. They take
 <Accordion title="Infrastructure processes" icon="server">
 | Process | Schedule | What it does |
 |---------|----------|-------------|
-| Nightly Maintenance | Daily at 3am | Vault cleanup, stream pruning, index rebuilds |
-| Health monitoring | Every 2 minutes | Checks service status, disk, memory, connectivity |
-| Encrypted backups | Daily at 3am | Restic backup to Hetzner Object Storage |
+| Nightly Maintenance | Daily at 3am | Vault cleanup, stream pruning, index rebuilds (Temporal) |
+| Health monitoring | Every 1 minute | Checks service status, disk, memory, connectivity (SaaS-side, not Temporal) |
+| Encrypted backups | Daily at 3am | Restic backup to Hetzner Object Storage (cron, not Temporal) |
 </Accordion>
 </AccordionGroup>
 
-All processes are managed by the Temporal Engine and can be monitored from your dashboard.
+Temporal-based processes can be monitored from the Workflows section of your dashboard. Infrastructure processes (health, backups) run outside Temporal.
 
 <Columns cols={2}>
   <Card title="Your Specialists" icon="gears" href="/guides/your-ai-agents">
