@@ -12,7 +12,7 @@ Part of Alfred's [six-layer architecture](/how-it-works). The Data layer capture
 
 You don't have to hand everything to Alfred manually. Streams are data pipelines that capture events from external sources — your email, your calendar, your payments, your conversations — and deliver them to Alfred's Inbox automatically.
 
-Once a stream is active, Alfred receives a continuous feed of structured events. The Curator processes each one, creating and updating vault records just as if you'd shared the content yourself.
+Once a stream is active, Alfred receives a continuous feed of structured events. Each event is automatically converted into a vault record using zero-LLM Python templates, with entities and context added by hourly batch enrichment.
 
 ## How streams work
 
