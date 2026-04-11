@@ -85,24 +85,14 @@ An external service POSTs events directly to your dedicated webhook URL. Alfred 
 Each webhook stream generates a unique, secure URL. Copy it from your dashboard and configure it in the external service.
 </Accordion>
 
-<Accordion title="Realtime — a persistent connection for continuous data" icon="signal">
-A long-lived WebSocket connection maintains a continuous feed for sources that produce data in real time.
+<Accordion title="Omi — ambient audio via webhook" icon="microphone">
+Omi wearable devices POST audio data to a dedicated webhook endpoint on your tenant. Alfred processes it through a local pipeline:
 
-| Source | What it captures |
-|--------|-----------------|
-| **Omi** | Ambient audio from your wearable — speech detection, local transcription, quality-gated stream events |
-
-Realtime streams stay connected as long as your Alfred is running, automatically reconnecting if the connection drops.
-
-### Omi audio pipeline
-
-Omi delivers raw PCM audio over a persistent WebSocket. Alfred processes it through a local pipeline:
-
-1. **RMS energy speech detection** — audio frames are evaluated against an RMS energy threshold of 300. Silence is discarded immediately.
-2. **Speech grouping** — consecutive speech segments are grouped together. A gap of 60 seconds or more starts a new group.
-3. **Local transcription** — each speech group is transcribed by `whisper-large-v3` running locally (int8 quantization, CPU-only, 4GB RAM via the `learn` container).
-4. **Quality gate** — transcripts must pass language confidence > 0.5 and contain at least 5 words, otherwise they are dropped.
-5. **Stream events** — passing transcripts are emitted as standard StreamEvents into the Inbox.
+1. **RMS energy speech detection** — audio frames evaluated against an RMS threshold. Silence discarded immediately.
+2. **Speech grouping** — consecutive speech segments grouped. 60-second gaps start a new group.
+3. **Local transcription** — each speech group transcribed by `whisper-large-v3` running locally (int8 quantization, CPU-only, 4GB RAM via the `learn` container).
+4. **Quality gate** — transcripts must pass language confidence > 0.5 and contain at least 5 words.
+5. **Stream events** — passing transcripts emitted as standard StreamEvents.
 
 Audio is retained for 48 hours, then automatically purged.
 </Accordion>

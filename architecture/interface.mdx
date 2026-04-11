@@ -32,16 +32,18 @@ This gives you the same access you'd have if you SSH'd into your instance and ra
 
 ---
 
-## OpenClaw Channels
+## Messaging Channels
 
-Connect Alfred to messaging platforms via OpenClaw's channel system. A message to Alfred on WhatsApp is processed the same way as content shared through the dashboard.
+Alfred supports messaging via OpenClaw's channel system. Currently available:
 
-| Channel | How it works |
-|---------|-------------|
-| **WhatsApp** | Talk to Alfred from your phone |
-| **iMessage** | Native Apple integration |
-| **Telegram** | Bot-based access |
-| **Discord** | Server or DM access |
+| Channel | Status | How it works |
+|---------|--------|-------------|
+| **Slack** | Live | Bot integration via Socket Mode. Connected as a Composio app. |
+| **Dashboard chat** | Live | Built into the Alfred dashboard at alfred.black |
+
+<Warning>
+Additional channels (WhatsApp, iMessage, Telegram, Discord) are planned but not yet implemented. When available, a message to Alfred on any channel will be processed the same way as content shared through the dashboard.
+</Warning>
 
 ---
 
@@ -68,7 +70,7 @@ Alfred doesn't call arbitrarily. Voice calls are reserved for moments where a ca
 </Accordion>
 
 <Accordion title="You call Alfred" icon="phone-arrow-down-left">
-Pick up the phone and dial Alfred's number any time. Ask questions, share updates, give instructions. Anything you share by voice flows through the same pipeline as text: the Curator processes it, records are created, your vault grows.
+Pick up the phone and dial Alfred's number any time. Ask questions, share updates, give instructions. Anything you share by voice flows through the same pipeline as text — records are created, your vault grows.
 </Accordion>
 
 <Accordion title="Setting up Talk Mode" icon="sliders">

@@ -14,7 +14,7 @@ Every Alfred Black subscriber gets a **dedicated, isolated server**. Your data n
 
 | Property | Detail |
 |----------|--------|
-| **Server** | Dedicated Hetzner Cloud instance (cx53: 8 vCPU, 32GB RAM) |
+| **Server** | Dedicated Hetzner Cloud instance (cx33 default, upgradeable) |
 | **Storage** | LUKS2 full-disk encryption (AES-256-XTS) |
 | **Network** | Private Tailscale mesh (WireGuard-based VPN) |
 | **Exposure** | Zero public-facing ports — no inbound access from the internet |
@@ -85,7 +85,7 @@ The SaaS layer checks your Alfred's health every 2 minutes over the encrypted Ta
 
 ## Backup strategy
 
-Automated daily backups at 3:00 AM via Restic with AES-256 encryption to Hetzner Object Storage. Retention: 7 daily, 4 weekly, 12 monthly snapshots. Containers are stopped during backup for consistency. Even if the S3 bucket is compromised, backup data cannot be read without the Restic password.
+Automated daily backups at 3:00 AM via Restic with AES-256 encryption to Hetzner Object Storage. Retention: 7 daily, 4 weekly, 6 monthly snapshots. Containers are stopped during backup for consistency. Even if the S3 bucket is compromised, backup data cannot be read without the Restic password.
 
 ## Data lifecycle
 
