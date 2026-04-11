@@ -85,11 +85,13 @@ The execution block on an instinct specifies:
   New instincts (fewer than 10 observations) always force `requires_approval=true` on their tasks, regardless of the execution block's setting. Alfred won't act autonomously until it has enough experience to be confident. This is the **discretion gate**.
 </Note>
 
-The Task Runner picks up the task, assembles context (the skill methodology, the related matter, relevant observations), and executes via `sessions_spawn`. When it finishes, it writes a ledger entry and handles any consequentials — follow-up errands that flow naturally from the completed work.
+The Task Runner picks up the task, assembles context, and spawns an **ephemeral agent** on the workers runtime. This agent has access to exactly the tools it needs — including `composio_execute` for actions on connected apps. When the task completes, the ephemeral agent is destroyed and a ledger entry is written.
+
+**Example**: you tell Alfred *"from now on, when a payment failure email arrives, reply acknowledging receipt."* Alfred captures this as an observation. Reflection creates an instinct with an execution block specifying `tools_required: ["GMAIL_REPLY_TO_EMAIL"]`. When a matching email arrives, Judgment fires, the Task Runner spawns an ephemeral agent, and that agent calls `composio_execute` to send the reply via your connected Gmail — without your intervention.
 
 Tasks are organized around **Matters** (ongoing concerns) and executed as **Errands** (discrete units of work). Items the system can't confidently classify are routed to **Triage** for your review — and your triage decisions feed back into the observation pipeline, teaching Alfred for next time.
 
-This closes the loop from observation to action: you teach Alfred by routing, Alfred learns through reflection, and eventually Alfred both routes *and* acts — with appropriate caution.
+This closes the loop from observation to action: you teach Alfred by routing, Alfred learns through reflection, and eventually Alfred both routes *and* acts on connected apps — with appropriate caution.
 
 ## The cold start
 

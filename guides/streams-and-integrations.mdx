@@ -6,27 +6,33 @@ icon: "radio"
 
 ## Overview
 
-Universal Streams are how Alfred automatically ingests data from the services you already use. Connect your email, notes, wearable devices, code repositories, and more — Alfred continuously pulls or receives data, processes it through the event pipeline, and creates structured vault records without any manual effort.
+Universal Streams are how Alfred automatically ingests data from the services you already use. Connect your email, calendar, notes, wearable devices, code repositories, and more — Alfred continuously pulls or receives data, creates structured vault records, and enriches them with entities and context.
 
-Once connected, each integration becomes a live stream of context that Alfred draws on to help you.
+Once connected, each integration becomes a live stream of context that Alfred draws on — and a set of actions Alfred can take on your behalf.
+
+<Tip>
+For connecting new apps via Composio (the recommended approach for Gmail, Calendar, Notion, GitHub, and 1,000+ others), see the [Connected Apps guide](/guides/connected-apps).
+</Tip>
 
 ## How Streams Work
 
-Every stream uses one of three transport types:
+Every stream uses one of four transport types:
 
-- **Pull** — Alfred fetches data on a schedule (e.g., Gmail every 5 minutes, Notion every 15 minutes)
-- **Push** — An external service sends data to Alfred via webhook (e.g., GitHub, Polar, Omi)
+- **Composio** — Alfred polls a connected app via the Composio SDK, using persistent OAuth tokens managed server-side (e.g., Gmail, Google Calendar, GitHub, Notion)
+- **Pull** — Alfred fetches data via direct HTTP calls with SaaS-managed OAuth tokens (legacy, for existing connections)
+- **Push** — An external service sends data to Alfred via webhook (e.g., Polar, Omi)
 - **System** — Internal Alfred activity that generates events automatically (e.g., OpenClaw conversations)
 
-The architecture follows a consistent pipeline regardless of transport:
+The processing pipeline:
 
-1. Raw data arrives (pulled or pushed) and is stored as JSONL files on your tenant
-2. The **event processor** classifies each event by type and extracts structured fields
-3. The **Curator** creates or updates vault records, linking entities together
-4. Deduplication via `source_ref` ensures the same event is never processed twice
+1. Raw data arrives (polled, pushed, or captured) and is stored as JSONL files on your tenant
+2. The **event processor** creates structured vault `event/` records using pure Python templates — **zero LLM calls**
+3. A one-line summary is appended to the daily stream log
+4. **Hourly batch enrichment** adds entities, topic tags, related matters, and priorities via a single LLM call per batch
+5. Deduplication via `source_ref` ensures the same event is never processed twice
 
 <Note>
-  Pull-based streams are powered by **StreamPullerWorkflow**, which runs on Temporal schedules. This gives you reliable, exactly-once processing with automatic retries if something goes wrong.
+Stream events no longer pass through the Curator. Since April 2026, all stream events are processed by zero-LLM Python templates at ingest time. Only manual inbox uploads (files you drop into the vault) still go through the Curator's full 4-stage pipeline.
 </Note>
 
 ## Gmail
@@ -35,17 +41,20 @@ Alfred connects to your Gmail account via OAuth2 and pulls new messages every 5 
 
 ### Authentication
 
-Gmail uses Google OAuth2. During onboarding, you are prompted to connect your Google account automatically. You can also connect it later from the **Integrations** page in Settings.
+There are two ways to connect Gmail:
+
+- **Composio (recommended)** — connect via the [Apps page](/guides/connected-apps) during onboarding or anytime. Persistent OAuth managed by Composio — tokens never expire.
+- **Legacy OAuth** — the original flow from signup. Tokens are stored in the SaaS database and may expire. If you have a legacy connection, connecting via Composio will migrate you automatically.
 
 ### What gets synced
 
 - Full email content (not just metadata) — subject, body, recipients, and timestamps
-- A **100-day backfill** runs during onboarding to give Alfred historical context
-- New messages are fetched every **5 minutes** via StreamPullerWorkflow
+- A **100-day backfill** runs during onboarding to give Alfred historical context (using the legacy OAuth token)
+- New messages are fetched every **5 minutes** via Composio in **append mode** (only emails after the last pull date)
 
 ### Processing pipeline
 
-Emails flow through the standard pipeline: event processor classifies the message, the Curator creates vault records for people, conversations, decisions, and tasks found within the content.
+Emails create vault `event/` records instantly via Python templates (zero LLM). The hourly enrichment pass adds entities, tags, and action items. Alfred can also **send emails** on your behalf via the `composio_execute` tool if Gmail is connected via Composio.
 
 <Tip>
   The 100-day backfill means Alfred understands your recent context from day one. You do not need to manually import old emails.
@@ -53,9 +62,12 @@ Emails flow through the standard pipeline: event processor classifies the messag
 
 ## Notion
 
-Alfred connects to your Notion workspace using an Internal Integration Token. Unlike Gmail, this is not an OAuth flow — you create the integration yourself and share specific pages with it.
+There are two ways to connect Notion:
 
-### Setup
+- **Composio (recommended)** — connect via the [Apps page](/guides/connected-apps). One OAuth click, persistent tokens.
+- **Legacy API token** — paste a Notion Internal Integration Token in the Streams page. Requires manual token management.
+
+### Legacy setup (API token)
 
 1. Go to [notion.so/profile/integrations](https://www.notion.so/profile/integrations)
 2. Create a new Internal Integration and copy the token

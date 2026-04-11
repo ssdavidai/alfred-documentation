@@ -14,13 +14,10 @@ The sidebar provides access to all dashboard sections:
 
 - **Home** — Command Center with stats and activity overview
 - **Vault** — Browse and search vault records
-- **Streams** — View and manage data pipelines feeding Alfred ([learn more](/architecture/data))
-- **Intuition** — See how Alfred is learning and route items that need your judgment
-- **Services** — Manage services and specialist model configuration
-- **Credentials** — Set API keys for LLM providers
-- **Terminal** — Web terminal for direct OpenClaw CLI and TUI access
-- **Logs** — Real-time service log viewer
-- **Settings** — Account info, subscription management, API keys
+- **Intelligence** — Inbox, Matters, Errands, Chores, and Activity
+- **Streams** — View and manage legacy data pipelines
+- **Apps** — Connected Apps marketplace — connect 1,000+ services via Composio ([learn more](/guides/connected-apps))
+- **Settings** — Account info, subscription management, credentials, API keys
 
 Additional pages are accessible from the Home page:
 
@@ -76,15 +73,33 @@ A chronological feed of recent vault mutations — records created, edited, move
 
 A chart at the bottom of the page showing the distribution of record types in your vault. Useful for understanding the shape of your world.
 
-## Streams / Integrations
+## Apps (Connected Apps)
 
-The Streams page shows all data pipelines feeding your vault. From here you can:
+The Apps page is Alfred's integration marketplace. From here you can:
 
-- **Connect integrations** — Gmail, Notion, Omi, GitHub, Polar, and custom webhooks
-- **View stream health** — see event counts, last sync time, and error states for each stream
-- **Manage credentials** — update or rotate integration tokens
+- **Browse 1,000+ apps** — search by name or filter by category (Communication, Productivity, Dev Tools, Finance, etc.)
+- **Connect with one click** — OAuth popup handles everything, credentials stored at Composio
+- **See connected app status** — stream activity, action count, skill file name
+- **Recommended section** — shows Gmail, Calendar, Notion, GitHub if not yet connected via Composio
+- **Disconnect and clean up** — removes streams, schedules, skills, and tool access
 
-For a full guide, see [Streams & Integrations](/guides/streams-and-integrations).
+For a full guide, see [Connected Apps](/guides/connected-apps).
+
+## Streams (Legacy)
+
+The Streams page shows legacy data pipelines (pre-Composio connections). For new integrations, use the Apps page instead. Existing legacy streams continue to work — when you connect the same app via Composio, the legacy stream is automatically migrated.
+
+For details, see [Streams & Integrations](/guides/streams-and-integrations).
+
+## Intelligence
+
+The Intelligence section has five tabs:
+
+- **Inbox** — items waiting for processing or your review
+- **Matters** — ongoing concerns Alfred is tracking (kitchen renovation, new product launch, etc.)
+- **Errands** — actionable tasks with status lifecycle (todo → active → blocked → done)
+- **Chores** — recurring scheduled workflows (weekly digest, health check-in, etc.)
+- **Activity** — learning observations, judgment decisions, and reflection summaries
 
 ## Matters
 

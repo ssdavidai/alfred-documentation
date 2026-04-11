@@ -20,31 +20,56 @@ Every stream follows the same pattern:
 
 <Steps>
   <Step title="An event occurs">
-    Something happens in the outside world — an email arrives, a calendar event starts, a payment is processed, a conversation takes place.
+    Something happens in the outside world — an email arrives, a calendar event changes, a payment is processed, a conversation takes place.
   </Step>
   <Step title="The stream captures it">
-    Your configured stream detects the event and wraps it in a StreamEvent envelope with metadata: source, timestamp, tenant, and the raw payload.
+    Your configured stream detects the event and wraps it in a StreamEvent envelope with metadata: source, timestamp, tenant, and the raw payload. Deduplication via `source_ref` ensures the same event is never processed twice.
   </Step>
-  <Step title="Alfred receives it">
-    The StreamEvent lands in your Inbox. The Curator reads it, extracts entities, and creates or updates vault records — people, tasks, decisions, whatever the content contains.
+  <Step title="Alfred creates a vault record (zero LLM)">
+    The event processor creates a structured vault `event/` record using a pure Python template — no LLM calls. A calendar event becomes a record with title, time, location, and attendees. An email becomes a record with sender, subject, and snippet. A one-line summary is also appended to the daily stream log.
+  </Step>
+  <Step title="Hourly enrichment adds context">
+    Once per hour, a batch enrichment pass collects all new event records and sends them in a single LLM call to extract entities (people, organisations), topic tags, related matters, and action items. This adds wikilinks and metadata to each record at a fraction of the cost of per-event processing.
   </Step>
 </Steps>
 
+<Note>
+Stream events no longer pass through the Curator for processing. The zero-LLM template system replaced the Curator path for stream events in April 2026. Manual inbox uploads (files you drop into the vault) still go through the Curator's full 4-stage pipeline.
+</Note>
+
 ## Source types
 
-Streams come in three flavours, depending on how the source delivers data.
+Streams come in four flavours, depending on how the source delivers data.
 
 <AccordionGroup>
+<Accordion title="Composio — 1,000+ apps via OAuth" icon="puzzle-piece">
+The primary way to connect apps. Composio manages OAuth tokens server-side and provides a universal action execution interface. Alfred polls connected apps on a schedule using the Composio SDK.
+
+| Source | What it captures | Interval | Sync mode |
+|--------|-----------------|----------|-----------|
+| **Google Calendar** | Events (creates, updates, deletes) | Every 5 min | Sync token (only changes) |
+| **Gmail** | Email messages and threads | Every 5 min | Append (after last pull date) |
+| **GitHub** | Notifications, PRs, issues | Every 5 min | Append (since last pull) |
+| **Notion** | Pages and database entries | Every 10 min | Append (last edited after pull) |
+| **1,000+ more** | Varies by app | Configurable | Snapshot or append |
+
+Composio streams support **incremental sync** — after an initial backfill, subsequent polls fetch only new or changed items. Google Calendar uses a native `syncToken` for true delta updates.
+
+See the [Connected Apps guide](/guides/connected-apps) for details on connecting apps and how incremental sync works.
+</Accordion>
+
 <Accordion title="Scheduled Pull — Alfred reaches out on an interval" icon="clock">
-A Temporal workflow polls an external API on an interval you define. Alfred reaches out, checks for new data, and pulls it in.
+Legacy pull streams that use direct HTTP calls with OAuth tokens managed by the SaaS platform. These predate the Composio integration and are still supported for existing connections.
 
 | Source | What it captures | Typical interval |
 |--------|-----------------|-----------------|
-| **Gmail** | New emails and threads (full email content, not just metadata) | Every 5 minutes |
-| **Calendar** | Upcoming and past events | Every 15 minutes |
-| **Notion** | Pages, databases, and block-level content (API token auth) | Every 15 minutes |
-| **Health data** | Activity, sleep, vitals | Every 30 minutes |
+| **Gmail (legacy)** | New emails and threads (full email content) | Every 5 minutes |
+| **Notion (legacy)** | Pages, databases, and block-level content | Every 15 minutes |
 | **OpenClaw sessions** | Your Alfred conversations and subagent runs | Every 5 minutes |
+
+<Note>
+When you connect Gmail or Notion via the [Connected Apps](/guides/connected-apps) page, the legacy stream is automatically disabled and replaced by the Composio-backed stream. Legacy streams are kept as a fallback for existing tenants.
+</Note>
 </Accordion>
 
 <Accordion title="Webhook Push — external services POST events instantly" icon="bolt">
@@ -191,9 +216,11 @@ Every stream supports **Pause**, **Resume**, **Edit**, and **Delete**. For webho
 
 ## What happens next
 
-Once events land in your Inbox, the standard specialist pipeline takes over. The Curator reads and structures. The Janitor verifies. The Distiller surfaces insights. Your vault grows richer, automatically.
+Stream events create vault records automatically — no LLM calls, no Curator involvement. Every 15 minutes, the event processor picks up new stream events, creates structured `event/` records using Python templates, and appends a summary to the daily stream log. Once per hour, a batch enrichment pass adds entities, tags, and priorities via a single LLM call.
 
-Streams are the front door — the rest of Alfred's team handles everything behind it.
+Manual inbox uploads (files you drop into the vault) still go through the Curator's full pipeline: analyse → entity resolution → interlink → enrich.
+
+Streams are the front door. Templates structure the data instantly. Enrichment adds intelligence in batch. Your vault grows richer, automatically.
 
 <Columns cols={2}>
   <Card title="Using the Inbox" icon="inbox" href="/guides/using-the-inbox">

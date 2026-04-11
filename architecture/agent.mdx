@@ -38,6 +38,19 @@ Each specialist operates within strictly defined permissions, enforced **in code
 
 The Curator can never delete your records. The Janitor can never create new ones. The Distiller can only create learning records. These aren't suggestions in a prompt — they're hard gates in code.
 
+## The main agent's tool surface
+
+Beyond the five specialists, Alfred's main agent (the one that handles your conversations) has access to **46 tools** across six categories:
+
+- **Vault tools** (11) — read, write, search, list, graph, schema — full vault CRUD
+- **Stream tools** (3) — list streams, view events, manually ingest items
+- **Learning tools** (8) — inspect observations, instincts, reflections, sessions, queue
+- **Workflow tools** (4) — list, trigger, pause, unpause Temporal workflows and schedules
+- **Admin tools** (9) — container management, health checks, model configuration
+- **Connected Apps** (1) — `composio_execute` for executing actions on 1,000+ connected apps
+
+The `composio_execute` tool is a single gateway to every connected app's actions. Instead of polluting the context with hundreds of individual tool definitions, Alfred reads per-app skill files to know what actions are available, then calls `composio_execute` with the action name and arguments. See [Connected Apps](/guides/connected-apps) for details.
+
 ## The vault CLI gate
 
 Agents never touch the filesystem directly. Every vault operation goes through the `alfred vault` CLI, which mediates all access:

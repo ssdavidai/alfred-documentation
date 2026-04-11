@@ -1,0 +1,154 @@
+---
+title: "Connected Apps"
+description: "Connect 1,000+ apps to Alfred via Composio — persistent OAuth, automatic streams, and tool access"
+icon: "puzzle-piece"
+---
+
+## Overview
+
+Connected Apps is Alfred's integration marketplace. It lets you connect over 1,000 third-party services — Gmail, Google Calendar, Notion, GitHub, Slack, Stripe, Linear, and many more — with a single OAuth click. Once connected, Alfred can both **read data from** and **take actions on** each app.
+
+Every connection is managed by [Composio](https://composio.dev), which handles OAuth tokens server-side. Your credentials never touch Alfred's infrastructure. Tokens are refreshed automatically — no more expired Gmail connections.
+
+<Note>
+Connected Apps is separate from the legacy Streams page. If you previously connected Gmail or Notion via the old OAuth flow, connecting the same app via Connected Apps will automatically migrate you to the persistent Composio connection.
+</Note>
+
+---
+
+## Connecting an app
+
+1. Go to **Dashboard → Apps** (the puzzle icon in the sidebar)
+2. Find your app in the catalog — browse by category or use the search bar
+3. Click **Connect** — a popup opens with the service's OAuth consent screen
+4. Authorize access — the popup closes and you're done
+
+Alfred automatically configures everything:
+- A **data stream** starts polling for new data (if the app supports it)
+- A **skill file** is generated so Alfred knows what actions are available
+- The **`composio_execute` tool** is added to Alfred's capabilities
+
+<Tip>
+During onboarding, you're prompted to connect Gmail (required), Google Calendar (recommended), and one optional app of your choice. You can always add more later from the Apps page.
+</Tip>
+
+---
+
+## What happens after you connect
+
+### Automatic stream creation
+
+For supported apps, Alfred creates a polling stream that pulls new data on a schedule:
+
+| App | What gets synced | Frequency | Sync mode |
+|-----|-----------------|-----------|-----------|
+| Google Calendar | Calendar events | Every 5 min | Incremental (syncToken — only changes) |
+| Gmail | Email messages | Every 5 min | Incremental (after last pull date) |
+| GitHub | Notifications | Every 5 min | Incremental (since last pull) |
+| Notion | Pages | Every 10 min | Incremental (last edited after last pull) |
+
+Not every app gets an automatic stream. Apps like Slack require a channel ID (which varies per workspace), so Slack is available as a tool but not auto-streamed. Apps without a clear "list" action (like Stripe) are tool-only.
+
+### Skill file generation
+
+Alfred generates a skill file for each connected app — for example, `alfred-composio-googlecalendar/SKILL.md`. This file lists every available action with its description and usage pattern. Alfred reads this skill when deciding how to fulfil your requests.
+
+### Zero-LLM stream processing
+
+Stream events are processed into structured vault records using pure Python templates — no LLM calls needed. A calendar event becomes an `event/` vault record with the title, time, location, organizer, and attendees extracted automatically. An email becomes a record with sender, subject, and snippet.
+
+Every hour, a batch enrichment pass runs one LLM call to add entities (people, organizations), topic tags, and priorities to recent events.
+
+---
+
+## Using connected apps in conversation
+
+Once an app is connected, you can ask Alfred to interact with it directly:
+
+> *"What's on my calendar tomorrow?"*
+
+Alfred reads the Google Calendar skill, calls `composio_execute` with `GOOGLECALENDAR_EVENTS_LIST`, and returns your upcoming events.
+
+> *"Create a calendar event for Monday at 10am called Team Sync"*
+
+Alfred calls `composio_execute` with `GOOGLECALENDAR_CREATE_EVENT` and the event appears in your Google Calendar.
+
+> *"Send a reply to Miguel's last email saying I'll review it tomorrow"*
+
+Alfred calls `composio_execute` with `GMAIL_REPLY_TO_EMAIL` — the reply is sent via Composio using your stored OAuth tokens. Your email credentials never touch Alfred's server.
+
+<Warning>
+Alfred can only use tools from apps you've connected. If you ask Alfred to create a Linear issue but haven't connected Linear, Alfred will tell you to connect it first.
+</Warning>
+
+---
+
+## The recommended section
+
+When you visit the Apps page, a **Recommended** section appears at the top showing core apps that aren't yet connected via Composio:
+
+- **Gmail** — persistent email access (never expires)
+- **Google Calendar** — calendar events with incremental sync
+- **Notion** — sync pages and databases automatically
+- **GitHub** — notifications and PR tracking
+
+These are the apps that give Alfred the most useful context. Connect them first for the best experience.
+
+---
+
+## Disconnecting an app
+
+Click the **Unplug** icon on any connected app card and confirm. Alfred removes:
+
+- The polling stream and its Temporal schedule
+- The generated skill file (from both main and worker agents)
+- Any tool access for that app's actions
+- The Composio connection itself (tokens revoked)
+
+If no Composio connections remain, the `composio_execute` tool is removed from Alfred's capabilities entirely.
+
+---
+
+## Legacy migration
+
+If you connected Gmail or Notion before the Connected Apps feature existed (via the old OAuth flow on the Streams page), those legacy connections still work. When you connect the same app via Composio:
+
+1. The Composio stream is created with persistent tokens
+2. The legacy stream is automatically disabled (marked `migrated-to-composio`)
+3. Your data continues flowing without interruption
+
+There's no need to manually disable legacy streams — the migration is automatic.
+
+---
+
+## How it works under the hood
+
+### One tool, many skills
+
+Instead of adding hundreds of individual tools to Alfred's context window (which would degrade response quality), Connected Apps uses a **single gateway tool** called `composio_execute`. This tool accepts any Composio action and its arguments:
+
+```
+composio_execute action="GOOGLECALENDAR_CREATE_EVENT" arguments={"summary": "Team sync", "start": {"dateTime": "2026-04-15T10:00:00Z"}, "calendarId": "primary"}
+```
+
+Per-connected-app skill files tell Alfred which actions are available. This keeps the context cost minimal — about 300 tokens per connected app instead of 15,000+ for individual tool definitions.
+
+### Incremental sync
+
+Streams don't blindly re-fetch all data on every poll. Each stream has a **pull mode**:
+
+- **Snapshot** — fetch everything (default for unknown apps)
+- **Append** ��� fetch only items after the last pull timestamp (Gmail, GitHub, Slack)
+- **Sync** — use the API's native sync token for true delta updates (Google Calendar)
+
+Google Calendar, for example, does a one-time backfill (30 days past + 90 days future), captures a `syncToken`, and then only fetches created/modified/deleted events on subsequent polls. A typical incremental poll returns 0–3 events instead of the full 250.
+
+### Composio manages credentials
+
+All OAuth tokens are stored at Composio's servers, not on your Alfred instance. When Alfred needs to call a connected app's API, the request goes:
+
+```
+Alfred → ctrl-api → Composio SDK → Composio servers → third-party API
+```
+
+Composio handles token refresh, scope management, and revocation. Your tokens are never written to disk on the Alfred VPS.

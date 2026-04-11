@@ -33,12 +33,26 @@ Alfred Black is a zero-config platform. Every new member gets a dedicated VPS (H
     Behind the scenes: a Hetzner cx53 with 32GB of RAM is being configured, your vault database is being created, and your specialist workers are being initialised.
   </Step>
 
+  <Step title="Connect your apps">
+    Before Alfred starts reading your world, you choose what to connect. The onboarding wizard shows three slots:
+
+    - **Gmail** (required) — Alfred needs email access to build your initial profile. Click Connect, authorize in the popup, done.
+    - **Google Calendar** (recommended) — calendar events give Alfred schedule awareness. One more popup click.
+    - **One more app** (optional) — pick from 1,000+ apps: Notion, GitHub, Slack, Linear, Stripe, and more. Click "Add another app," search, connect.
+
+    All connections use Composio's OAuth — credentials are stored server-side and never expire. You authorise once and Alfred maintains access permanently.
+
+    <Tip>
+    You can always add more apps later from the **Apps** page in the dashboard. But connecting during onboarding means Alfred has richer data to work with from day one.
+    </Tip>
+  </Step>
+
   <Step title="The 100-day Gmail backfill begins">
-    Once your instance is live, Alfred starts reading your Gmail — going back 100 days. This is not a shallow scan. Alfred fetches full email content and extracts facts from every message, day by day.
+    Once your apps are connected and you click "Generate Your First Brief," Alfred starts reading your Gmail — going back 100 days. This is not a shallow scan. Alfred fetches full email content and extracts facts from every message, day by day.
 
-    The dashboard shows your progress:
+    The dashboard shows an animated orb while Alfred works:
 
-    > **Day 34 of 100 — 1,247 facts discovered**
+    > *"Alfred is coming to life. I'm reading your world now."*
 
     People, organisations, projects, decisions, commitments, deadlines — Alfred is building a structured understanding of your life from the raw material of your inbox.
 
@@ -87,13 +101,18 @@ Alfred Black is a zero-config platform. Every new member gets a dedicated VPS (H
   </Step>
 
   <Step title="Add more integrations">
-    From the **Integrations** page, you can connect additional sources:
+    From the **Apps** page (puzzle icon in the sidebar), you can connect additional services from a catalog of over 1,000 apps:
 
-    - **Notion** — paste your API token and Alfred begins indexing your workspace
-    - **Omi** — pair your wearable device for ambient audio capture and real-time conversation transcription
-    - **More coming** — each integration adds a new stream of facts flowing into your vault
+    - **Notion** — sync your pages and databases automatically
+    - **GitHub** — track notifications, PRs, and issues
+    - **Slack** — post messages and interact with channels
+    - **Linear, Stripe, Todoist, Asana** — and hundreds more
 
-    Every new source deepens Alfred's understanding. The more Alfred knows, the more Alfred can do.
+    Every new connection gives Alfred both **data** (via automatic streams) and **actions** (via the `composio_execute` tool). Connect Notion, and Alfred can read your pages. Connect Slack, and Alfred can post messages on your behalf.
+
+    <Tip>
+    Connected apps use Composio for persistent OAuth. Unlike the legacy integration flow, these tokens never expire — Alfred maintains access indefinitely without re-authentication.
+    </Tip>
   </Step>
 </Steps>
 
@@ -104,13 +123,15 @@ Alfred Black is a zero-config platform. Every new member gets a dedicated VPS (H
 In roughly ten minutes of your time, Alfred:
 
 1. Provisioned a dedicated server for you
-2. Read 100 days of your email
-3. Extracted thousands of structured facts
-4. Built a knowledge graph of your world
-5. Analysed your patterns and relationships
-6. Wrote you a personalised welcome briefing
-7. Activated a real-time Gmail stream
-8. Started working — permanently
+2. Connected your apps via Composio (Gmail, Calendar, and more)
+3. Read 100 days of your email
+4. Extracted thousands of structured facts
+5. Built a knowledge graph of your world
+6. Analysed your patterns and relationships
+7. Wrote you a personalised welcome briefing
+8. Activated real-time streams for every connected app
+9. Generated skill files so Alfred can take actions on your behalf
+10. Started working — permanently
 
 You didn't configure anything. You didn't write a single API call. You signed up, and Alfred did the rest.
 
