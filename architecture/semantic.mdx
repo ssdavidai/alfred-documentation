@@ -86,10 +86,11 @@ Every record can reference other records through wikilinks. When Alfred discover
 
 **Example:** You share notes from a planning meeting:
 
-1. The **Curator** creates records: 3 people, 1 project, 2 tasks, 1 decision, and the conversation itself — all cross-linked
-2. The **Janitor** verifies all links are valid and metadata is consistent
-3. The **Distiller** later surfaces an assumption ("we're assuming the API will be ready by March") and a constraint ("budget is capped at $50k")
-4. The **Surveyor** clusters these records with existing ones, revealing that this meeting's topics overlap with three other recent discussions
+1. Alfred creates records: the conversation itself, plus event records for each significant item — all cross-linked
+2. The hourly enrichment pass adds entities (3 people, 1 project) and topic tags
+3. The **Janitor** verifies all links are valid and metadata is consistent
+4. The **Distiller** later surfaces an assumption ("we're assuming the API will be ready by March") and a constraint ("budget is capped at $50k")
+5. The **Surveyor** clusters these records with existing ones, revealing that this meeting's topics overlap with three other recent discussions
 
 Your vault grows richer with everything you share.
 
@@ -105,11 +106,11 @@ graph LR
     D --> E[Instincts form]
     E --> F[Alfred exercises judgment]
     F --> G{Confident?}
-    G -->|Yes| H[Curator processes]
-    G -->|No| I[Escalated to you]
-    H --> J[Structured vault records]
-    H -->|Execution block?| K[Task created]
-    K --> L[Task Runner executes]
+    G -->|Yes, execution block| K[Task created]
+    G -->|Yes, no action| J[Vault record updated]
+    G -->|No| I[Escalated to you via Triage]
+    K --> L[Ephemeral agent executes]
+    L -->|composio_execute| EXT[Connected Apps]
     L --> M[Consequentials]
     I --> A
 ```
@@ -118,9 +119,9 @@ graph LR
 
 **Reflection** — Every night at 2am, Alfred reviews observations and distills them into instincts — learned patterns for how to handle recurring types of input.
 
-**Judgment** — When new inputs arrive, Alfred scores them against its instincts. Confident? It hands the input to the Curator with routing context (destination, assignee, process). Uncertain? It asks you.
+**Judgment** — When new inputs arrive, Alfred scores them against its instincts. Confident? It creates execution tasks and routes them to the Task Runner. Uncertain? It escalates to Triage for your review.
 
-When Judgment routes an input, the **Curator** receives the raw content along with routing metadata — which project it belongs to, who it's assigned to, and which process applies. The Curator then creates structured records, extracts entities, and interlinks everything with wikilinks. The resulting observation captures both the routing decision *and* the Curator's output (entities found, links created), giving the learning loop richer signal for future instinct refinement.
+When Judgment matches an instinct with an execution block, it creates an errand for the Task Runner. The Task Runner spawns an ephemeral agent that can take actions on connected apps (send emails, create calendar events, update issues) via `composio_execute`. The resulting observation captures both the routing decision and the execution outcome, giving the learning loop richer signal for future instinct refinement.
 
 Alfred starts cautious, asking about everything. As evidence accumulates, it gradually handles more on its own — but always errs on the side of asking when uncertain. This is **discretion** — a good butler's most important quality.
 

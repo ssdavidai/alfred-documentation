@@ -106,11 +106,11 @@ You mention "I should call the accountant next week" while having coffee. Alfred
 <Accordion title="How Ambient Mode works" icon="signal">
 Ambient Mode runs as a realtime Stream, feeding a Temporal pipeline that turns raw audio into structured intelligence.
 
-1. Your Omi device captures ambient audio and transmits it via a persistent WebSocket connection
-2. The recording is transcribed with speaker identification
-3. The transcript enters your Inbox as a StreamEvent
-4. The Curator processes it — identifying people, projects, decisions, tasks, and commitments
-5. Your vault updates automatically
+1. Your Omi device captures ambient audio and sends it to Alfred via webhook
+2. Alfred processes the audio locally — RMS speech detection, grouping, Whisper transcription
+3. The transcript enters the stream pipeline as a StreamEvent
+4. A vault record is created automatically with the transcript and metadata
+5. Hourly enrichment adds entities, topics, and context
 
 A single conversation can produce tasks, new person records, decisions, commitments, and entity updates.
 </Accordion>
