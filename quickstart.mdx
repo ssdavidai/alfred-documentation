@@ -1,17 +1,17 @@
 ---
 title: "Quickstart"
-description: "Sign up, sit back, and meet your Alfred. No configuration required."
+description: "Sign up, connect your apps, and meet your Alfred. Five minutes of your time — three hours of Alfred's."
 icon: "rocket"
 ---
 
-## You don't need to do anything.
+## Five minutes from you. Three hours from Alfred.
 
-No API keys. No terminal commands. No configuration files. You sign up, and Alfred handles the rest — from provisioning your dedicated server to reading your first hundred days of email to writing your welcome briefing.
+No API keys. No terminal commands. No configuration files. You sign up, connect a few apps, and walk away. Alfred spends the next three hours reading your world, analysing your patterns, generating personalised automations, and writing you a welcome briefing.
 
-The entire onboarding takes about ten minutes of your time. Alfred works for hours behind the scenes.
+The five minutes are yours: sign up, connect apps, verify a few facts. The three hours are Alfred's — a nine-stage intelligence pipeline that builds a complete model of your life before you touch the dashboard.
 
 <Note>
-Alfred Black is a zero-config platform. Every new member gets a dedicated VPS provisioned automatically on Hetzner Cloud. You never touch infrastructure.
+Alfred Black is a zero-config platform. Every new member gets a dedicated VPS provisioned automatically on Hetzner Cloud. You never touch infrastructure. Your data never shares a server with anyone else's.
 </Note>
 
 ---
@@ -24,13 +24,13 @@ Alfred Black is a zero-config platform. Every new member gets a dedicated VPS pr
   </Step>
 
   <Step title="Alfred provisions your dedicated instance">
-    The moment you sign up, Alfred begins spinning up a dedicated VPS just for you. The dashboard shows a "Preparing your Alfred" animation while this happens — typically five to ten minutes.
+    The moment you sign up, Alfred begins spinning up a dedicated VPS just for you. The dashboard shows a progress animation — typically five to ten minutes.
 
     <Tip>
-    You can watch the provisioning progress in real time. Every Alfred instance is isolated — your data never shares a server with anyone else's.
+    You can watch the provisioning progress in real time. Every Alfred instance is isolated — encrypted at rest, no shared infrastructure.
     </Tip>
 
-    Behind the scenes: a dedicated Hetzner Cloud server is being configured, your vault database is being created, and your specialist workers are being initialised.
+    Behind the scenes: a dedicated Hetzner Cloud server is being configured, your vault is being created, and your specialist workers are being initialised.
   </Step>
 
   <Step title="Connect your apps">
@@ -47,57 +47,69 @@ Alfred Black is a zero-config platform. Every new member gets a dedicated VPS pr
     </Tip>
   </Step>
 
-  <Step title="The 100-day Gmail backfill begins">
-    Once your apps are connected and you click "Generate Your First Brief," Alfred starts reading your Gmail — going back 100 days. This is not a shallow scan. Alfred fetches full email content and extracts facts from every message, day by day.
+  <Step title="Alfred reads your world">
+    Click **"Generate Your First Brief"** and the animated orb appears. This is where Alfred's work begins — a nine-stage pipeline that runs for roughly three hours:
 
-    The dashboard shows an animated orb while Alfred works:
+    **Stage 1 — Email fetch** (1–2 min): Alfred reads the last 100 days of your Gmail. Not just subject lines — full emails, every thread, every sender.
 
-    > *"Alfred is coming to life. I'm reading your world now."*
+    **Stage 2 — Behavioral profiler** (5–10 min): A pure machine-learning pipeline analyses your email patterns. No AI language model — just maths. It detects:
+    - Your **daily rhythm** — when you start work, when you stop, how regular you are
+    - Your **inner circle** — the people you communicate with most, ranked by frequency and reciprocity
+    - Your **financial footprint** — subscription services, payment patterns, recurring charges
+    - Your **communication style** — thread depth, response times, weekend activity
+    - **Anomalies** — senders who disappeared, timing shifts, volume spikes
 
-    People, organisations, projects, decisions, commitments, deadlines — Alfred is building a structured understanding of your life from the raw material of your inbox.
+    This structured profile grounds everything that follows. When Alfred writes about you, it draws on real data — not guesses.
+
+    **Stage 3 — Fact extraction** (1–2 min): A single Opus call extracts 200–400 structured facts from your emails, organised across ten categories: personal, home, health, professional, financial, social, routine, interests, travel, and services.
+
+    **Stage 4 — Pattern discovery** (1–2 min): Another Opus call synthesises behavioral patterns from the facts and profiler data — work patterns, communication patterns, life patterns, priorities, and key relationships.
+
+    **Stage 5 — Personalisation** (1–2 min): Opus writes your `USER.md` (who you are, what you care about) and `SOUL.md` (how Alfred should speak to you, what tone fits).
 
     <Note>
-    The backfill runs in the background. You do not need to keep the dashboard open. Alfred will keep working whether you watch or not.
+    The orb keeps animating while all of this runs. You don't need to keep the dashboard open — Alfred works whether you watch or not.
     </Note>
   </Step>
 
-  <Step title="Pattern analysis and personalisation">
-    As the backfill completes, Alfred's specialists begin deeper work:
-
-    - **Pattern analysis** — identifying recurring themes, relationships, and rhythms in your communication
-    - **Personalisation** — generating your `USER.md` (who you are, what you care about) and `SOUL.md` (how Alfred should speak to you, what tone fits)
-    - **Automation suggestions** — spotting opportunities where Alfred can handle things without being asked
-    - **First Brief composition** — drafting your butler-quality welcome letter
-  </Step>
-
   <Step title="Fact verification">
-    After patterns and personalisation complete, Alfred pauses before sharing its first observations. A **fact verification card** appears on screen:
+    After personalisation completes, Alfred pauses. A **fact verification card** appears on screen:
 
     > *"Sir, before I share my first observations, I want to ensure I have the basics right..."*
 
-    Alfred displays 8–12 key identity facts it extracted from your email — your name, age, location, partner, children, company, job title, and other core details. Each fact is **editable inline** — click any item to correct it.
+    Alfred displays 8–12 key identity facts — your name, age, location, partner, children, company, job title, and other core details extracted from your email. Each fact is **editable inline** — click any item to correct it.
 
     <Tip>
-    Take a moment to review each fact. Corrections are fed directly into brief generation, ensuring Alfred never gets your identity basics wrong. This is the last step before your First Brief — it's worth getting right.
+    Take a moment to review each fact. Corrections are fed directly into brief generation, ensuring Alfred never gets your identity basics wrong. This is the last step that requires your attention.
     </Tip>
 
-    Once you confirm, Alfred incorporates your corrections and begins composing your personalised welcome briefing.
+    Once you confirm, the pipeline resumes automatically.
   </Step>
 
-  <Step title="Your First Brief appears">
-    When Alfred is ready, your First Brief appears on screen. This is not a system notification or a generic welcome message. It is a personal letter — written by Alfred, about you, based on everything just learned from your email.
+  <Step title="Your First Brief and vault seeding">
+    Three things happen after you confirm your facts:
 
-    It will mention people by name. It will reference real projects. It will surface something you forgot about. This is Alfred introducing itself by demonstrating that it already knows you.
+    **The First Brief** — Opus composes a personal letter about you based on everything just learned. It mentions people by name, references real projects, and surfaces something you forgot about. This appears on screen as a butler-quality welcome letter.
 
-    <Tip>
-    The First Brief is the moment most members realise this is different from anything they have used before. Take a moment to read it properly.
-    </Tip>
+    **Four packs** (runs in background, ~60 min) — While you read the brief, Alfred generates your initial vault population:
+    - **Matter pack** — 8–12 ongoing concerns Alfred will track (career, family, health, finances, etc.)
+    - **Instinct pack** — 8–12 learned routing rules based on your behavioral patterns
+    - **Errand pack** — 8–12 one-time actionable items discovered from your emails
+    - **Stream pack** — suggested app integrations based on detected service domains
+
+    **Personalised chores** (runs in background, ~20 min) — Alfred generates 4–8 recurring automations tailored to your life. Each chore is a real Python workflow:
+    - Written by Opus based on your profiler data and opportunities
+    - Statically validated and smoke-tested in a sandbox
+    - Deployed and scheduled immediately
+    - First three runs are dry-run (quarantine) to catch errors before going live
+
+    By the time you reach the dashboard, your vault has 40+ records, your chores are running, and your streams are polling.
   </Step>
 
   <Step title="Continue to your Dashboard">
     Click **Continue to Dashboard** to enter your Alfred. The first thing you see is the **Vault Nebula** — a real-time visualisation of your knowledge graph. People, organisations, projects, and facts, all connected and floating in space.
 
-    Your Gmail stream is now active, pulling new email every five minutes. Your vault will grow continuously from here.
+    Behind the scenes, Alfred also finalises your app connections — creating persistent Composio streams for every app you connected during onboarding, with incremental sync so only new data is fetched on each poll.
   </Step>
 
   <Step title="Add more integrations">
@@ -109,10 +121,6 @@ Alfred Black is a zero-config platform. Every new member gets a dedicated VPS pr
     - **Linear, Stripe, Todoist, Asana** — and hundreds more
 
     Every new connection gives Alfred both **data** (via automatic streams) and **actions** (via the `composio_execute` tool). Connect Notion, and Alfred can read your pages. Connect Slack, and Alfred can post messages on your behalf.
-
-    <Tip>
-    Connected apps use Composio for persistent OAuth. Unlike the legacy integration flow, these tokens never expire — Alfred maintains access indefinitely without re-authentication.
-    </Tip>
   </Step>
 </Steps>
 
@@ -120,20 +128,23 @@ Alfred Black is a zero-config platform. Every new member gets a dedicated VPS pr
 
 ## What just happened?
 
-In roughly ten minutes of your time, Alfred:
+In five minutes of your time, you triggered a three-hour intelligence pipeline that:
 
-1. Provisioned a dedicated server for you
-2. Connected your apps via Composio (Gmail, Calendar, and more)
-3. Read 100 days of your email
-4. Extracted thousands of structured facts
-5. Built a knowledge graph of your world
-6. Analysed your patterns and relationships
-7. Wrote you a personalised welcome briefing
-8. Activated real-time streams for every connected app
-9. Generated skill files so Alfred can take actions on your behalf
-10. Started working — permanently
+1. Provisioned a dedicated encrypted server
+2. Connected your apps via Composio (persistent OAuth, never expires)
+3. Read 100 days of your email (up to 5,000 messages)
+4. Ran a behavioral profiler — rhythm analysis, relationship mapping, financial detection, anomaly detection
+5. Extracted 200–400 structured facts across ten life categories
+6. Discovered behavioral patterns in your communication, work, and life
+7. Wrote personalised configuration files (USER.md, SOUL.md)
+8. Verified key facts with you and incorporated corrections
+9. Composed a butler-quality welcome briefing
+10. Generated 40+ vault records (matters, instincts, errands)
+11. Created 4–8 personalised recurring automations (chores)
+12. Activated incremental streams for every connected app
+13. Started working — permanently
 
-You didn't configure anything. You didn't write a single API call. You signed up, and Alfred did the rest.
+You didn't configure anything. You didn't write a single API call. You signed up, connected your apps, confirmed a few facts, and Alfred built a complete model of your world.
 
 ---
 
@@ -146,8 +157,8 @@ You didn't configure anything. You didn't write a single API call. You signed up
   <Card title="Browsing Your Vault" icon="vault" href="/guides/browsing-your-vault">
     Explore and search the records Alfred creates for you
   </Card>
-  <Card title="Your Specialists" icon="gears" href="/guides/your-ai-agents">
-    Understand the Curator, Janitor, Distiller, and Surveyor
+  <Card title="Connected Apps" icon="puzzle-piece" href="/guides/connected-apps">
+    Connect 1,000+ apps for data and actions
   </Card>
   <Card title="API Reference" icon="code" href="/api-reference/introduction">
     Full endpoint documentation for developers
