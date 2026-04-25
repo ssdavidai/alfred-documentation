@@ -1,54 +1,68 @@
 ---
-title: "Ingest Conversation"
-description: "Import a conversation directly"
+title: "Ingest Bulk Conversation"
+description: "Split a bulk conversation export into per-message inbox files."
 api: "POST /api/v1/workers/ingest"
 ---
 
-Imports a bulk conversation export and splits it into individual inbox files for Curator processing. Each message becomes a separate file in your vault's inbox, ready to be processed into structured records.
+Runs `alfred ingest`, which reads a bulk conversation export from a known path inside the `alfred` container and writes one inbox file per message. Curator picks them up on its next sweep. Use this to bootstrap the vault from a Slack, ChatGPT, or similar export rather than dropping files into `vault/inbox/` by hand.
+
+The endpoint streams stdout back. If the CLI emits JSON, that JSON is returned as-is; otherwise the trimmed text is returned under `raw`.
+
+## Authentication
+
+Bearer token in the `Authorization` header.
+
+## Request body
 
 <ParamField body="dry_run" type="boolean" optional default={false}>
-  If `true`, returns what would be created without writing any files.
+  When `true`, the CLI is invoked with `--dry-run`: it reports what would be written without creating any inbox files.
 </ParamField>
 
 <RequestExample>
 
-```bash Standard Ingest
-curl -X POST https://alfred.black/api/v1/workers/ingest \
-  -H "Authorization: Bearer alf_your_key_here" \
-  -H "Content-Type: application/json"
-```
-
-```bash Dry Run
+```bash Real ingest
 curl -X POST https://alfred.black/api/v1/workers/ingest \
   -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
-  -d '{
-    "dry_run": true
-  }'
+  -d '{}'
+```
+
+```bash Dry run
+curl -X POST https://alfred.black/api/v1/workers/ingest \
+  -H "Authorization: Bearer alf_your_key_here" \
+  -H "Content-Type: application/json" \
+  -d '{"dry_run": true}'
 ```
 
 </RequestExample>
 
 <ResponseExample>
 
-```json Structured Response
+```json 200 Structured
 {
-  "ingested": 47
+  "ingested": 412,
+  "skipped": 3,
+  "source": "vault/inbox/conversation-export.md"
 }
 ```
 
-```json Raw Response
+```json 200 Raw fallback
 {
-  "raw": "Ingested 47 messages"
+  "raw": "Ingested 412 messages from vault/inbox/conversation-export.md (skipped 3 duplicates)"
 }
 ```
 
 </ResponseExample>
 
-<Note>
-  If the response contains structured JSON, it is returned directly. Otherwise, the output is returned in a `raw` field.
-</Note>
-
 <ResponseField name="raw" type="string">
-  Human-readable output when structured JSON is not available.
+  Trimmed stdout when the underlying CLI did not return JSON. Present only in the fallback case.
 </ResponseField>
+
+## When to use
+
+- Onboarding a new vault from an external chat export.
+- Replaying a backed-up conversation after a vault reset.
+
+<Note>
+  Run with `dry_run: true` first when ingesting anything large — the resulting inbox files are real, and a flood of them will keep Curator busy for a long time.
+</Note>

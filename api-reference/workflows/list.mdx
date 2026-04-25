@@ -1,58 +1,79 @@
 ---
 title: "List Workflows"
-description: "Retrieve a list of workflows with optional filtering"
+description: "List Temporal workflow executions on the alfred-learn task queue."
 api: "GET /api/v1/workflows"
 ---
 
-List all workflow executions for your instance. Returns an array of workflow summaries including their current status, type, and timing information. Supports optional filtering to narrow results by status, type, or time range.
+Lists workflow executions visible to the tenant's Temporal cluster. Wraps `temporal workflow list --output json` and returns whatever the Temporal CLI emits.
+
+This includes every workflow type registered against the `alfred-learn` task queue — for example `EventProcessorWorkflow`, `JudgmentWorkflow`, `HourlyEnrichmentWorkflow`, `OnboardingPipelineWorkflow`, `DailyDigestWorkflow`, and any user-generated chore workflows.
+
+## Authentication
+
+Bearer token in the `Authorization` header.
+
+## Query parameters
 
 <ParamField query="query" type="string" optional>
-  Query string for filtering workflows. Uses SQL-like syntax. Examples:
-  - `ExecutionStatus='Running'`
-  - `WorkflowType='MyWorkflow' AND ExecutionStatus='Completed'`
-  - `StartTime > '2026-01-01T00:00:00Z'`
+  Temporal visibility query passed straight to `--query`. Uses Temporal's SQL-like syntax. If omitted, no filter is applied.
+
+  Examples:
+  - `ExecutionStatus="Running"`
+  - `WorkflowType="JudgmentWorkflow" AND ExecutionStatus="Completed"`
+  - `StartTime > "2026-04-01T00:00:00Z"`
 </ParamField>
 
 <RequestExample>
-```bash cURL
-# List all workflows
-curl -X GET \
-  -H "Authorization: Bearer alf_your_key_here" \
-  /api/v1/workflows
 
-# List running workflows
-curl -X GET \
-  -H "Authorization: Bearer alf_your_key_here" \
-  "/api/v1/workflows?query=ExecutionStatus%3D%27Running%27"
+```bash All workflows
+curl -X GET https://alfred.black/api/v1/workflows \
+  -H "Authorization: Bearer alf_your_key_here"
 ```
+
+```bash Running only
+curl -X GET --get https://alfred.black/api/v1/workflows \
+  --data-urlencode 'query=ExecutionStatus="Running"' \
+  -H "Authorization: Bearer alf_your_key_here"
+```
+
 </RequestExample>
 
 <ResponseExample>
+
 ```json 200
 [
   {
     "execution": {
-      "workflowId": "curator-sweep-20260226-143022",
+      "workflowId": "al-judgment-run",
       "runId": "f47ac10b-58cc-4372-a567-0e02b2c3d479"
     },
-    "type": {
-      "name": "CuratorWorkflow"
-    },
-    "startTime": "2026-02-26T14:30:22.154Z",
+    "type": {"name": "JudgmentWorkflow"},
+    "taskQueue": "alfred-learn",
+    "startTime": "2026-04-25T09:14:00Z",
     "status": "WORKFLOW_EXECUTION_STATUS_RUNNING"
   },
   {
     "execution": {
-      "workflowId": "janitor-scan-20260226-120000",
+      "workflowId": "al-hourly-enrichment-run",
       "runId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
     },
-    "type": {
-      "name": "JanitorWorkflow"
-    },
-    "startTime": "2026-02-26T12:00:00.000Z",
-    "closeTime": "2026-02-26T12:05:13.442Z",
+    "type": {"name": "HourlyEnrichmentWorkflow"},
+    "taskQueue": "alfred-learn",
+    "startTime": "2026-04-25T09:00:00Z",
+    "closeTime": "2026-04-25T09:00:42Z",
     "status": "WORKFLOW_EXECUTION_STATUS_COMPLETED"
   }
 ]
 ```
+
 </ResponseExample>
+
+## When to use
+
+- Powering the Workflows tab in the dashboard.
+- Confirming that scheduled workflows are firing on cadence.
+- Filtering for stuck `RUNNING` executions older than a known threshold.
+
+<Note>
+  The exact JSON shape comes from Temporal's CLI output, not from ctrl-api. Treat the schema as Temporal's contract — it has historically been stable but can shift between Temporal server upgrades. The endpoint uses `parseJsonLines`, so it tolerates both pretty-printed JSON arrays and JSONL streams.
+</Note>

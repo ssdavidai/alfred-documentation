@@ -1,27 +1,46 @@
 ---
 title: "Trigger Schedule"
-description: "Manually trigger an immediate workflow execution from a schedule"
+description: "Fire a schedule immediately, out of cron cadence."
 api: "POST /api/v1/schedules/{schId}/trigger"
 ---
 
-Immediately trigger a workflow execution from a schedule, bypassing the normal cron timing. The schedule's configured overlap policy is respected. This is useful for on-demand runs without waiting for the next scheduled time.
+Fires a schedule immediately, in addition to (not instead of) its normal cron cadence. Wraps `temporal schedule trigger --schedule-id <id>`. The schedule's configured overlap policy is honoured.
+
+## Authentication
+
+Bearer token in the `Authorization` header.
+
+## Path parameters
 
 <ParamField path="schId" type="string" required>
-  The schedule ID to trigger
+  Schedule ID to trigger.
 </ParamField>
 
 <RequestExample>
+
 ```bash cURL
-curl -X POST \
-  -H "Authorization: Bearer alf_your_key_here" \
-  /api/v1/schedules/curator-hourly/trigger
+curl -X POST https://alfred.black/api/v1/schedules/al-hourly-enrichment/trigger \
+  -H "Authorization: Bearer alf_your_key_here"
 ```
+
 </RequestExample>
 
 <ResponseExample>
+
 ```json 200
 {
   "message": "Schedule triggered"
 }
 ```
+
 </ResponseExample>
+
+## When to use
+
+- Forcing an immediate `HourlyEnrichmentWorkflow` after a large stream backlog landed.
+- Re-running a daily digest after fixing an upstream data issue.
+- Verifying that a newly-created or just-unpaused schedule fires correctly without waiting for the next cron tick.
+
+<Note>
+  Trigger fires once. Each call enqueues one execution; call multiple times if you need multiple immediate runs (subject to the schedule's overlap policy).
+</Note>

@@ -1,24 +1,30 @@
 ---
-title: "Get Sweep History"
-description: "View Janitor scan history"
+title: "Janitor Sweep History"
+description: "List the most recent Janitor sweeps."
 api: "GET /api/v1/workers/janitor/history"
 ---
 
-Returns a chronological history of Janitor vault health scans, including how many issues were found and fixed in each sweep.
+Returns the most recent Janitor sweeps in reverse chronological order, including how many files were scanned, how many issues were found, and how many were fixed or deleted in each sweep. Wraps `alfred janitor history --limit <N>`.
 
-<ParamField query="limit" type="number" default={10}>
-  Maximum number of sweep records to return.
+## Authentication
+
+Bearer token in the `Authorization` header.
+
+## Query parameters
+
+<ParamField query="limit" type="string" optional default="10">
+  Maximum number of sweeps to return. Passed straight through to the CLI as a string.
 </ParamField>
 
 <RequestExample>
 
-```bash Default Limit
+```bash Default (10 sweeps)
 curl -X GET https://alfred.black/api/v1/workers/janitor/history \
   -H "Authorization: Bearer alf_your_key_here"
 ```
 
-```bash Custom Limit
-curl -X GET "/api/v1/workers/janitor/history?limit=25" \
+```bash Last 25 sweeps
+curl -X GET "https://alfred.black/api/v1/workers/janitor/history?limit=25" \
   -H "Authorization: Bearer alf_your_key_here"
 ```
 
@@ -26,30 +32,41 @@ curl -X GET "/api/v1/workers/janitor/history?limit=25" \
 
 <ResponseExample>
 
-```json Structured Response
+```json 200 Structured
 {
-  "history": [
+  "sweeps": [
     {
-      "timestamp": "2026-02-26T10:15:00Z",
+      "timestamp": "2026-04-25T03:00:12Z",
+      "files_scanned": 423,
+      "issues_found": 7,
+      "files_fixed": 0,
+      "files_deleted": 0
+    },
+    {
+      "timestamp": "2026-04-24T03:00:08Z",
+      "files_scanned": 421,
       "issues_found": 12,
-      "issues_fixed": 10
+      "files_fixed": 10,
+      "files_deleted": 0
     }
   ]
 }
 ```
 
-```json Raw Response
+```json 200 Raw fallback
 {
-  "raw": "Sweep history (last 10):\n..."
+  "raw": "Sweep history (last 10):\nTimestamp                Issues   Fixed    Deleted\n2026-04-25T03:00:12Z     7        0        0\n2026-04-24T03:00:08Z     12       10       0"
 }
 ```
 
 </ResponseExample>
 
-<Note>
-  If the response contains structured JSON, it is returned directly. Otherwise, the output is returned in a `raw` field.
-</Note>
-
 <ResponseField name="raw" type="string">
-  Human-readable output when structured JSON is not available.
+  Trimmed stdout when the CLI did not return JSON. Present only in the fallback case.
 </ResponseField>
+
+## When to use
+
+- Trending vault-health metrics in the dashboard.
+- Confirming a recent `janitor/fix` ran end-to-end.
+- Investigating whether a spike in issues correlates with a Curator deploy.

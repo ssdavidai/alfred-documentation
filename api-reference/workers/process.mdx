@@ -1,73 +1,84 @@
 ---
 title: "Process Inbox"
-description: "Trigger manual Curator processing of inbox items"
+description: "Run a one-off batch of Curator processing over the inbox."
 api: "POST /api/v1/workers/process"
 ---
 
-Triggers the Curator to process inbox files as a one-time batch operation. Each inbox item is analyzed and converted into structured vault records. This is separate from the continuous background processing that the Curator agent performs automatically.
+Triggers a one-shot batch processing run of every unprocessed file in `vault/inbox/`. Each file goes through Curator's four-stage pipeline (analyze → entity resolution → interlink → enrich) and is moved into structured records.
+
+Before invoking the CLI the endpoint also calls `POST /api/v1/streams/inbox/scan` so any newly-arrived inbox files are first ingested as stream events. This keeps `alfred-learn`'s event processor and Curator in sync. The bridge call is best-effort with a 10-second timeout — failure there does not block the processing run.
+
+## Authentication
+
+Bearer token in the `Authorization` header.
+
+## Request body
 
 <ParamField body="limit" type="number" optional>
-  Maximum number of inbox files to process. If omitted, processes all files.
+  Maximum number of inbox files to process this run. Omit to process all of them.
 </ParamField>
 
 <ParamField body="dry_run" type="boolean" optional default={false}>
-  If `true`, returns what would be processed without actually running the Curator.
+  When `true`, the CLI is invoked with `--dry-run` and reports what would be processed without writing any vault records.
 </ParamField>
 
 <ParamField body="jobs" type="number" optional>
-  Number of parallel processing jobs.
+  Number of files to process in parallel. Useful for big backlogs; pushes more concurrent LLM calls through the OpenClaw gateway.
 </ParamField>
 
 <RequestExample>
 
-```bash Process All Files
-curl -X POST https://alfred.black/api/v1/workers/process \
-  -H "Authorization: Bearer alf_your_key_here" \
-  -H "Content-Type: application/json"
-```
-
-```bash Process Limited Files
+```bash Process everything pending
 curl -X POST https://alfred.black/api/v1/workers/process \
   -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
-  -d '{
-    "limit": 10,
-    "jobs": 3
-  }'
+  -d '{}'
 ```
 
-```bash Dry Run
+```bash Process up to 20 files, 4 at a time
 curl -X POST https://alfred.black/api/v1/workers/process \
   -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
-  -d '{
-    "dry_run": true
-  }'
+  -d '{"limit": 20, "jobs": 4}'
+```
+
+```bash Dry run
+curl -X POST https://alfred.black/api/v1/workers/process \
+  -H "Authorization: Bearer alf_your_key_here" \
+  -H "Content-Type: application/json" \
+  -d '{"dry_run": true}'
 ```
 
 </RequestExample>
 
 <ResponseExample>
 
-```json Structured Response
+```json 200 Structured
 {
-  "processed": 10,
-  "skipped": 2
+  "processed": 17,
+  "skipped": 0,
+  "errors": 0
 }
 ```
 
-```json Raw Response
+```json 200 Raw fallback
 {
-  "raw": "Processed 10 inbox files"
+  "raw": "Processed 17 inbox files, 0 skipped, 0 errors"
 }
 ```
 
 </ResponseExample>
 
-<Note>
-  If the response contains structured JSON, it is returned directly. Otherwise, the output is returned in a `raw` field.
-</Note>
-
 <ResponseField name="raw" type="string">
-  Human-readable output when structured JSON is not available.
+  Trimmed stdout when the CLI did not return JSON. Present only in the fallback case.
 </ResponseField>
+
+## When to use
+
+- Clearing an inbox backlog after a long offline window.
+- Forcing immediate processing of a hand-dropped file rather than waiting for the Curator daemon.
+- Validating new Curator skill changes against a known set of inbox items (with `dry_run`).
+
+<Note>
+  This is independent of the long-running Curator daemon. Both can write to the same inbox safely; Curator's per-file lock prevents double processing.
+</Note>
