@@ -48,7 +48,8 @@
               "architecture/data",
               "architecture/semantic",
               "architecture/kinetic",
-              "architecture/interface"
+              "architecture/interface",
+              "architecture/channels"
             ]
           },
           {

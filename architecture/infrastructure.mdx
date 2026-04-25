@@ -1,108 +1,123 @@
 ---
-title: "Infrastructure Layer"
-description: "Your dedicated machine: encryption, network isolation, and container hardening."
+title: "Infrastructure"
+description: "The dedicated server, encrypted disk, private mesh, and Docker stack that house your Alfred."
 icon: "server"
 ---
 
 <Note>
-Part of Alfred's [six-layer architecture](/how-it-works). Infrastructure is the foundation everything else runs on.
+The first of seven architecture pages. Infrastructure is the foundation; every other layer rides on top of it.
 </Note>
 
-## Your Alfred is yours alone
+## Your Alfred lives on his own machine
 
-Every Alfred Black subscriber gets a **dedicated, isolated server**. Your data never shares hardware, databases, or services with anyone else.
+When Sir signs up, the SaaS control plane provisions a fresh Hetzner Cloud VPS, attaches an encrypted volume, joins it to a private mesh, and stands up Sir's full Docker stack on it. Nothing is shared with another tenant — not the database, not the vault, not the AI gateway, not the workflow engine.
 
-| Property | Detail |
-|----------|--------|
-| **Server** | Dedicated Hetzner Cloud instance (cx33 default, upgradeable) |
-| **Storage** | LUKS2 full-disk encryption (AES-256-XTS) |
-| **Network** | Private Tailscale mesh (WireGuard-based VPN) |
-| **Exposure** | Zero public-facing ports — no inbound access from the internet |
+| Component | Detail |
+|---|---|
+| Server | Hetzner Cloud `cx53` for Premium and Black tiers; `cx33` for the older Starter tier (`packages/saas/app/src/payment/plans.ts`) |
+| Storage | LUKS2 full-disk encryption, AES-256-XTS, key generated per-instance (`packages/ctrl/src/templates/cloud-init.yaml.njk`) |
+| Network | Private Tailscale mesh on WireGuard; SSH on port 22, Tailscale on UDP 41641, ICMP — nothing else |
+| Browser path | Cloudflare → SaaS host → Tailscale → tenant ctrl-api on `127.0.0.1:3100` |
 
-Your Alfred is not a container on a shared cluster. It's a dedicated machine, encrypted at rest, accessible only through a private network.
+There is no public route into your Alfred's services. The Hetzner firewall denies everything except SSH, ICMP, and Tailscale's WireGuard port. Every container binds to localhost.
 
-## Encryption
+## Provisioning, in order
 
-<AccordionGroup>
-<Accordion title="At rest — LUKS2 full-disk encryption">
-Your vault and all associated data are stored on a LUKS2-encrypted volume using AES-256-XTS. The encryption key is a 64-character random string, generated uniquely per instance during provisioning.
+The fleet TUI/CLI in `packages/ctrl/src/infra/provisioner.ts` walks the same numbered steps for every new instance:
 
-The encrypted volume contains your Obsidian vault, Alfred worker state, OpenClaw state, secrets (API keys, provider credentials), and Restic backup metadata.
+<Steps>
+  <Step title="Generate an Ed25519 keypair">
+    Stored locally at `data/ssh_keys/<instance_id>/`. Never re-used between tenants.
+  </Step>
+  <Step title="Upload the public key + ensure shared firewall">
+    Hetzner firewall labelled `managed-by: alfred-ctrl` allows only inbound SSH and ICMP.
+  </Step>
+  <Step title="Create the encrypted volume + render cloud-init">
+    Cloud-init is rendered from `cloud-init.yaml.njk` and includes the LUKS keyfile generation, fail2ban + UFW setup, Docker install, Tailscale install, and the systemd timer that pulls fresh container images every 15 minutes.
+  </Step>
+  <Step title="Create the server + wait for cloud-init">
+    Hetzner backups are enabled. The volume is attached. Cloud-init formats the disk with LUKS2 and creates `/mnt/encrypted/{vault,openclaw,alfred,temporal}`.
+  </Step>
+  <Step title="Upload secrets via SSH (not via cloud-init)">
+    `.env` (LLM keys, AAS_API_KEY, Composio creds, AgentMail/AgentPhone tokens) is SFTP'd post-boot. Cloud-init `user_data` is readable through Hetzner's metadata API, so secrets never go there.
+  </Step>
+  <Step title="Render + upload docker-compose, start containers">
+    The compose file is rendered from `docker-compose.yaml.njk`, the init container scaffolds the vault and writes config, and the rest of the stack comes up.
+  </Step>
+  <Step title="Bootstrap OpenClaw + Tailscale + Cloudflare Tunnel">
+    Tailscale auth key is generated on the fly. The instance joins Sir's private mesh. Cloudflare DNS + Tunnel records are created if a custom subdomain is configured.
+  </Step>
+  <Step title="Back up the LUKS key + run health check">
+    The keyfile is downloaded into `data/ssh_keys/<id>/luks.key` so the instance can be recovered if Hetzner loses the disk. A first health probe must come back green before the instance is marked `done`.
+  </Step>
+</Steps>
 
-The LUKS passphrase is backed up to the control plane for disaster recovery. Even if the server is lost, your data can be restored from encrypted backups.
-</Accordion>
+End-to-end: roughly three minutes when using the golden snapshot, eighteen to twenty when building from scratch.
 
-<Accordion title="In transit — three layers of transport encryption">
-- **Tailscale** — End-to-end encrypted mesh network using the WireGuard protocol. All traffic between your browser/apps and your Alfred travels through this encrypted tunnel.
-- **HTTPS** — TLS 1.3 via Cloudflare for browser connections, and via Tailscale Serve for direct API access.
-- **Cloudflare Tunnel** — Outbound-only encrypted channel for OpenClaw device connectivity. Your server's IP is never exposed.
-</Accordion>
+## The encrypted volume
 
-<Accordion title="API key storage — SHA-256, never stored in plain text">
-When you create an API key, the full key (`alf_...`) is shown to you once. A SHA-256 hash is computed and stored. The original key is discarded — it cannot be recovered. Authentication compares hashes, never raw keys.
-</Accordion>
-</AccordionGroup>
+Everything that matters is on `/mnt/encrypted` — the LUKS2 volume — and nothing outside it.
 
-## Network isolation
+| Path | What it holds |
+|---|---|
+| `/mnt/encrypted/vault` | Sir's Markdown vault. Bind-mounted into every container. |
+| `/mnt/encrypted/openclaw` | Main agent's OpenClaw config + workspace. |
+| `/mnt/encrypted/openclaw-workers` | Background workers' OpenClaw config + workspace. Separate from main. |
+| `/mnt/encrypted/alfred` | Tenant secrets file (`.gateway-token`), authorized phone numbers, onboarding state, Composio user id, stream JSONLs. |
+| `/mnt/encrypted/temporal` | Temporal SQLite database (workflow state). |
+| `/mnt/encrypted/ollama` | Cached embedding model weights for the surveyor (`nomic-embed-text`). |
 
-Your Alfred has **zero public ports** for application services. All services listen on `127.0.0.1` only:
+The LUKS keyfile lives at `/opt/alfred/luks.key` on the host — readable only by root, used by the `alfred-luks.service` systemd unit to auto-unlock the volume on boot.
 
-| Service | Port | External Access |
-|---------|------|-----------------|
-| Tenant API | 3100 | Tailscale Serve (HTTPS) |
-| OpenClaw Gateway | 18789 | Cloudflare Tunnel (outbound-only) |
-| Temporal Engine | 7233 | Tailscale Serve (HTTPS) |
+## The Docker stack
 
-A Hetzner Cloud firewall permits only Tailscale WireGuard (UDP 41641) and ICMP inbound. SSH is restricted to pre-authorized IP ranges. No service listens on a public interface.
+Eight containers per tenant. All built from `docker-compose.yaml.njk`; image tags are `:latest` because the `alfred-update.timer` systemd unit pulls fresh images every fifteen minutes.
 
-## Container hardening
+| Service | Image | Port | Role |
+|---|---|---|---|
+| `init` | `ssdavidai00/alfred-init` | — | One-shot. Scaffolds vault, copies skills, renders config, generates the gateway token, registers the MCP `self` server. Exits when done. |
+| `temporal` | `temporalio/temporal` | `7233`, `8233` | Durable workflow engine. SQLite-backed, dev mode. |
+| `ollama` | `ollama/ollama` | `11434` | Local embedding server. Auto-pulls `nomic-embed-text` on first boot. |
+| `openclaw` | `ssdavidai00/alfred-openclaw` | `18789` | Main agent gateway. Where Sir's chat, voice, and channel messages land. |
+| `openclaw-workers` | `ssdavidai00/alfred-openclaw` | `18790` | Background-worker gateway. Where the Clerk and ephemeral subagents run. Separate process so a long-running chore can't block Sir's chat. |
+| `alfred` | `ssdavidai00/alfred-worker` | — | Vault specialists daemon — runs the Curator, Janitor, Distiller, and Surveyor processes. |
+| `alfred-learn` | `ssdavidai00/alfred-learn` | — | Python + Temporal worker. Hosts every scheduled workflow (event processor, hourly enrichment, judgment, task runner, daily digest, reflection, and the dynamically loaded chores). |
+| `ctrl-api` | `node:22-slim` running `api.mjs` | `3100` | Tenant API. Every read and write to the vault, every stream operation, every channel send goes through here. |
 
-Docker containers run with defense-in-depth hardening:
+`init` must complete before `openclaw` and `openclaw-workers` start. Both must be healthy before `alfred` boots. `alfred-learn` waits on `temporal`, `openclaw-workers`, and `ctrl-api` all being healthy. The dependency graph is enforced in compose, not by hope.
 
-| Protection | Detail |
-|-----------|--------|
-| **Privilege escalation** | `no-new-privileges: true` on all containers |
-| **Capabilities** | `cap_drop: ALL` — all Linux capabilities removed |
-| **Memory limits** | 2GB per container default; `learn` container runs at 4GB for the Whisper model |
-| **PID limits** | 256 processes per container — prevents fork bombs |
-| **Network** | All containers bound to localhost only |
+<Tip>
+The two OpenClaw processes (`openclaw` and `openclaw-workers`) share the same Docker image but read different config files and write to different state directories. This separation means a long batch job in `openclaw-workers` cannot stall Sir's interactive chat in `openclaw`.
+</Tip>
 
-## Whisper model
+## Network paths
 
-The `whisper-large-v3` model (~3GB) is baked directly into the `learn` container's Docker image. This means zero-config deployment — no model downloads at runtime, no external model registries, no startup delays. The `learn` container has a `mem_limit` of 4GB to accommodate the model in memory.
+There are exactly three ways into Sir's machine:
 
-## Terminal proxy
+1. **Tailscale** — the SaaS host, the operator's laptop, and any paired devices reach `ctrl-api:3100` over the mesh. Encryption is WireGuard, end-to-end. The Hetzner firewall allows the WireGuard handshake on UDP 41641 and nothing else.
+2. **Cloudflare Tunnel** — outbound-only. When Sir opens the dashboard at `alfred.black`, the SaaS host proxies the API call over Tailscale; no inbound HTTP hits the tenant directly.
+3. **SSH** — port 22, key-based only, hardened in cloud-init (`PermitRootLogin no`, `PasswordAuthentication no`, `MaxAuthTries 3`, fail2ban on top).
 
-The Terminal proxy provides direct CLI access to OpenClaw from your dashboard. It uses the **Docker Engine exec API** with real PTY allocation, supporting proper `SIGWINCH` signals for terminal resize events. This gives you a native terminal experience — full-screen editors, interactive prompts, and correct line wrapping all work as expected.
+The voice channel takes a different shape: Twilio's Media Stream WebSocket lands on `voice.alfred.black` (DNS-only at Cloudflare, because the WAF drops Twilio's WS upgrade with error 31920) and the Voice Bridge runs on the SaaS host, not on the tenant. See [Channels](/architecture/channels) for the full picture.
 
-## Temporal schedule creation
+## Backups + recovery
 
-Temporal schedules are created using the `--type` flag (not `--workflow-type`). All scheduled workflows — specialist runs, intuition processes, stream polling — are registered through this mechanism during provisioning.
+A daily `restic` job runs at 03:00 host-local via the `alfred-backup.timer` systemd unit (`cloud-init.yaml.njk`). It stops `alfred`, `openclaw`, and `temporal` for a consistent snapshot, runs `restic backup /mnt/encrypted --exclude=/mnt/encrypted/temporal`, and restarts them. Retention: 7 daily, 4 weekly, 6 monthly. Destination: Hetzner Object Storage, encrypted with a Restic password that is itself stored only in `/opt/alfred/restic.env` and `data/ssh_keys/<id>/restic.env` on the operator's machine.
 
-## Health monitoring
+The LUKS keyfile is backed up at provision time and never touched again. Even if Hetzner loses the disk, the operator can re-mount the encrypted volume from its raw bytes plus the backed-up keyfile.
 
-The SaaS layer checks your Alfred's health every 2 minutes over the encrypted Tailscale network. It monitors service status, disk and memory usage, container health, and Tailscale connectivity. Results power your dashboard's Command Center.
+## Defence in depth
 
-## Backup strategy
+Every long-lived container runs with:
 
-Automated daily backups at 3:00 AM via Restic with AES-256 encryption to Hetzner Object Storage. Retention: 7 daily, 4 weekly, 6 monthly snapshots. Containers are stopped during backup for consistency. Even if the S3 bucket is compromised, backup data cannot be read without the Restic password.
+- `no-new-privileges: true`
+- `cap_drop: ALL` (with narrow `cap_add` like `DAC_OVERRIDE` only where needed for `chown` on bind-mounts)
+- `mem_limit` of 1–4 GB depending on workload (`alfred-learn` and `openclaw` get 4 GB; `ctrl-api` gets 1 GB)
+- `pids_limit: 128–256`
+- All ports bound to `127.0.0.1` only
 
-## Data lifecycle
+`fail2ban` watches sshd. UFW denies inbound except 22/tcp and 41641/udp. Unattended-upgrades is enabled for security packages. SSH keys are Ed25519 and per-instance.
 
-| Event | What happens |
-|-------|-------------|
-| **Subscription starts** | Dedicated server provisioned, encrypted volume created, secrets uploaded via SSH |
-| **Active subscription** | Continuous operation, daily encrypted backups, health monitoring |
-| **Subscription cancelled** | Data preserved for 30 days — resubscribing restores access immediately |
-| **After 30 days** | Environment permanently decommissioned, all data destroyed |
-
-Your vault is an Obsidian-compatible collection of Markdown files. You can pair a device to access your vault directly and maintain your own local copies at any time.
-
-<Columns cols={2}>
-  <Card title="Security" icon="shield-halved" href="/guides/security">
-    Full security architecture, threat model, and incident response
-  </Card>
-  <Card title="How the API Works" icon="route" href="/guides/how-the-api-works">
-    The full request path from your browser to your vault
-  </Card>
-</Columns>
+<Card title="Security guide" icon="shield-halved" href="/guides/security">
+  Full threat model, audit findings, and the security guarantees Alfred Black makes (and the ones it doesn't).
+</Card>
