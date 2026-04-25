@@ -1,125 +1,173 @@
 ---
-title: "Record Format"
-description: "How vault records are structured — metadata, content, and connections."
-icon: "database"
+title: "Vault Schema"
+description: "Frontmatter conventions, common fields, wikilink syntax, and how the schema is enforced — and where it is not."
+icon: "file-code"
 ---
 
-## Overview
+The vault schema is the contract every record adheres to. It is small, opinionated, and deliberately permissive: Alfred would rather accept a slightly malformed record from Sir's dictation than reject Sir's intent.
 
-Every record in your vault is a structured document with metadata, content, and connections to other records. This page explains the format so you can work with records via the API.
+This page explains how a record is shaped, which fields are common, how wikilinks work, and what happens when the schema is bent.
 
-## Record structure
+## The shape of a record
 
-Each record has three parts:
-
-1. **Metadata** — Type, status, dates, tags, and other properties
-2. **Content** — The main body with details and context
-3. **Connections** — Links to other records using the `[[type/Record Name]]` format
-
-Here's an annotated example:
+Every vault record is a single markdown file with two parts: a YAML frontmatter block, and the prose body that follows.
 
 ```markdown
 ---
-type: person                          # What kind of record
-created: 2026-02-26                   # When it was created
-name: Alice Smith                     # Display name
-status: active                        # Current status
-org: "[[org/Acme Corp]]"              # Connection to an org record
-email: alice@acme.com                 # Custom field
-tags: [engineering, backend]          # Tags for categorization
+type: conversation
+created: 2026-04-02T11:48:56.633000+00:00
+status: active
+name: "Renovation budget — 2026-04-02"
+source: "dabdc94c-d806-46e0-b9e6-0cd36149cc35"
+source_ref: "omi-audio:omi-device?sample_rate=16000:1775130536633"
+stream_type: omi-audio
+tags: [omi-audio, lang/en]
+enrichment_status: pending
+conversation_id: "95f4a068"
+languages: ["en"]
+duration_seconds: 274.7
+segments: 42
+word_count: 694
+speaker_attribution: ambient
+possession_evidence: false
 ---
 
-# Alice Smith
+# Renovation budget — 2026-04-02
 
-Senior backend engineer who joined Acme in 2025.
-Leads the [[project/Platform v2]] migration effort.
+Date: 2026-04-02 | Time: 11:48-11:53 | Language: en
+
+…transcript follows…
 ```
+
+The frontmatter is parsed as YAML; everything between the second `---` and end of file is the body. The body is rendered as Markdown by the dashboard and indexed for search.
+
+## Required fields
+
+Two fields must be present on every record. Everything else is optional.
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `type` | string | One of the recognised types — see [Record types](/vault/record-types) |
+| `created` | string (ISO date or datetime) | When the record was created. Templates default to `"{{date}}"`, which expands to today's date on creation. |
+
+A missing `type` or `created` field will be flagged by the [Janitor](/architecture/agent) as `FM001 — MISSING_REQUIRED_FIELD` (a critical issue) and either auto-fixed or surfaced for Sir's review.
 
 ## Common fields
 
-These fields are shared across all record types:
+Most records carry a small set of fields beyond `type` and `created`. Not every type uses every field, but the meaning is consistent across types.
 
-| Field | Description | Required |
-|-------|-------------|----------|
-| `type` | Record type identifier (e.g., `person`, `task`) | Yes |
-| `created` | Creation date | Yes |
-| `name` | Display name (most types) | No |
-| `subject` | Display name for `conversation` and `input` types | No |
-| `status` | Current status (valid values depend on type) | No |
-| `owner` | Who is responsible (connection to a person) | No |
-| `tags` | Array of categorization tags | No |
-| `related` | Array of connections to other records | No |
+| Field | Type | Purpose |
+|-------|------|---------|
+| `name` | string | Human-readable title. (Conversations and inputs use `subject` instead.) |
+| `status` | string | Lifecycle state — values constrained per type, see below |
+| `tags` | list | Free-form labels used by the Surveyor and dashboard filters |
+| `description` | string | One-line summary, often shown in list views |
+| `aliases` | list | Alternative names for the entity (used for entity resolution) |
+| `related` | list | Wikilinks to records this one is generally related to |
+| `relationships` | list | Typed relationship edges, set by the Surveyor |
+| `project`, `matter` | wikilink or list | Parent work record this belongs to |
+| `source`, `source_ref` | string | Provenance for stream-derived records |
+| `created_by` | string | Which agent or pipeline created it (e.g. `onboarding_pipeline`, `curator`) |
+| `enrichment_status` | string | `pending` or `enriched` — the hourly enrichment pass flips this |
 
-<Note>
-  Only `type` and `created` are strictly required. All other fields are optional.
-</Note>
+### Fields that must be lists
 
-## Connections
+A small number of fields must always be lists, never bare strings. The vault validator enforces this.
 
-Records connect to each other using this format:
-
+```python
+# from c/alfred/src/alfred/vault/schema.py
+LIST_FIELDS = {
+    "tags", "aliases", "related", "relationships", "participants",
+    "outputs", "depends_on", "blocked_by", "based_on", "supports",
+    "challenged_by", "approved_by", "confirmed_by", "invalidated_by",
+    "cluster_sources", "governed_by", "references", "project",
+}
 ```
-[[type/Record Name]]
+
+If Sir writes `tags: kitchen` instead of `tags: [kitchen]`, the Janitor's `FM004 — INVALID_FIELD_TYPE` will catch it on the next sweep.
+
+### Per-type status values
+
+The full set of valid `status` values per type is listed under each entry in [Record types](/vault/record-types). The Janitor flags an out-of-set value as `FM003 — INVALID_STATUS_VALUE` (warning level — Alfred keeps the record but notes the deviation).
+
+## Wikilinks
+
+Records reference one another with `[[wikilink]]` syntax. Two forms are recognised:
+
+```markdown
+[[person/jane-doe]]                  # bare link — renders as "jane-doe"
+[[person/jane-doe|Jane Doe]]         # piped — renders as "Jane Doe"
 ```
 
-For example:
-- `[[person/Alice Smith]]` — links to a person record
-- `[[project/Q1 Launch]]` — links to a project record
-- `[[org/Acme Corp]]` — links to an organization record
+Wikilinks may appear anywhere in the body and in any string-valued frontmatter field, including inside list items:
+
+```yaml
+key_people:
+  - "[[person/jane-doe]]"
+  - "[[person/michael-ng]]"
+based_on:
+  - "[[event/2026-04-12-a3f9c1b2e8d4]]"
+```
+
+When a record is created or edited, the vault layer extracts every wikilink target and verifies the target file exists. Unresolved targets become `LINK001 — BROKEN_WIKILINK` issues for the Janitor to fix — usually by creating a stub record or correcting a typo.
+
+When the [Janitor moves or renames a file](/architecture/agent), every wikilink that points to it is rewritten across the entire vault in one pass.
+
+## How the schema is enforced — and where it is not
 
 <Warning>
-  The type prefix is required. `[[Alice Smith]]` won't work — it must be `[[person/Alice Smith]]`.
+The schema is **permissive**. Alfred validates type names, status values, list-typedness, and required fields on every write through the vault CLI — but it does **not** reject records with extra fields, missing optional fields, or unusual frontmatter shapes. Cleanup is the [Janitor's](/architecture/agent) job, not the writer's.
 </Warning>
 
-Connections can appear in metadata fields (like `org`, `owner`, `participants`) or in the content body.
+Three things are checked at write time, in code, before any file touches disk:
 
-## Status values by type
+| Check | Source | What happens on violation |
+|-------|--------|---------------------------|
+| `type` is in the recognised list | `vault/ops.py` `_validate_type` | Write rejected with `VaultError` |
+| `status` is valid for the type (if set) | `vault/ops.py` `_validate_status` | Write rejected with `VaultError` |
+| `LIST_FIELDS` are actually lists | `vault/ops.py` `_validate_list_fields` | Write rejected with `VaultError` |
 
-Each record type has its own set of valid status values:
+Three things are **not** checked at write time but get cleaned up after the fact by the Janitor's structural sweep:
 
-| Type | Valid Statuses |
-|------|---------------|
-| `person` | `active`, `inactive` |
-| `org` | `active`, `inactive` |
-| `project` | `active`, `paused`, `completed`, `abandoned`, `proposed` |
-| `task` | `queued`, `active`, `blocked`, `done`, `cancelled` |
-| `event` | _(no status constraint)_ |
-| `note` | `draft`, `active`, `review`, `final` |
-| `location` | `active`, `inactive` |
-| `process` | `active`, `proposed`, `design`, `deprecated` |
-| `account` | `active`, `suspended`, `closed`, `pending` |
-| `asset` | `active`, `retired`, `maintenance`, `disposed` |
-| `conversation` | `active`, `waiting`, `resolved`, `closed`, `archived` |
-| `input` | `unprocessed`, `processed`, `deferred` |
-| `run` | `active`, `completed`, `blocked`, `cancelled` |
-| `session` | `active`, `completed` |
-| `triage` | `unprocessed`, `reviewed`, `resolved` |
-| `skill` | _(no status constraint)_ |
-| `matter` | `active`, `resolved`, `archived` |
-| `ledger_entry` | _(no status constraint)_ |
-| `assumption` | `active`, `challenged`, `invalidated`, `confirmed` |
-| `decision` | `draft`, `final`, `superseded`, `reversed` |
-| `constraint` | `active`, `expired`, `waived`, `superseded` |
-| `contradiction` | `unresolved`, `resolved`, `accepted` |
-| `synthesis` | `draft`, `active`, `superseded` |
+| Check | Issue code | Severity |
+|-------|------------|----------|
+| File is in the right type-folder | `DIR001 — WRONG_DIRECTORY` | Warning |
+| All wikilinks resolve to existing records | `LINK001 — BROKEN_WIKILINK` | Critical |
+| Records are not orphaned (no inbound links) | `ORPHAN001 — ORPHANED_RECORD` | Warning |
+| Records are not stubs (frontmatter only, no body) | `STUB001 — STUB_RECORD` | Info |
+| No two records have the same `name` | `DUP001 — DUPLICATE_NAME` | Info |
 
-## List fields
+The Janitor's full issue catalogue is defined in `c/alfred/src/alfred/janitor/issues.py`. Sir can review every flagged issue from the dashboard before the Janitor applies a fix.
 
-Some fields accept multiple values as arrays:
+## Templates
 
-`tags`, `aliases`, `related`, `relationships`, `participants`, `outputs`, `depends_on`, `blocked_by`, `based_on`, `supports`, `challenged_by`, `approved_by`, `confirmed_by`, `invalidated_by`, `governed_by`, `references`, `project`
+Each recognised type has a template at `_templates/<type>.md` inside the vault. When `vault_create` is called without an explicit body, the template is used as the starting point. Templates are markdown files with the same frontmatter-and-body shape, plus two placeholders:
 
-## Schema API endpoint
+- `{{title}}` — replaced by the record's name
+- `{{date}}` — replaced by today's date
 
-You can retrieve the complete, up-to-date schema programmatically:
+Templates are seeded at provision time from `c/alfred/src/alfred/_bundled/scaffold/_templates/` (the original nineteen) and `c/alfred-platform/packages/ctrl/src/templates/vault-seed/_templates/` (the platform's extensions). Sir may edit them; new records inherit from the edited version.
 
-```bash
-curl -H "Authorization: Bearer alf_your_key_here" \
-  /api/v1/vault/schema
-```
+## Extending the schema
 
-This returns all record types, valid status values, and field definitions as JSON.
+Two paths are open if Sir wants Alfred to track something the existing types do not capture cleanly.
 
-<Tip>
-  The schema endpoint is always the authoritative source for record format details. If anything on this page seems outdated, trust the API response.
-</Tip>
+<Tabs>
+  <Tab title="Add a tag, not a type">
+    The first answer is almost always: use `tags`. The schema is intentionally compact. Most "new types" Sir might imagine — *shipment*, *lead*, *reading*, *recipe* — are better expressed as a `note` with `tags: [shipment]` than as a brand-new type. The Surveyor will cluster them together; the dashboard can filter on tags.
+  </Tab>
+  <Tab title="Add a real type">
+    If a tag is not enough — Sir wants the dashboard to show the type as a first-class section, with its own status values and folder — adding a type takes a coordinated change in two places:
+
+    1. Add the type name and status values to `c/alfred/src/alfred/vault/schema.py` (or the platform's `packages/ctrl/src/api/routes/vault.ts` if it is a platform-only concept).
+    2. Add a template at `_templates/<type>.md`.
+
+    Existing records of the new type can be created immediately. The Janitor will pick up the type as recognised on its next sweep. A skill describing when to create the new type can be added to `packages/openclaw/workspace-template/skills/` so Alfred knows to use it.
+  </Tab>
+</Tabs>
+
+## Mutation log
+
+Every write — create, edit, move, delete — is appended to an audit log at `/mnt/encrypted/alfred/vault_audit.log` on the tenant host (one JSONL line per affected file). Each line records the timestamp, the operation, the agent scope, and the affected path.
+
+The audit log feeds the agent-activity panel on the dashboard's vault graph view. It is kept indefinitely and backed up alongside the rest of the vault.
