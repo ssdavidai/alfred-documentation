@@ -1,127 +1,185 @@
 ---
 title: "Monitoring"
-description: "Keep an eye on your Alfred's health, specialists, and services."
-icon: "chart-line"
+description: "Check Sir's tenant health, container status, workflow runs, and recent activity from one place."
+icon: "activity"
 ---
 
-## Overview
+## What there is to monitor
 
-Alfred Black gives you visibility into your Alfred's health, specialist status, and service operations — from your dashboard and via the API.
+Sir's tenant is a Docker stack of seven containers (`init`, `ctrl-api`, `temporal`, `openclaw`, `openclaw-workers`, `alfred`, `alfred-learn`, `ollama`), a Temporal workflow engine running ~12 distinct workflow types, the openclaw AI gateway with its agent sessions, and four background vault specialists. Most days you won't think about any of this — Alfred just runs. But when something feels off, here's how to look.
 
-## Dashboard Command Center
+---
 
-Your [Alfred Black dashboard](https://alfred.black) Command Center shows at a glance:
+## The one-shot health check
 
-- **Health badge** — Overall status (healthy, degraded, or down)
-- **Vault stats** — Record counts and recent activity
-- **Specialist status** — Whether the Curator, Janitor, Distiller, and Surveyor are running
-
-## Health check
-
-### From the API
+Start here:
 
 ```bash
-curl -s /api/v1/admin/health \
-  -H "Authorization: Bearer alf_your_key_here" | jq .
+curl -s "$ALFRED_API_BASE/api/v1/admin/dashboard" \
+  -H "Authorization: Bearer $ALFRED_API_KEY" \
+  | jq
 ```
 
-Example response:
+Returns containers + service health + vault stats in one shot. If everything looks green, you're done. If something's wrong, drill in.
 
-```json
-{
-  "status": "ok",
-  "containers": 5,
-  "unhealthy": 0,
-  "disk_percent": 45,
-  "memory_percent": 62
-}
-```
+---
 
-### What health statuses mean
+## Containers
 
-| Status | Meaning |
-|--------|---------|
-| **healthy** | All services running normally |
-| **degraded** | Some services have issues but core functionality works |
-| **down** | Critical services are unavailable |
+| Endpoint | What it does |
+|---|---|
+| `GET /api/v1/admin/containers` | List every container with state (running, exited, restarting) and uptime |
+| `GET /api/v1/admin/containers/:service/logs?tail=100` | Last N log lines from a container |
+| `POST /api/v1/admin/containers/:service/restart` | Restart a container (requires `X-Confirm-Self-Restart: yes` header for `openclaw` or `ctrl-api`) |
+| `POST /api/v1/admin/containers/:service/stop` | Stop a container |
+| `POST /api/v1/admin/containers/:service/start` | Start a stopped container |
 
-## System information
+The dashboard's Logs page wraps the same endpoints. You can filter by service, set the tail count, and watch logs without leaving the browser.
 
-Get detailed system metrics:
+The self-restart guardrail (the `X-Confirm-Self-Restart` header) prevents an agent from accidentally killing the container holding its own session. Without the header, restarting `openclaw` or `ctrl-api` returns 409.
+
+---
+
+## Workflows (Temporal)
+
+Every scheduled job and every on-demand task runs as a Temporal workflow. To inspect:
 
 ```bash
-curl -s /api/v1/admin/system/info \
-  -H "Authorization: Bearer alf_your_key_here" | jq .
+# List recent workflows
+curl -s "$ALFRED_API_BASE/api/v1/workflows" \
+  -H "Authorization: Bearer $ALFRED_API_KEY" | jq
+
+# Inspect a specific workflow — activities, results, failures
+curl -s "$ALFRED_API_BASE/api/v1/workflows/<workflow-id>" \
+  -H "Authorization: Bearer $ALFRED_API_KEY" | jq
 ```
 
-## Service status
+The dashboard's Workflows tab is the rich version — drill into activity history, see retry attempts, view inputs and outputs.
 
-List all services running on your Alfred:
+The workflows you'll see most often:
+
+| Workflow | When it runs |
+|---|---|
+| `EventProcessorWorkflow` | Every 2 min — fetches stream events, drops to inbox, marks processed |
+| `SessionTrackerWorkflow` | Every 5 min — tracks live agent sessions |
+| `LearningWorkflow` | Every 5 min — extracts observations |
+| `JudgmentWorkflow` | Every 2 min — routes new inputs through instincts |
+| `HourlyEnrichmentWorkflow` | Every hour — one Clerk call enriches all pending records |
+| `ReflectionWorkflow` | Daily 2am — synthesises observations into instincts |
+| `DailyDigestWorkflow` | Daily 6pm — assembles the daily digest |
+| `MediaIngestionWorkflow` | Per binary upload — Whisper / OCR / extraction |
+| `StreamPullerWorkflow` | Per stream, on its schedule — fetches new events |
+| `chore-*` | Per chore on its cron — Sir's generated workflows |
+
+---
+
+## Schedules
+
+Every periodic job is a Temporal schedule. List, inspect, and control them:
 
 ```bash
-curl -s /api/v1/admin/containers \
-  -H "Authorization: Bearer alf_your_key_here" | jq .
+# List schedules
+curl -s "$ALFRED_API_BASE/api/v1/schedules" \
+  -H "Authorization: Bearer $ALFRED_API_KEY" | jq
+
+# Trigger out of cycle
+curl -s -X POST "$ALFRED_API_BASE/api/v1/schedules/al-hourly-enrichment/trigger" \
+  -H "Authorization: Bearer $ALFRED_API_KEY" | jq
+
+# Pause / unpause
+curl -s -X POST "$ALFRED_API_BASE/api/v1/schedules/<id>/pause" \
+  -H "Authorization: Bearer $ALFRED_API_KEY" | jq
 ```
 
-## Viewing logs
+Schedules use predictable IDs: `al-*` for system schedules, `chore-*` for generated chores. The Workflows tab shows live schedule status alongside the workflows it's spawning.
 
-### From the dashboard
+---
 
-Navigate to the **Logs** page to view real-time logs from your services.
+## Workers (vault specialists)
 
-### Via the API
-
-Stream logs in real-time using Server-Sent Events:
+The four vault specialists (Curator, Janitor, Distiller, Surveyor) report status independently:
 
 ```bash
-# Stream all logs
-curl -N /api/v1/logs \
-  -H "Authorization: Bearer alf_your_key_here"
-
-# Stream logs from a specific service
-curl -N "/api/v1/logs?service=alfred" \
-  -H "Authorization: Bearer alf_your_key_here"
+curl -s "$ALFRED_API_BASE/api/v1/workers/status" \
+  -H "Authorization: Bearer $ALFRED_API_KEY" | jq
 ```
 
-Get logs from a specific service:
+Restart a stuck worker:
 
 ```bash
-curl -s /api/v1/admin/containers/alfred/logs \
-  -H "Authorization: Bearer alf_your_key_here"
+curl -s -X POST "$ALFRED_API_BASE/api/v1/workers/restart" \
+  -H "Authorization: Bearer $ALFRED_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"worker": "curator"}' | jq
 ```
 
-## Restarting services
+The dashboard's Worker Activity Charts (under the Vault Nebula on the homepage) show the 24h rolling activity of each specialist.
 
-If a service is misbehaving, you can restart it from the dashboard or via the API:
+---
+
+## System info
+
+CPU, memory, disk, uptime:
 
 ```bash
-curl -X POST /api/v1/admin/containers/alfred/restart \
-  -H "Authorization: Bearer alf_your_key_here"
+curl -s "$ALFRED_API_BASE/api/v1/admin/system/info" \
+  -H "Authorization: Bearer $ALFRED_API_KEY" | jq
 ```
 
-## Specialist monitoring
+Disk usage matters — Sir's vault grows steadily, and the streams jsonl files retain 7 days by default. If you see disk pressure, prune old stream events: `POST /api/v1/streams/prune` with `{retention_days: 3}` to be more aggressive.
 
-Check what your specialists are up to:
+---
+
+## Recent activity
+
+The Activity tab in the Intelligence menu shows everything that has happened — workflow runs, agent sessions, API calls, chore executions, container events. Filter by:
+
+- Service (ctrl-api, openclaw, alfred-learn, alfred, temporal)
+- Time window (last hour, last 24h, last 7 days)
+- Workflow type
+- Source (web, slack, voice, sms, email, schedule)
+
+Equivalent API: `GET /api/v1/admin/activity`.
+
+---
+
+## What "broken" tends to look like
+
+| Symptom | Most likely cause | First check |
+|---|---|---|
+| Dashboard shows the reconfiguring banner for >2 min | Composio gateway restart stuck | `GET /api/v1/openclaw/ready` |
+| New stream events not appearing in vault | EventProcessor or HourlyEnrichment workflow stuck | Workflows tab → check last EventProcessor run |
+| Chore "ran" but produced nothing | Chore in dry-run quarantine (first 3 runs) | Chores tab → quarantine status |
+| Voice call connects but agent says nothing | Voice Bridge primer fetch failed | `GET /api/v1/phone/voice-context` |
+| SMS reply takes >30s | Cold openclaw session bootstrap | Wait — first SMS each session takes ~15-30s, subsequent are fast |
+| Email send returns 4xx | AgentMail not configured / quota issue | `GET /api/v1/email/status` |
+| Slack DMs go unanswered | Openclaw container exited | Containers list → openclaw status |
+| Connected app stops syncing | OAuth token revoked upstream | Apps page → reconnect |
+
+---
+
+## Audit logs
+
+Every API call hits the activity log. For longer-term audit (who did what, when), the system-openclaw-sessions stream captures every main-agent session with its summary, the channel it came from (slack, web, email, voice, sms), and the actions taken. Read it like any other stream:
 
 ```bash
-# Overall worker status
-curl -s /api/v1/workers/status \
-  -H "Authorization: Bearer alf_your_key_here"
-
-# Janitor scan history
-curl -s /api/v1/workers/janitor/history \
-  -H "Authorization: Bearer alf_your_key_here"
-
-# Distiller extraction history
-curl -s /api/v1/workers/distiller/history \
-  -H "Authorization: Bearer alf_your_key_here"
+curl -s "$ALFRED_API_BASE/api/v1/streams/events?stream_id=system-openclaw-sessions" \
+  -H "Authorization: Bearer $ALFRED_API_KEY" | jq
 ```
 
-<Columns cols={2}>
-  <Card title="Your Specialists" icon="gears" href="/guides/your-ai-agents">
-    Direct your specialists
+---
+
+<CardGroup cols={2}>
+  <Card title="Your Dashboard" icon="layout-dashboard" href="/guides/your-dashboard">
+    Everything above also lives in the dashboard
   </Card>
-  <Card title="Instance API" icon="code" href="/api-reference/admin/health">
-    Full management endpoints
+  <Card title="Recipes" icon="book-open" href="/guides/recipes">
+    Copy-pastable monitoring queries
   </Card>
-</Columns>
+  <Card title="Security" icon="shield-check" href="/guides/security">
+    Network model, encryption, audit
+  </Card>
+  <Card title="API Reference" icon="code" href="/api-reference/introduction">
+    Every monitoring endpoint
+  </Card>
+</CardGroup>

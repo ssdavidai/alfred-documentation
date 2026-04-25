@@ -1,0 +1,42 @@
+---
+title: "Replace Authorised Numbers"
+description: "Overwrite the entire authorised-phone-numbers list."
+api: "PUT /api/v1/phone/authorized-numbers"
+---
+
+## Overview
+
+Replaces the full list with the supplied array. Numbers are deduped and normalised (stripped of whitespace, dashes, parens) before persistence.
+
+## Body Parameters
+
+<ParamField body="numbers" type="array" required>
+  Array of phone number strings. Empty array clears the list.
+</ParamField>
+
+## Response
+
+<ResponseField name="numbers" type="array">The persisted list after dedup + normalisation.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X PUT -H "Authorization: Bearer $AAS_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"numbers": ["+15559876543", "+447700900123"]}' \
+  https://alfred.black/api/v1/phone/authorized-numbers
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{ "numbers": ["+15559876543", "+447700900123"] }
+```
+
+</ResponseExample>

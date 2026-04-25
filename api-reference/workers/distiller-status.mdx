@@ -1,10 +1,16 @@
 ---
-title: "Get Distiller Status"
-description: "Get Distiller agent status"
+title: "Distiller Status"
+description: "Last extraction run, lifetime counts, and per-learning-type breakdown."
 api: "GET /api/v1/workers/distiller/status"
 ---
 
-Returns the current status of the Distiller agent, including whether it is running and details about its most recent knowledge extraction run.
+Returns Distiller's bookkeeping: total runs recorded, the most recent extraction run, and counts of records created per learning type. Wraps `alfred distiller status`.
+
+Distiller is the latent-knowledge worker. It walks existing vault records looking for assumptions, decisions, constraints, contradictions, and synthesis opportunities, then writes new dedicated records for each piece of latent knowledge it surfaces. It does not touch embeddings or clustering — that is the Surveyor's job.
+
+## Authentication
+
+Bearer token in the `Authorization` header.
 
 <RequestExample>
 
@@ -17,27 +23,39 @@ curl -X GET https://alfred.black/api/v1/workers/distiller/status \
 
 <ResponseExample>
 
-```json Structured Response
+```json 200 Structured
 {
-  "status": "running",
-  "last_run": "2026-02-26T09:00:00Z",
-  "candidates": 8,
-  "learnings_extracted": 12
+  "total_runs": 42,
+  "last_run": {
+    "run_id": "run-0042",
+    "timestamp": "2026-04-24T21:00:00Z",
+    "candidates_found": 8,
+    "candidates_processed": 8,
+    "records_created": {
+      "assumption": 4,
+      "decision": 6,
+      "constraint": 3,
+      "contradiction": 1,
+      "synthesis": 4
+    }
+  }
 }
 ```
 
-```json Raw Response
+```json 200 Raw fallback
 {
-  "raw": "Distiller: running\nLast run: 2026-02-26 09:00 (8 candidates, 12 learnings extracted)"
+  "raw": "Total runs recorded: 42\n\nLast run: run-0042 at 2026-04-24T21:00:00Z\n  Candidates: 8 found / 8 processed\n  Records: assumption:4 decision:6 constraint:3 contradiction:1 synthesis:4"
 }
 ```
 
 </ResponseExample>
 
-<Note>
-  If the response contains structured JSON, it is returned directly. Otherwise, the output is returned in a `raw` field.
-</Note>
-
 <ResponseField name="raw" type="string">
-  Human-readable output when structured JSON is not available.
+  Trimmed stdout when the CLI did not return JSON. Present only in the fallback case.
 </ResponseField>
+
+## When to use
+
+- Confirming Distiller is alive before triggering a manual `run`.
+- Surfacing per-type extraction counts in a dashboard tile.
+- Spot-checking that a recent vault edit produced new candidates.

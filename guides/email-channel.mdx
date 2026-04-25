@@ -1,0 +1,169 @@
+---
+title: "Email Channel"
+description: "Sir's own AgentMail inbox at alfred.<username>@mail.alfred.black — authorised senders get a live agent reply, everyone else lands in the stream pipeline."
+icon: "mail"
+---
+
+## Sir's email address
+
+Every Alfred Black tenant is provisioned an inbox at `alfred.<username>@mail.alfred.black`. This is not a Composio-brokered Gmail integration — this is **Alfred's own email address**, hosted on the shared AgentMail pod with per-tenant inbox-scoped credentials.
+
+Sir's username is derived from his account at provision time. Inbox addresses are unique across the fleet.
+
+Mail addressed to this inbox routes through one of two paths depending on who sent it:
+
+| Sender | Path | Effect |
+|---|---|---|
+| **On the authorised list** | Channel — full payload to ctrl-api `/api/v1/channels/email/inbound` | Spawns a one-shot openclaw session; the main agent reads the full thread (with quoted history) and replies, forwards, executes the request, or stays silent — per the `alfred-email-channel` skill |
+| **Not on the authorised list** | Stream — extracted-text payload to `/api/v1/streams/ingest` with `stream_type: "agentmail"` | Zero-LLM ingest; the email becomes a vault `event/` record, attached to relevant matters/people via the hourly enrichment pass |
+
+This dual mode is the heart of the email channel. The same inbox handles both signal (authorised conversation) and noise (everything else) without bothering Sir with the noise.
+
+---
+
+## Authorising a sender
+
+The authorised list lives at `vault/.auth/authorized_senders.json` on Sir's tenant and is managed via three endpoints:
+
+```bash
+# List
+curl -s "$ALFRED_API_BASE/api/v1/auth/senders" \
+  -H "Authorization: Bearer $ALFRED_API_KEY" | jq
+
+# Add
+curl -s -X POST "$ALFRED_API_BASE/api/v1/auth/senders" \
+  -H "Authorization: Bearer $ALFRED_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"email": "sarah@acme.com"}' | jq
+
+# Remove
+curl -s -X DELETE "$ALFRED_API_BASE/api/v1/auth/senders/sarah%40acme.com" \
+  -H "Authorization: Bearer $ALFRED_API_KEY" | jq
+```
+
+Sir can also do this conversationally — tell Alfred "authorise sarah@acme.com" and he'll handle it.
+
+The First Brief at the end of onboarding is delivered to Sir's Google address by email. Sir's reply to that brief bootstraps the authorised-sender path: his own Gmail address gets added so future emails from him reach the channel directly.
+
+---
+
+## How the dual dispatch works
+
+When AgentMail receives a message for Sir's inbox, it fires a Svix-signed webhook to `https://alfred.black/webhooks/agentmail`. The SaaS:
+
+1. Verifies the Svix signature using the shared webhook secret
+2. Looks up the tenant by `inbox_id`
+3. Extracts the bare email from the `from` field (handles RFC 5322 `"Display Name" <addr@domain>"` form)
+4. Fetches the tenant's authorised list (cached for 60s per tenant)
+5. Dispatches:
+   - **Authorised**: full message (including quoted history) → tenant `/api/v1/channels/email/inbound` → openclaw session spawn
+   - **Unauthorised**: extracted-text only → tenant `/api/v1/streams/ingest` → vault event
+
+Both dispatches use Tailscale to reach the tenant. If the tenant is unreachable, the message is buffered as a `StreamEvent` row on the SaaS side as a fallback.
+
+---
+
+## What the agent does on inbound
+
+The `alfred-email-channel/SKILL.md` is the agent's playbook. The decision tree:
+
+1. **Reply (plain)** — Sir on `To:`, no others on `Cc:`, or others on `Cc:` but the instruction is personal
+2. **Reply-all** — Sir on `To:` with others on `Cc:` and the instruction implies group response
+3. **Forward** — Sir is forwarding a third-party email asking Alfred to do something with it
+4. **Execute the request, then confirm** — Sir asked for a task; Alfred does it via other ctrl-api endpoints or Composio actions, then sends a short confirmation reply
+5. **No-action** — Alfred is on `Cc:` purely as an observer; no direct question, no instruction
+
+Before composing any reply, Alfred fetches the full thread (`GET /api/v1/email/thread/<thread_id>`) so quoted history is in context, searches the vault for related matters/people, and only downloads attachments if the request actually requires reading them.
+
+---
+
+## Outbound — sending, replying, forwarding
+
+Sir can send mail via the dashboard ("compose" UI), via the agent conversationally ("Alfred, please email Sarah about Q3"), or directly via API. All three paths converge on the same endpoints:
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /api/v1/email/send` | New email (new thread). Body: `{to, subject, text, html?, cc?, bcc?, reply_to?, labels?, attachments?}` |
+| `POST /api/v1/email/reply` | Reply within an existing thread. Body: `{message_id, text, html?, reply_all?, attachments?}` |
+| `POST /api/v1/email/forward` | Forward a message. Body: `{message_id, to, subject?, text?, attachments?}` |
+| `GET /api/v1/email/message/:message_id` | Fetch a single message (for cases where the webhook payload was truncated at 1 MB) |
+| `GET /api/v1/email/thread/:thread_id` | Fetch the full thread |
+| `GET /api/v1/email/attachment/:message_id/:attachment_id` | Download an attachment |
+| `GET /api/v1/email/status` | Confirm AgentMail is configured on this tenant |
+
+---
+
+## Attachments
+
+Send, reply, and forward all accept an `attachments` array:
+
+```json
+{
+  "to": ["sarah@acme.com"],
+  "subject": "Q3 financial summary",
+  "text": "Sarah, please find the Q3 summary attached.",
+  "attachments": [
+    {
+      "content": "<base64-encoded file bytes>",
+      "filename": "q3-summary.pdf",
+      "content_type": "application/pdf"
+    }
+  ]
+}
+```
+
+`content` is base64-encoded bytes, no data-URL prefix. `filename` and `content_type` are optional but recommended.
+
+<Warning>
+**Never claim an attachment Alfred didn't send.** If the body says "please find attached", the same request must include a non-empty `attachments` array. The skill explicitly forbids this hallucination — Sir will notice and trust will be damaged. If Alfred can't produce the file, he says so or sends the content inline as HTML.
+</Warning>
+
+---
+
+## PDF rendering
+
+Alfred can render HTML to PDF using Playwright + Chromium, both pre-installed in the openclaw container. The pattern:
+
+1. Write the report as HTML (with inline CSS) to `~/.openclaw/workspace/data/report.html`
+2. Spawn a subagent with a small Playwright script: load the file, call `page.pdf({path: "data/report.pdf", format: "A4", printBackground: true})`
+3. Once the PDF exists, base64-encode it and include in the email's attachments array
+
+This is a real capability, advertised in the email skill. Sir asks ("send me Q3 as a PDF") and Alfred delivers.
+
+---
+
+## Limits and edge cases
+
+- **Attachment size** — AgentMail rejects attachments above ~20 MB base64. Compress or paginate large content; for big files, prefer Slack uploads (`SLACK_FILES_UPLOAD` via Composio) or the Drive integration.
+- **Webhook payload truncation** — AgentMail truncates inbound webhook bodies at 1 MB. If a long thread arrives truncated, Alfred fetches the full thread via `GET /api/v1/email/thread/:id` before composing a reply.
+- **Display-name parsing** — Sender comparison handles RFC 5322 angle-bracket form: `"Sarah Jones" <sarah@acme.com>` matches the bare `sarah@acme.com` on the authorised list.
+- **First Brief delivery** — The First Brief at end of onboarding is sent to Sir's Google address (the one he signed in with), not to a tenant inbox. Sir's reply to that brief authorises his own Gmail going forward.
+- **No initiating cold outreach** — Alfred responds; he doesn't send unsolicited mail. This is enforced in the skill's hard rules.
+
+---
+
+## Configuration storage
+
+Sir's per-tenant AgentMail credentials live in two places (both on the LUKS-encrypted volume):
+
+- Tenant `.env`: `AGENTMAIL_API_KEY`, `AGENTMAIL_INBOX_ID`, `AGENTMAIL_INBOX_ADDRESS`
+- Fallback file: `/mnt/encrypted/alfred/.agentmail-credentials.json`
+
+The master AgentMail key (used to derive per-inbox keys) lives only on the SaaS host — never on tenants.
+
+---
+
+<CardGroup cols={2}>
+  <Card title="Voice Channel" icon="phone" href="/guides/voice-channel">
+    The other premium channel — calls and SMS
+  </Card>
+  <Card title="SMS Channel" icon="message-circle" href="/guides/sms-channel">
+    Authorised SMS gets the same dual-mode treatment
+  </Card>
+  <Card title="Connected Apps" icon="puzzle" href="/guides/connected-apps">
+    Gmail-via-Composio is a different story — read here
+  </Card>
+  <Card title="Recipes" icon="book-open" href="/guides/recipes">
+    Copy-pastable email send and authorise examples
+  </Card>
+</CardGroup>

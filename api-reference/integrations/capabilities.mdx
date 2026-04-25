@@ -1,0 +1,95 @@
+---
+title: "Get Capabilities"
+description: "Enriched action inventory for one connected integration — what streams + tools are wired up."
+api: "GET /api/v1/integrations/:id/capabilities"
+---
+
+## Overview
+
+Returns Composio's full action catalogue for the connection's toolkit, classified into `stream_actions` (long-poll data sources, e.g. `GMAIL_FETCH_EMAILS`) and `tool_actions` (one-shot operations, e.g. `GMAIL_SEND_EMAIL`). Each entry is enriched with display metadata + live state from the on-disk stream config so the dashboard can render "enabled / paused / last pull / event count" for every action without a second round-trip.
+
+Stale-stream detection: any local stream config whose `composio_action` is no longer in Composio's catalogue (renamed or removed) is surfaced under `stale_streams[]` with a suggested replacement. The Apps page uses this to offer a one-click migrate.
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  Composio connection id.
+</ParamField>
+
+## Query Parameters
+
+<ParamField query="include_deprecated" type="string" optional>
+  Pass `1` to include actions Composio has marked deprecated. Excluded by default.
+</ParamField>
+
+## Response
+
+<ResponseField name="connection_id" type="string">Echo of the path id.</ResponseField>
+
+<ResponseField name="toolkit" type="string">Lowercase toolkit slug.</ResponseField>
+
+<ResponseField name="toolkit_name" type="string">Display name.</ResponseField>
+
+<ResponseField name="toolkit_icon" type="string">Logo URL or null.</ResponseField>
+
+<ResponseField name="composio_execute_enabled" type="boolean">
+  Whether `composio_execute` is in `gateway.tools.allow`. The single binary signal of "can Alfred invoke any tool on this toolkit".
+</ResponseField>
+
+<ResponseField name="stream_actions" type="array">
+  Each: `{slug, display_name, description, deprecated, enabled, stream_id, schedule_interval_seconds, last_pull_at, last_pull_status, event_count, last_event_at}`. Enabled streams sort first.
+</ResponseField>
+
+<ResponseField name="tool_actions" type="array">
+  Each: `{slug, display_name, description, deprecated}`. No per-action toggle — `composio_execute` dispatches them all.
+</ResponseField>
+
+<ResponseField name="stale_streams" type="array">
+  Stream configs whose action is no longer in Composio's catalogue. Each includes `suggested_replacement` for one-click migrate.
+</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -H "Authorization: Bearer $AAS_API_KEY" \
+  "https://alfred.black/api/v1/integrations/ca_01HXYZ/capabilities?include_deprecated=0"
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "connection_id": "ca_01HXYZABCDEFGH",
+  "toolkit": "gmail",
+  "toolkit_name": "Gmail",
+  "toolkit_icon": "https://...",
+  "composio_execute_enabled": true,
+  "stream_actions": [
+    {
+      "slug": "GMAIL_FETCH_EMAILS",
+      "display_name": "Fetch emails",
+      "description": "Pull recent messages from the user's inbox.",
+      "deprecated": false,
+      "enabled": true,
+      "stream_id": "composio-gmail-gmail-fetch-emails",
+      "schedule_interval_seconds": 300,
+      "last_pull_at": "2026-04-25T11:30:00Z",
+      "last_pull_status": "ok",
+      "event_count": 142,
+      "last_event_at": "2026-04-25T11:29:58Z"
+    }
+  ],
+  "tool_actions": [
+    {"slug": "GMAIL_SEND_EMAIL", "display_name": "Send email", "description": "...", "deprecated": false}
+  ],
+  "stale_streams": []
+}
+```
+
+</ResponseExample>

@@ -1,25 +1,29 @@
 ---
-title: "Agent Memory"
-description: "Get agent memory usage and statistics"
+title: "Search agent memory"
+description: "Query OpenClaw's per-agent memory store, optionally filtered by a search term."
 api: "GET /api/v1/openclaw/memory"
 ---
 
-Query your instance's agent memory and conversation history. You can search for specific topics or list all memory entries. This is useful for understanding what your agents have learned and retained across sessions.
+Queries the OpenClaw gateway's agent memory. With no parameters, returns recent memory entries. With a `query` parameter, filters entries to those matching the search term. Use this to inspect what Alfred has remembered between sessions.
 
-The response is returned as structured JSON when available, or as raw text in a `raw` field.
+## Query parameters
 
-<ParamField query="query" type="string" optional>
-  Search query text. If provided, filters memory entries matching the query. If omitted, returns all memory entries.
+<ParamField query="query" type="string">
+  Free-text search term. When omitted, the full recent memory is returned.
 </ParamField>
+
+## How it works
+
+ctrl-API shells into OpenClaw and runs `openclaw memory [query]`. JSON output is forwarded; non-JSON text is returned in a `raw` field.
 
 <RequestExample>
 
-```bash With Query
-curl -X GET "/api/v1/openclaw/memory?query=vault%20organization" \
+```bash With a query
+curl -X GET "https://alfred.black/api/v1/openclaw/memory?query=vault%20cleanup" \
   -H "Authorization: Bearer alf_your_key_here"
 ```
 
-```bash Without Query
+```bash Without a query
 curl -X GET https://alfred.black/api/v1/openclaw/memory \
   -H "Authorization: Bearer alf_your_key_here"
 ```
@@ -28,13 +32,19 @@ curl -X GET https://alfred.black/api/v1/openclaw/memory \
 
 <ResponseExample>
 
-```json Structured Response
+```json Structured
 {
-  "...": "Structure depends on gateway memory output"
+  "matches": [
+    {
+      "agent": "main",
+      "snippet": "Sir prefers concise summaries with bullet points first",
+      "scored_at": "2026-04-25T07:42:00Z"
+    }
+  ]
 }
 ```
 
-```json Raw Response
+```json Raw fallback
 {
   "raw": "No memory entries found"
 }
@@ -43,5 +53,5 @@ curl -X GET https://alfred.black/api/v1/openclaw/memory \
 </ResponseExample>
 
 <Note>
-  The response format depends on the gateway's output. If the gateway returns valid JSON, it is passed through as-is. Otherwise, the raw text is returned in a `raw` field.
+  This is OpenClaw's own per-agent memory, not the vault's MEMORY.md or the learning pipeline's instincts. For vault-side facts and user instructions, browse the `instinct/` and `event/` records via the vault endpoints.
 </Note>

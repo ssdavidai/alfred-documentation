@@ -1,27 +1,46 @@
 ---
 title: "Delete Schedule"
-description: "Permanently delete a workflow schedule"
+description: "Remove a Temporal schedule permanently."
 api: "DELETE /api/v1/schedules/{schId}"
 ---
 
-Permanently delete a workflow schedule. Any workflows that have already been started by this schedule will continue running -- only future scheduled executions are prevented.
+Permanently deletes a Temporal schedule. Wraps `temporal schedule delete --schedule-id <id>`. Workflows that have already been started by the schedule continue to completion — only future fires are stopped.
+
+## Authentication
+
+Bearer token in the `Authorization` header.
+
+## Path parameters
 
 <ParamField path="schId" type="string" required>
-  The schedule ID to delete
+  Schedule ID to delete.
 </ParamField>
 
 <RequestExample>
+
 ```bash cURL
-curl -X DELETE \
-  -H "Authorization: Bearer alf_your_key_here" \
-  /api/v1/schedules/surveyor-daily
+curl -X DELETE https://alfred.black/api/v1/schedules/weekly-billing-summary \
+  -H "Authorization: Bearer alf_your_key_here"
 ```
+
 </RequestExample>
 
 <ResponseExample>
+
 ```json 200
 {
   "message": "Schedule deleted"
 }
 ```
+
 </ResponseExample>
+
+## When to use
+
+- Removing a generated chore schedule that has been deprecated or superseded.
+- Cleaning up an experimental schedule registered by hand.
+- Tenant teardown.
+
+<Warning>
+  Delete is irreversible. To temporarily stop a schedule without losing the configuration, use [`pause`](/api-reference/schedules/pause) instead.
+</Warning>

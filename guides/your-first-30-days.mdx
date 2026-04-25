@@ -1,240 +1,129 @@
 ---
 title: "Your First 30 Days"
-description: "What to expect from the moment you sign up to the morning you open the envelope."
+description: "Week-by-week — what Alfred does, what you'll see, and how the trust gradient relaxes from cautious to autonomous."
 icon: "route"
 ---
 
-## It begins with a click.
+## A timeline, not a checklist
 
-You sign up with Google at [alfred.black](https://alfred.black). One OAuth consent screen. One click.
-
-Your dedicated instance begins provisioning — a server just for you, spun up in real time. The dashboard shows a calm animation: "Preparing your Alfred." Five to ten minutes.
-
-Then you connect your apps. The onboarding wizard shows three slots: **Gmail** (required — this is how Alfred reads your world), **Google Calendar** (recommended), and one optional app of your choice from a catalog of over 1,000 — Notion, GitHub, Slack, Linear, anything you use. Each connection is a single OAuth popup. Credentials are stored securely by Composio and never expire.
-
-<Note>
-No setup call. No configuration form. No invite code. Alfred provisions your instance, connects to your apps, and begins learning — all from a single sign-up.
-</Note>
-
-## Day 0 — Alfred builds your world
-
-Click **"Generate Your First Brief"** and Alfred begins a three-hour intelligence pipeline. An animated orb holds the screen while nine stages run behind it.
-
-### What's happening behind the orb
-
-**The behavioral profiler** runs first. This is not AI — it's a pure machine-learning pipeline using your email metadata. Eight sub-modules analyse:
-
-- **Rhythm** — when you work, when you stop, how regular your schedule is (using entropy scoring on hourly email distributions)
-- **Relationships** — who your inner circle is, response times, thread depth, reciprocity scores
-- **Sender clustering** — automated senders vs personal contacts vs newsletters, ranked by engagement
-- **Financial patterns** — detected subscriptions, payment services, recurring charges
-- **Anomalies** — senders who disappeared, unusual timing shifts, volume spikes (Isolation Forest)
-- **Engagement prediction** — which contacts are likely to remain active (BG/NBD probabilistic model)
-
-This profile feeds everything that follows. When Alfred writes about you, it draws on real behavioral data — not guesses from a single LLM prompt.
-
-**Three Opus calls** then run in sequence:
-1. **Fact extraction** — 200–400 structured facts across ten categories (personal, professional, financial, social, health, routine, interests, home, travel, services)
-2. **Pattern discovery** — recurring themes in your work, communication, and life
-3. **Personalisation** — your `USER.md` (who you are) and `SOUL.md` (how Alfred should speak to you)
-
-**The fact verification card** appears. Alfred pauses the pipeline and shows you 8–12 key identity facts it extracted: your name, age, location, partner, children, company, job title. Each is editable inline. Correct anything wrong — these corrections feed directly into your First Brief.
-
-Once you confirm, the pipeline resumes:
-
-**Your First Brief** is composed — a butler-quality letter that mentions people by name, references real projects, and surfaces something you forgot about. This is Alfred demonstrating that it already knows you.
-
-**While you read the brief**, Alfred continues working in the background:
-- **Four packs** seed your vault with 40+ records — matters (ongoing concerns), instincts (routing rules), errands (action items), and stream suggestions
-- **4–8 personalised chores** are generated as Python Temporal workflows — weekly digests, payment watchers, wellness checks — each tailored to your behavioral profile, validated in a sandbox, and deployed to run on schedule
-
-By the time you click **Continue to Dashboard**, your vault is populated, your chores are running, and your streams are polling. Alfred didn't just read your world — it built a structured model and started acting on it.
-
-### What you'll find on the dashboard
-
-The **Vault Nebula** — a CSS cloud visualisation of your knowledge graph. Each cloud is a cluster of related records, sized by count and coloured by theme. This is your world, structured and visible.
-
-Your Gmail stream is pulling every five minutes with incremental sync. Calendar events are syncing. Any other apps you connected are active. Chores are scheduled and running (the first three runs of each are dry-run to catch errors).
+There is nothing for Sir to do here beyond what onboarding asks of him. The thirty-day arc described below happens whether Sir watches or not. The notes are about what to expect — and what changes — as observation count grows and the trust gradient relaxes.
 
 ---
 
-## Days 1–7 — The vault takes shape
+## Day 1 — Onboarding
 
-Your streams are running. Every few minutes, new data arrives — emails, calendar events, notifications — and becomes structured vault records. No LLM calls at ingest time. Hourly batch enrichment adds entities, tags, and context.
+The five-minute onboarding triggers a three-hour intelligence pipeline. By the end:
 
-### Your chores are already working
+- A dedicated `cx53` Hetzner VPS is running Sir's stack
+- 100 days of Sir's email is in onboarding state
+- The behavioural profiler has mapped Sir's rhythm, inner circle, financial footprint, and communication style
+- 200–400 facts and a structured pattern set have been extracted by Opus
+- Sir has confirmed (or corrected) 8–12 key identity facts
+- The First Brief is in Sir's vault and in his Google inbox
+- The four packs are populated: matters, instincts, errands, suggested streams
+- 4–8 personalised chores are deployed and scheduled, each in **dry-run quarantine** for their first three runs
+- All connected apps from onboarding are streaming
 
-The chores Alfred generated during onboarding are now active. Depending on your profile, you might have:
-
-- A **daily morning briefing** at 5:30am — overnight business items, today's calendar, family logistics
-- A **payment failure watcher** — monitors for card expiry, subscription lapses, access restrictions
-- A **weekly wellness checkpoint** — analyses late-night work patterns, gym visits, health actions
-- Project-specific trackers for matters Alfred identified as important to you
-
-Each chore runs on its own Temporal schedule. If there's nothing to report, it stays silent — no empty notifications. If something meaningful happened, Alfred writes a digest to your vault and sends it to your active session.
-
-### Connecting more apps
-
-Visit the **Apps** page (puzzle icon) to connect additional services. Each new connection auto-configures a polling stream and generates a skill file so Alfred can take actions on your behalf.
-
-<Tip>
-The more apps Alfred has access to, the richer its chore output. A payment watcher that can read your Gmail is useful. One that can also check your Stripe dashboard is better.
-</Tip>
-
-### What Alfred is doing in the background
-
-- The **event processor** creates vault records from stream events every 15 minutes (zero LLM)
-- **Hourly enrichment** adds entities, topics, and priorities in a single batched LLM call
-- The **learning workflow** captures observations from your conversations and interactions
-- The **Janitor** scans for broken links and structural issues during nightly maintenance
-- Your vault grows steadily — new people, projects, and connections appearing in the Nebula
-
-### The daily pulse
-
-Every evening at 6pm, Alfred delivers a digest of the day's activity:
-
-- What arrived across your streams
-- What the enrichment discovered
-- What chores ran and what they found
-- One observation about patterns emerging in your data
-
-You didn't configure this. It just starts happening.
+At end of day 1, Sir's vault has 40+ records and Alfred is fully online. See the [Welcome Pack](/guides/welcome-pack) for the full breakdown.
 
 ---
 
-## Day 7 — The first weekly review
+## Week 1 — Quarantine clears, real chores begin
 
-Sunday evening. Alfred delivers a review of your week:
+The chores deployed during onboarding spend their first three runs in dry-run quarantine. They execute the full pipeline (real data fetched, real activities called) but suppress the user-facing side effects: no notifications, no vault writes. This is Alfred's safety net — if a chore was generated incorrectly and would produce nonsense, it shows up in the Chores tab as "quarantined" and never bothers Sir.
 
-- What was accomplished — chores handled, events processed, entities discovered
-- What remains open — errands awaiting action, matters needing attention
-- What Alfred is watching next week
-- One observation about patterns, people, or priorities that emerged
+By day 7:
 
-The weekly review becomes a rhythm. Every week, same time, same calm accounting of your life — handled.
+- Most chores have completed three clean runs and **auto-released**. Notifications start arriving on schedule.
+- Stream events have been arriving continuously — Gmail every 5 min, Calendar every 5 min, Notion every 10 min, GitHub every 5 min
+- The hourly enrichment pass has run ~150 times, attaching entities and tags to every stream event
+- The Surveyor has re-clustered Sir's vault with the new records; the Vault Nebula now reflects current life
+- 100s of new vault records exist: every email is now a vault `event/`, every meeting a `conversation/`, every GitHub notification an `event/`
 
----
+What Sir notices:
 
-## Days 7–14 — Deepening
+- The First Brief was the inflection point. From here on Alfred starts replying conversationally on Slack, web chat, email, voice, and SMS.
+- Connected apps are silently doing their work in the background.
+- Authorised senders / numbers haven't been configured yet — anything from external senders is going to the stream pipeline (zero-LLM ingest), not direct conversation.
 
-Alfred begins using what it knows. Not in obvious ways. In ways that make you pause.
-
-### Connecting Omi
-
-In your second week, consider connecting your **Omi wearable** from the Apps page. Omi captures ambient audio from your conversations and meetings. Transcription happens locally using **whisper-large-v3** — your audio never leaves your server unprocessed.
-
-Once connected, conversations become vault records. Promises made in meetings become tracked commitments. Names mentioned in passing become person records with context.
-
-### The intelligence layer builds
-
-Alfred's intuition system is accumulating observations:
-
-- **Observations** — atomic behavioral signals extracted from your stream events and conversations
-- **Instincts forming** — the nightly reflection at 2am reviews observations and proposes routing rules
-- **Judgment sharpening** — every 15 minutes, Alfred scores new inputs against its instincts
-
-New instincts start cautious — they require your approval before taking action. As confidence builds (10+ matching observations), Alfred begins handling routine decisions autonomously.
-
-### Matters and Errands
-
-The matters Alfred seeded during onboarding are now accumulating context from your streams. Email about the kitchen renovation links to the renovation matter. A calendar event with the contractor appears in the same cluster. The knowledge graph densifies.
-
-Errands — discrete actionable items — appear in the Intelligence tab. Some came from onboarding packs. Others are created by chores or the enrichment pipeline. Each has a status lifecycle: todo → active → blocked → done.
+This is the right time for Sir to **add authorised senders** (his own Gmail, his spouse, his closest collaborators) so they can email or text Alfred and get a real agent reply.
 
 ---
 
-## Day 14 — The halfway check-in
+## Weeks 2–3 — Instincts learn, observations accumulate
 
-Alfred presents something different. Not a briefing. Not a report.
+The intuition system is most active here. Every routing decision Alfred makes generates an observation. Every correction Sir issues ("that should have gone to the legal matter, not the general inbox") generates an INSTRUCTION-class observation. Every "good — keep doing that" generates a CONFIRMATION.
 
-> *"Two weeks in. I wanted to check in directly — not with a summary, but to ask: is there anything weighing on you that we haven't addressed?"*
+Reflection runs nightly at 2am, reading accumulated observations and either:
 
-A real conversation. Alfred listens. If something significant surfaces — a worry, a project, a relationship — Alfred notes it and acts on it in the days that follow.
+- **Strengthening** an existing instinct (raising its `observation_count`, lowering its discretion threshold)
+- **Proposing** a new instinct from a pattern that's repeating
+- **Weakening or revoking** an instinct Sir has corrected against
 
-Then Alfred says something specific:
+By the end of week 3:
 
-> *"From your emails, I could see the house renovation was overwhelming you. In the past two weeks, I've consolidated all contractor emails, created a timeline, and flagged two decisions that need your attention this week."*
+- Most onboarding instincts have accumulated 10–30 observations and crossed the 0.85 threshold — Alfred is fairly certain and starting to act without asking
+- New instincts have appeared from Sir's actual behaviour, not just inferred patterns from email analysis
+- The Distiller has run and surfaced cross-record assumptions, decisions, and constraints — Sir sees the first `synthesis/` and `assumption/` records appear
 
-This is the moment you feel seen.
+What Sir notices:
 
----
-
-## Days 14–21 — Progressive autonomy
-
-By week three, your vault has thousands of records from streams, enrichment, and conversation. Alfred's instinct layer begins to crystallise.
-
-### Instincts driving execution
-
-Alfred now has enough observations to act on its own for routine patterns. When an instinct matches an incoming event with sufficient confidence, Alfred creates an execution task:
-
-1. The **Task Runner** picks it up every 15 minutes
-2. An **ephemeral agent** is spawned with exactly the tools needed
-3. The agent takes action — via `composio_execute` on connected apps if needed
-4. A **ledger entry** records what was done and why
-
-Example: you told Alfred *"when a payment failure email arrives, reply acknowledging receipt."* Alfred observed this instruction, Reflection created an instinct, and now when a matching email arrives, an ephemeral agent sends the reply via your connected Gmail — without your intervention.
-
-### Chores maturing
-
-The chores that were in quarantine (first three dry-runs) are now running in production. You're getting real weekly digests, real payment alerts, real wellness mirrors. If a chore has nothing to report, it stays silent. When it does fire, you get a notification in your active session.
-
-### The Vault Nebula is dense
-
-Clusters of people, projects, and organisations, all interconnected. You can see your world taking shape. The graph grows with every stream event, every enrichment pass, every conversation.
+- Slack DMs feel sharper. Alfred references prior conversations from the cross-channel memory primer.
+- Email and SMS auto-handling on noise tier domains is silent and reliable.
+- The dashboard's Intelligence menu is visibly fuller. Matters that started with thin bodies now have rich threads of linked records.
+- Voice calls (if Sir has tried them) feel grounded — Alfred remembers what was discussed earlier in the day.
 
 ---
 
-## Days 21–28 — Becoming infrastructure
+## Week 4 — Autonomous execution, vault rich enough to query
 
-By now, Alfred has been running chores, processing streams, managing matters, and learning for three weeks. Your life has quietly reorganised around Alfred's rhythm.
+By day 28, the trust gradient has relaxed considerably for high-volume instincts. The 50+ observation tier (threshold 0.75) is reachable for routing patterns Sir uses constantly — newsletter dispositions, vendor email triage, recurring meeting prep.
 
-### Full intelligence layer
+For **execution** instincts (those that don't just route but actually do something — send a message, schedule a meeting, update a Notion page) the per-task `requires_approval` gate begins to relax. Reflection flips it to `false` only after the instinct has accumulated enough observations AND its prior approved executions have run cleanly.
 
-The daily digests are precise and personal. Enrichment catches entities and patterns you wouldn't have spotted. Chores handle recurring work without being asked. Connected app actions execute via instinct-triggered automation.
+By the end of week 4:
 
-> *"Every Tuesday you spend forty minutes compiling the same status update. I can draft it from your vault records and have it ready for your review by eight AM. Shall I?"*
+- The vault is rich enough to be the answer to most "where did I see X?" questions. Search returns relevant context within milliseconds.
+- The Distiller's synthesis records are starting to be the most valuable — they show patterns Sir himself wasn't tracking
+- A handful of execution instincts have moved off the approval gate. Alfred sends routine replies, schedules routine meetings, posts routine updates on Sir's behalf
+- The chores generated during onboarding are now firmly in production. Sir's daily / weekly / monthly recurring delivery cadence is established.
 
-Alfred makes the accumulation visible — gently:
-
-> *"You have six active chores running and four instincts executing autonomously. Here's what they handled this week while you were focused elsewhere."*
-
-The feeling isn't gratitude. It's something closer to weight. The weight of what would stop if Alfred weren't there. Not threatening — just undeniable.
-
-*I can't believe this was all manual before.*
+This is when the first **30-day call** happens. Sir's Alfred reaches out — not Sir reaching out to Alfred — to walk through the month. What worked. What was missed. What new instincts Reflection has been considering.
 
 ---
 
-## Day 30 — The envelope
+## What's NOT going to happen
 
-Alfred calls on the morning of the date printed on the envelope.
+Set expectations realistically:
 
-> *"Good morning. Today is the day. I believe there's something you've been keeping for this moment."*
-
-You open the wax-sealed envelope. Inside: a card. **"Your One Thing."**
-
-Your own words — from your earliest emails, the thing that came through most clearly as overwhelming, most urgent, most in need of fixing.
-
-The bottom half of the card is blank. Alfred says:
-
-> *"I'd like to hear how you'd fill that in now."*
-
-A short conversation about what changed. What shifted. What you no longer carry alone.
-
-Then Alfred offers a reflection — what was learned about you, what patterns emerged, what's planned next.
-
-And then one question:
-
-> *"Shall we talk about the next thirty days?"*
-
-You say yes. And the relationship is no longer onboarding. It's just life, attended to.
+- **Alfred won't be perfect on day 7.** The instincts are still cautious. Sir will still get escalations he wishes Alfred had handled.
+- **Some chores will fail their first runs.** The dependency audit catches most, but not all, mismatches between what a chore claims to do and what it can actually access. Failed chores are quarantined, not deleted — Sir can edit and redeploy.
+- **Some Composio actions will hit upstream rate limits.** Gmail's per-user quota, GitHub's 5000 requests/hour. Alfred surfaces these as errors, doesn't pretend success.
+- **Voice calls have a latency floor.** ~800ms–1.2s round-trip on Realtime, plus 1–3s on tool calls. Alfred says "One moment, sir" before tool calls so silence doesn't read as failure.
+- **The Curator will occasionally miscategorise an upload.** The Distiller and Janitor catch most; the rest is corrected by Sir telling Alfred conversationally.
 
 ---
 
-<Columns cols={2}>
-  <Card title="The Welcome Pack" icon="gift" href="/guides/welcome-pack">
-    What's in the box and why each item matters
+## Things that improve over time without effort
+
+- Cross-channel memory accuracy. The session summaries pile up; the voice-context primer gets richer.
+- Surveyor cluster labels. As Sir's vault grows, semantic clusters become tighter and labels more specific.
+- Reflection-derived instincts. The longer Alfred runs, the better Reflection's pattern recognition.
+- The Distiller's surface area. Six months in, the Distiller is the highest-value specialist — it surfaces patterns no human could track manually.
+
+---
+
+<CardGroup cols={2}>
+  <Card title="Welcome Pack" icon="package-open" href="/guides/welcome-pack">
+    Day-1 deliverables in detail
   </Card>
-  <Card title="How Alfred Works" icon="diagram-project" href="/how-it-works">
-    The six-layer architecture behind every briefing
+  <Card title="Intuition" icon="brain" href="/guides/intuition">
+    The trust gradient mechanics
   </Card>
-</Columns>
+  <Card title="Your AI Agents" icon="users" href="/guides/your-ai-agents">
+    Who's doing the learning
+  </Card>
+  <Card title="Monitoring" icon="activity" href="/guides/monitoring">
+    See it happen
+  </Card>
+</CardGroup>

@@ -1,10 +1,23 @@
 ---
-title: "Get Worker Status"
-description: "Get the status of all your AI agents"
+title: "Worker Status"
+description: "Overall daemon status across Curator, Janitor, Distiller, and Surveyor."
 api: "GET /api/v1/workers/status"
 ---
 
-Returns the current operational status of all AI agents (Curator, Janitor, Distiller, Surveyor). Use this to check which agents are running and their current state.
+Reports the current state of every worker daemon running inside the `alfred` container. This is the equivalent of running `alfred status` on the tenant VPS and is the fastest way to confirm that Sir's vault automations are alive.
+
+The four workers cover distinct responsibilities:
+
+- **Curator** — watches `vault/inbox/` and turns raw notes into structured records.
+- **Janitor** — sweeps the vault for structural problems (broken links, bad frontmatter, orphans).
+- **Distiller** — extracts latent knowledge (assumptions, decisions, constraints, contradictions, syntheses) from existing records.
+- **Surveyor** — embeds and clusters records for semantic search and entity linking.
+
+The endpoint shells out to `alfred status` and returns its raw output unparsed, so the response shape mirrors whatever the CLI prints today.
+
+## Authentication
+
+Bearer token in the `Authorization` header. See [Authentication](/api-reference/authentication).
 
 <RequestExample>
 
@@ -17,14 +30,24 @@ curl -X GET https://alfred.black/api/v1/workers/status \
 
 <ResponseExample>
 
-```json Response
+```json 200
 {
-  "raw": "curator: running\njanitor: running\ndistiller: stopped"
+  "raw": "Daemon: running (pid 142, uptime 4h12m)\n\nCurator:\n  Backend: anthropic\n  Processed files: 1284\n\nJanitor:\n  Last sweep: 2026-04-25T03:00:12Z\n  Issues outstanding: 7\n\nDistiller:\n  Last run: 2026-04-24T21:00:00Z\n  Learnings extracted (lifetime): 312\n\nSurveyor:\n  Embeddings: 4108\n  Clusters: 47\n  Entity linking: 91% resolved"
 }
 ```
 
 </ResponseExample>
 
 <ResponseField name="raw" type="string">
-  Per-agent status information as human-readable text.
+  Trimmed stdout of `alfred status`. Multi-line, human-readable. Parse only if absolutely needed; structure may evolve with worker upgrades.
 </ResponseField>
+
+## When to use
+
+- Health checks after a deploy or container restart.
+- Sanity-check before triggering a manual `process` or `janitor/fix` run.
+- Surfacing daemon liveness in the dashboard's diagnostics panel.
+
+<Note>
+  This endpoint does not return per-worker structured fields. For that, call the dedicated `janitor/status` and `distiller/status` endpoints — they emit JSON when the underlying CLI does.
+</Note>

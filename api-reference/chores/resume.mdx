@@ -1,0 +1,41 @@
+---
+title: "Resume Chore"
+description: "Resume a paused chore — unpauses the Temporal schedule, sets status=active."
+api: "POST /api/v1/chores/:slug/resume"
+---
+
+## Overview
+
+Runs `temporal schedule toggle --unpause` against `chore-<slug>` and writes `status: active` into the chore record. Idempotent.
+
+## Path Parameters
+
+<ParamField path="slug" type="string" required>
+  Chore slug.
+</ParamField>
+
+## Response
+
+<ResponseField name="slug" type="string">Echo.</ResponseField>
+<ResponseField name="status" type="string">`active`.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X POST -H "Authorization: Bearer $AAS_API_KEY" \
+  https://alfred.black/api/v1/chores/weekly-cashflow-forecast/resume
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{ "slug": "weekly-cashflow-forecast", "status": "active" }
+```
+
+</ResponseExample>

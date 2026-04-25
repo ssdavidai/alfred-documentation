@@ -1,0 +1,35 @@
+---
+title: "Enable Alfred Learn"
+description: "Set ALFRED_LEARN_ENABLED=true and start the container if it exists."
+api: "POST /api/v1/learning/enable"
+---
+
+## Overview
+
+Sets `ALFRED_LEARN_ENABLED=true` in `.env` and runs `docker compose up -d alfred-learn`. Tolerates missing-container errors silently — older deployments won't have the service registered until `/learning/bootstrap` is called.
+
+## Response
+
+<ResponseField name="message" type="string">`Alfred Learn enabled`.</ResponseField>
+<ResponseField name="enabled" type="boolean">`true`.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X POST -H "Authorization: Bearer $AAS_API_KEY" \
+  https://alfred.black/api/v1/learning/enable
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{ "message": "Alfred Learn enabled", "enabled": true }
+```
+
+</ResponseExample>

@@ -1,0 +1,60 @@
+---
+title: "Route an Input"
+description: "Route a vault input to a destination — runs the curator pipeline with a raw-move fallback."
+api: "POST /api/v1/learning/route"
+---
+
+## Overview
+
+Tries the 4-stage Curator pipeline first (analyze → entity resolution → interlink → enrich). If the curator fails, falls back to a raw `mv` of the file from `inbox/<id>` to `<destination>/<id>`. Either way, writes an enriched observation record capturing the routing decision and outcome.
+
+## Body Parameters
+
+<ParamField body="input_id" type="string" required>
+  Vault-relative path of the input file (e.g. `inbox/scratch-note.md`).
+</ParamField>
+
+<ParamField body="destination" type="string" required>
+  Vault-relative directory to move into (e.g. `note/`, `task/`).
+</ParamField>
+
+## Response
+
+<ResponseField name="message" type="string">Confirmation string.</ResponseField>
+<ResponseField name="processed" type="boolean">True iff Curator processing succeeded (vs. raw-move fallback).</ResponseField>
+<ResponseField name="note_path" type="string">Final vault path of the routed file (null if neither path succeeded).</ResponseField>
+<ResponseField name="entities_created" type="array">New vault entities created by Curator.</ResponseField>
+<ResponseField name="entities_linked" type="array">Existing entities Curator linked to.</ResponseField>
+<ResponseField name="observation" type="string">Path of the routing observation written.</ResponseField>
+<ResponseField name="observation_path" type="string">Same value, normalised key for backward compatibility.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X POST -H "Authorization: Bearer $AAS_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"input_id": "inbox/scratch-note.md", "destination": "note/"}' \
+  https://alfred.black/api/v1/learning/route
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "message": "Routed inbox/scratch-note.md to note/",
+  "processed": true,
+  "note_path": "note/scratch-note.md",
+  "entities_created": [],
+  "entities_linked": ["person/Alice Chen"],
+  "observation": "observation/2026-04-25-routed-scratch-note.md",
+  "observation_path": "observation/2026-04-25-routed-scratch-note.md"
+}
+```
+
+</ResponseExample>

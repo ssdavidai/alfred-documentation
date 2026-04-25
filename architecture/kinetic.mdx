@@ -1,224 +1,230 @@
 ---
-title: "Kinetic Layer"
-description: "Temporal workflow engine, Matters, Errands, Triage, Chores, Rules, and the path from knowledge to action."
+title: "Kinetic"
+description: "Matters, errands, chores, instincts, the Task Runner, and the trust gradient that decides when Alfred acts on his own."
 icon: "gears"
 ---
 
 <Note>
-Part of Alfred's [six-layer architecture](/how-it-works). The Kinetic layer turns knowledge into action.
+The kinetic layer turns knowledge into action. The semantic layer figures out what something is; this layer decides what to do about it and does it.
 </Note>
 
-## Alfred acts, not just remembers
+## A vault that does things
 
-Your vault holds what Alfred knows. But knowledge without action is just a filing cabinet. The Kinetic layer is where understanding becomes execution — handling the things that need doing so you don't have to.
+Sir's vault knows. The kinetic layer makes Alfred act on what's known. It's organised around five concepts — matters, errands, chores, instincts, and execution tasks — all coordinated by Temporal workflows running inside the `alfred-learn` container.
 
-## Temporal — the execution engine
+| Concept | Vault type | Created by | Acted on by |
+|---|---|---|---|
+| Matter | `matter/` | Onboarding pack, Sir, Curator | Errands group under it; chores reference it |
+| Errand | `task/` | Sir, Curator, Judgment, Conversation | Sir (if owner=human) or the Task Runner (if owner=alfred) |
+| Chore | `chore/` | Onboarding pack (Opus generates bespoke Python) | Its own Temporal schedule + the dynamic loader |
+| Instinct | `instinct/` | Reflection (nightly synthesis of observations) | Judgment (every 15 min) |
+| Execution task | `task/` (with `created_by: judgment`) | Judgment when an instinct's execution block fires | Task Runner → ephemeral subagent |
 
-[Temporal](https://temporal.io) provides durable workflow orchestration. Unlike simple cron jobs, Temporal workflows survive process restarts, automatically retry failed activities, log full execution history, and accept external signals. It runs as a Docker container on your encrypted volume.
+Temporal is the substrate. Every recurring job, every pickup loop, every retry policy, every workflow restart-on-failure is a Temporal primitive. Workflow state lives at `/mnt/encrypted/temporal/`, durable across container restarts.
 
-Every specialist, every intuition process, and every scheduled job runs as a Temporal workflow. You can monitor them from the Workflows section of your dashboard or via the API.
+## Matters — standing concerns
 
-## Matters
+A matter is an ongoing area of attention. "Growing Family & Second Baby Preparation". "Eagle Farm Construction". "Q2 Product Launch". It has no status lifecycle of its own — it exists while it's relevant and it collects the errands that belong to it.
 
-Matters are standing concerns that group related work. Think of a matter as an ongoing area of attention — "Kitchen renovation", "Q2 product launch", or "Tax preparation". A matter doesn't have a status lifecycle of its own; it exists as long as it's relevant and collects the errands that belong to it.
+When the Curator creates errands from a meeting note, or when Judgment matches an instinct that names a matter, the new errand is grouped under it. The dashboard's matter detail view then shows everything connected: errands, conversations, decisions, ledger entries, related people and organisations.
 
-When the Curator or Judgment identifies work that relates to an existing matter, new errands are automatically grouped under it. This gives you a single place to see everything associated with a concern, rather than a flat list of unrelated tasks.
+The first batch of matters comes out of onboarding — the matter pack generator (`packages/learn/src/activities/packs_opus.py`) reads Sir's email behavioural profile and produces ~10 matter records personalised to the patterns it found.
 
-## Errands
+## Errands — units of work
 
-Errands are the execution units of the Kinetic layer — actionable tasks Alfred carries out on your behalf. They originate from everywhere:
+An errand is `task/` with an owner and a tier. Owners are either `alfred` (he'll attempt it) or `human` (Sir handles it). The status lifecycle is fixed:
 
-- **Instincts** — when Judgment matches an instinct with an execution block, it creates an errand automatically
-- **Conversations** — "I should call the accountant next week" becomes an errand
-- **Your dashboard** — create errands directly when you know what needs doing
-- **Triage** — items you promote from the triage queue become errands
-- **Consequentials** — completing one errand can spawn follow-up errands
+```
+todo → active → blocked → done
+```
 
-Each errand has an **owner** (`alfred` or `human`), a **tier** that governs its power, and optionally a **skill** — a methodology file that tells Alfred how to approach the work. Errands belong to a Matter when one exists.
+Errands carry:
 
-### Status lifecycle
+- **owner** — `alfred` or `human`
+- **tier** — 1 (read-only, 10-turn budget), 2 (read+write vault, 25-turn budget), 3 (full tools, 50-turn budget)
+- **skill_entry** — optional methodology file in the vault's `skill/` folder. If set, the Task Runner reads it as the agent's plan rather than improvising.
+- **matter** — optional grouping
+- **depends_on**, **blocked_by** — prerequisite errands or files
+- **requires_approval** — if true, the Task Runner won't pick it up until Sir explicitly approves it from the dashboard
 
-Every errand moves through a defined lifecycle:
+Errands originate from many places:
 
-`todo` → `active` → `blocked` → `done`
+- Onboarding's errand pack — Opus reads matters and behavioural profile to seed ~10 errands per tenant
+- The Curator — extracted from inbox uploads
+- Judgment — when an instinct with an execution block fires
+- A chore's run — chores can spawn follow-up errands
+- Sir — created directly through the dashboard or through chat ("add an errand to follow up with Robert next week")
+- A previous errand's ledger entry — consequentials chain
 
-- **todo** — queued and waiting for the Task Runner (or you) to pick it up
-- **active** — currently being worked on
-- **blocked** — waiting on a dependency, another errand, or external input
-- **done** — completed, with a ledger entry recording what happened
+## The Task Runner
 
-## Triage
+Source: `packages/learn/src/workflows/task_runner.py`. Schedule: every 15 minutes. Picks up to 5 queued errands per tick.
 
-Not everything that arrives deserves immediate processing. When the Curator encounters an item it's uncertain about — ambiguous intent, low confidence, or potentially sensitive — it routes the item to the **Triage queue** instead of acting on it.
+For each errand:
 
-Triage items sit in your dashboard waiting for a human decision:
+<Steps>
+  <Step title="Check prerequisites">
+    Are `depends_on` and `blocked_by` clear? If not, skip.
+  </Step>
+  <Step title="Mark active">
+    Flip the status so the dashboard reflects the work in progress.
+  </Step>
+  <Step title="Assemble context">
+    Load the matter, the related observations, the skill methodology if set, recent ledger entries from the same matter.
+  </Step>
+  <Step title="Spawn an ephemeral subagent">
+    `create_ephemeral_agent` writes a scoped agent entry into the workers' `openclaw.json`. Tools are limited to what the instinct's execution block declared. The workers gateway hot-reloads (~10–15s); `wait_for_agent_ready` blocks until it's healthy.
+  </Step>
+  <Step title="Execute">
+    `sessions_spawn` against `http://openclaw-workers:18790` runs the work inside the fresh agent, bounded by the tier's turn budget.
+  </Step>
+  <Step title="Write artifacts">
+    Vault records produced during execution are written through ctrl-api. The errand is marked `done`; a `ledger_entry` is created with what happened and how long it took.
+  </Step>
+  <Step title="Handle consequentials">
+    Any follow-up errands the agent identified are created and queued.
+  </Step>
+  <Step title="Tear down the subagent">
+    `delete_ephemeral_agent` removes the entry. The workers gateway hot-reloads back to its previous shape.
+  </Step>
+</Steps>
 
-- **Promote** — convert to an errand (optionally assigning it to a matter)
-- **Dismiss** — discard the item; Alfred learns from the dismissal
+Errands with `owner: human` are skipped entirely — they sit in the dashboard for Sir.
 
-This keeps Alfred from acting on things it shouldn't while ensuring nothing important falls through the cracks.
+## Skills as methodology
 
-### Tiers
+When an errand carries `skill_entry: skill/weekly-digest.md`, the Task Runner reads that file and uses it as the agent's reasoning plan. Skills are plain English Markdown — what to look for, what questions to ask, what patterns to follow, what to produce. They live in the vault, not in code, so Sir can read them, edit them, and refine them as Alfred's behaviour evolves.
 
-| Tier | Profile | Capabilities | Turn budget |
-|------|---------|-------------|-------------|
-| **1** | Fast and cheap | Read-only vault access | 10 turns |
-| **2** | Capable | Read and write vault access | 25 turns |
-| **3** | Full power | Everything — vault, tools, external | 50 turns |
+This means execution is auditable. Every errand's ledger entry references the skill that guided it; reading the skill tells Sir exactly what Alfred was trying to do.
 
-### The Task Runner
+## Chores — recurring scheduled work
 
-The Task Runner is a Temporal workflow that runs every 15 minutes, picking up errands with `status=todo` and `owner=alfred`. For each errand, it follows a pipeline:
+A chore is a recurring Temporal workflow. Unlike a stock cron job, every chore is a **bespoke Python workflow generated by Opus** specifically for Sir's needs.
 
-1. **Check prerequisites** — verify `depends_on` and `blocked_by` are clear
-2. **Mark active** — set the errand to `active` so it's visible in your dashboard
-3. **Assemble context** — gather the skill methodology, related matter, and relevant observations
-4. **Execute** — run the work via OpenClaw `sessions_spawn` with full tool access, bounded by the tier's turn budget
-5. **Write artifacts** — create or update vault records as the skill directs
-6. **Mark done** — close the errand and write a ledger entry recording what happened
-7. **Handle consequentials** — spawn any follow-up errands that flow from the completed work
+### How a chore is created
 
-Errands owned by `human` skip the runner entirely — they appear on your dashboard for you to handle at your discretion.
+During onboarding, the chores stage runs the bespoke generation pipeline (`packages/learn/src/activities/chore_generation.py`). For each opportunity surfaced by the brief stage:
 
-### Skills as methodology
+1. **Match against standard library.** A few common chores (subscription watcher, weekly matter digest) live in `packages/learn/src/workflows/chores/`. If the opportunity matches, the standard one is used.
+2. **Generate.** If no match, Opus drafts a Python Temporal workflow targeted at the opportunity. The prompt includes the activity manifest (what helper activities are available — `fetch_financial_events`, `write_matter_digest_via_llm`, etc.), worked-example templates, and the opportunity's data shape.
+3. **Validate.** `validate_template_source` runs a syntax check, an import check, and confirms the workflow has the expected `@workflow.defn` decorator and emits its own schedule cron in a header comment.
+4. **Smoke test.** A subprocess sandbox runs the workflow against fake input. If it crashes, the prompt is amended and Opus retries — up to three attempts per opportunity.
+5. **Deploy.** The validated source is written to `/alfred-data/user-chores/<module>.py` and the dynamic loader picks it up on the next worker restart (`packages/learn/src/workflows/chores/_dynamic_loader.py`).
 
-When an errand references a skill, the Task Runner doesn't just execute blindly — it follows the skill's reasoning methodology. Skills are plain English files in your vault's `skill/` folder that describe how to approach a type of work: what to look for, what questions to ask, what patterns to follow, what to produce.
+Each chore deploys with its own cron schedule (declared in a header comment), its own activity dependencies, and its own user-facing description.
 
-This means Alfred's execution is transparent and auditable. You can read the skill, understand the methodology, and refine it over time.
+### Quarantine — three dry-runs before production
 
-## Ledger entries
+The first three runs of every generated chore are **dry-run**: no notifications sent, no vault writes. If all three complete without errors, the chore auto-releases. This catches the case where Opus produces code that looks correct but fails on real data — a hallucinated field name, a missing key — before Sir ever notices.
 
-Every completed errand produces a **ledger entry** — a consequential record that captures what was done, what was produced, and what follow-up errands (if any) were spawned. Ledger entries are stored as vault records, making them searchable and linkable.
-
-Ledger entries serve three purposes:
-
-- **Audit trail** — you can always see exactly what Alfred did and why
-- **Continuity** — follow-up errands reference the ledger entry that created them, maintaining a chain of causation
-- **Learning** — the Distiller and Reflection processes use ledger entries to refine instincts over time
-
-## Chores
-
-Chores are recurring scheduled jobs that Alfred generates, validates, and runs automatically. Unlike static templates, every chore is a **bespoke Python Temporal workflow** generated by Opus specifically for your needs during onboarding.
-
-### How chores are created
-
-During onboarding, Alfred analyses your email patterns, relationships, and financial activity, then generates a set of personalised chores. Each chore is:
-
-1. **Written as a Python Temporal workflow** by Opus, tailored to your data and habits
-2. **Statically validated** — syntax check, import verification
-3. **Smoke-tested** in a subprocess sandbox — dry-run to catch runtime errors before deployment
-4. **Deployed** to `/alfred-data/user-chores/` where the dynamic loader picks them up on next worker restart
-
-### Quarantine
-
-The first 3 runs of every generated chore are **dry-run** — no notifications sent, no vault writes. If all 3 dry-runs complete without errors, the chore is auto-released to production. This protects against hallucinated code that looks correct but fails on real data.
-
-### Examples of generated chores
+### Examples
 
 | Chore | Schedule | What it does |
-|-------|----------|-------------|
-| **Weekly Cash Flow Forecast** | Sundays at 6pm | Reads financial transactions from vault, projects upcoming expenses |
-| **Gym and Health Check-in** | Weekdays at 6pm | Reviews health/activity data, tracks gym visit patterns |
-| **Property and Home Digest** | Fridays at 7pm | Aggregates property-related emails, bills, maintenance items |
-| **Deferred Obligations Tracker** | Daily at 6pm | Scans for promises/commitments approaching their deadlines |
+|---|---|---|
+| Weekly Cash Flow Forecast | Sundays at 18:00 | Reads financial events from the vault, projects upcoming expenses |
+| Gym & Health Check-in | Weekdays at 18:00 | Reviews health stream events, tracks gym attendance |
+| Property & Home Digest | Fridays at 19:00 | Aggregates property-related emails, bills, maintenance items |
+| Deferred Obligations Tracker | Daily at 18:00 | Scans for promises and commitments approaching their deadlines |
 
-### Managing chores
+### Source visibility
 
-From the **Chores tab** in the Intelligence section of your dashboard:
+Every chore is auditable from the dashboard. `GET /api/v1/chores/{slug}/source` returns the full generated Python code plus a dependency audit: which activities the workflow imports, what each one reads from and writes to, and a live data-readiness probe against the vault directories the activities depend on. This catches "the weekly cashflow forecast has no data source" before the chore silently produces nothing for a month.
 
-- **Pause/Resume** — temporarily stop a chore's schedule
-- **Trigger** — manually fire a chore outside its normal schedule
-- **Delete** — remove the chore and its Temporal schedule
-- **View source** — see the full generated Python workflow code
-- **Dependency audit** — check which vault data sources each chore depends on and whether that data exists
+### Promotion to standard library
 
-## Rules
+`packages/learn/src/workflows/chore_promotion.py`. Runs Sundays at 03:00. Walks every tenant's `/alfred-data/user-chores/` directory, filters to templates that have proven useful (minimum runs and success rate), and asks Opus to draft a promotion pull-request description. Drafts are persisted; a separate process can opt to file them as actual GitHub PRs against the standard library. Useful generated chores graduate; the rest stay personal to one tenant.
 
-Rules are if/then automation defined in natural language. Tell Alfred what to watch for and what to do about it.
+### Output goes through Sir's main agent
 
-> "When an invoice arrives by email, extract the amount and due date, then create a task three days before it's due."
+A chore never sends Slack messages or pushes notifications directly. When it has something to deliver, it dispatches via `POST /api/v1/notifications` — which routes through Sir's main agent on the right channel, with the right voice. This keeps Sir's experience of Alfred consistent across every interaction; he never receives a message that sounds different from the rest of his butler.
 
-> "If anyone mentions a new competitor in a meeting, create a record and notify me."
+## Instincts and execution tasks
 
-Rules are evaluated continuously against incoming stream events and vault changes. When a condition matches, Alfred executes the action — creating a task, sending a notification, updating a record, or triggering a chore.
+Instincts are described in [Semantic](/architecture/semantic#intuition--alfred-learns-how-sir-routes). What kinetic adds is what happens when an instinct says **act**, not just **route**.
+
+The instinct schema includes an optional `execution:` block (`packages/learn/src/activities/packs_opus.py`):
+
+```yaml
+execution:
+  enabled: true
+  task_title_template: "Reply to {sender}: {subject}"
+  tier: 2
+  requires_approval: true
+```
+
+When Judgment matches an instinct with `execution.enabled: true` above the discretion threshold, it doesn't just record the routing — it calls `_create_execution_task` (`packages/learn/src/activities/judge.py`), which writes a `task/` record with `owner: alfred`, `created_by: judgment`, and the requested tier and approval flag.
+
+### The trust gradient
+
+`requires_approval` isn't taken at face value. The activity overrides it based on how much evidence the instinct has accumulated:
+
+| Observations behind the instinct | Effective `requires_approval` |
+|---|---|
+| < 10 | Forced `true` regardless of what the instinct declared |
+| 10–49 | Use the instinct's declared value |
+| 50+ AND match score > 0.75 | Defaults to `false` (full autonomy unless Sir's pattern says otherwise) |
+
+This is **discretion** — a good butler's most important quality. Alfred starts cautious. As evidence accumulates that he reads the situation correctly, he asks less and acts more. The slope is gentle on purpose.
+
+### Approval flow
+
+When an execution task lands with `requires_approval: true`, the dashboard shows it with **Approve** / **Reject** buttons. Approve patches the frontmatter to set `approved: true`; the Task Runner picks it up on the next tick. Reject deletes the task and writes an observation that becomes evidence against the instinct in the next reflection — Alfred learns from the rejection.
+
+## The full loop
 
 ```mermaid
 graph LR
-    A[Streams] -->|zero-LLM| D[Vault Records]
-    A -->|manual uploads| B[Inbox]
-    B --> C[Curator]
-    C --> D
-    C -->|uncertain| T[Triage]
-    T -->|promote| J
-    T -->|dismiss| X[Dropped]
-    D --> E[Hourly Enrichment]
-    E -->|entities, tags| D
-    I[Judgment] -->|execution block| J[Errand created]
-    J -->|grouped under| MA[Matter]
-    J --> K[Task Runner]
-    K -->|ephemeral agent| L[Execution]
-    L -->|composio_execute| EXT[Connected Apps]
-    L --> M[Ledger entry]
-    L -->|consequentials| J
-    G[Chores] -->|scheduled| K
+    A[Stream event] --> B{stream_type?}
+    B -->|template| V[Vault event/ record]
+    B -->|inbox-upload| C[Curator]
+    C --> N[note/ + person/ + org/]
+    V --> H[Hourly enrichment]
+    H --> E[entities + tags]
+    O[Sir routes input] --> L[Learning hook]
+    L --> OBS[observation/]
+    OBS --> R[Reflection<br/>nightly 2am]
+    R --> I[instinct/]
+    V --> J[Judgment<br/>every 15 min]
+    I --> J
+    J -->|match + execution| TASK[task/ created]
+    TASK --> APR{approval?}
+    APR -->|yes, awaiting| SIR[Sir approves in dashboard]
+    APR -->|no, autonomous| TR[Task Runner<br/>every 15 min]
+    SIR --> TR
+    TR --> EPH[ephemeral subagent]
+    EPH --> COMPOSIO[composio_execute]
+    EPH --> LE[ledger_entry/]
+    LE -->|consequentials| TASK
+    CHORES[chore Temporal schedules] --> EPH
 ```
 
-A stream event becomes a vault record instantly (zero LLM). Enrichment adds intelligence in batch. Judgment routes to execution via ephemeral agents that can call connected app actions. Chores fire on schedule through the same Task Runner. The entire cycle runs autonomously — from data arriving to actions being taken.
+A stream event becomes a vault record instantly. Hourly enrichment adds intelligence in batch. Judgment routes — sometimes to action. Action runs in an ephemeral subagent with scoped tools. Every action produces a ledger entry. Chores feed into the same execution path on their own schedules. The loop is always running; Sir watches as much or as little of it as he likes.
 
-<Warning>
-Rules (if/then natural-language automation) are in active development. Currently, the same behaviour is achieved through instincts — Alfred learns patterns from your instructions and executes them via the judgment → task runner → ephemeral agent pipeline.
-</Warning>
+## What runs when
 
-## Background processes
+| Workflow | Schedule | Source |
+|---|---|---|
+| EventProcessorWorkflow | every 15 min | `packages/learn/src/workflows/event_processor.py` |
+| SessionTrackerWorkflow | every 15 min | `session_tracker.py` |
+| LearningWorkflow | every 15 min | `learning.py` |
+| JudgmentWorkflow | every 15 min | `judgment.py` |
+| TaskRunnerWorkflow | every 15 min | `task_runner.py` |
+| HourlyEnrichmentWorkflow | every 1 hour | `hourly_enrichment.py` |
+| OmiAudioProcessorWorkflow | every 10 min | `omi_processor.py` |
+| DailyDigestWorkflow | daily 18:00 | `daily_digest.py` |
+| ReflectionWorkflow | daily 02:00 | `reflection.py` |
+| NightlyMaintenanceWorkflow | daily 03:00 | `nightly_maintenance.py` |
+| ChorePromotionReflectionWorkflow | weekly Sunday 03:00 | `chore_promotion.py` |
+| StreamPullerWorkflow | per-stream interval | `stream_puller.py` |
+| Dynamically loaded chores | per-chore cron | `/alfred-data/user-chores/*.py` |
 
-Alfred runs automated processes on schedules you don't need to manage. They take care of themselves.
+All schedules are registered by `packages/learn/scripts/register_schedules.py` on the worker's first boot, idempotently.
 
-<AccordionGroup>
-<Accordion title="Specialist processes" icon="gears">
-| Process | Schedule | What it does |
-|---------|----------|-------------|
-| Curator | Watches for new files | Reads manual inbox uploads and creates structured records |
-| Janitor | Periodic sweeps | Scans for and repairs structural issues |
-| Distiller | On-demand + scheduled | Surfaces latent knowledge from records |
-| Surveyor | On-demand + scheduled | Embeds, clusters, and discovers relationships |
-</Accordion>
-
-<Accordion title="Stream & enrichment processes" icon="wave-pulse">
-| Process | Schedule | What it does |
-|---------|----------|-------------|
-| Event Processor | Every 15 minutes | Creates vault records from stream events (zero LLM) |
-| Stream Pullers | Per-stream schedule (2–10 min) | Polls connected apps via Composio for new data (per-stream Temporal schedules, not a global workflow) |
-| Hourly Enrichment | Every 1 hour | Batched LLM call to add entities, tags, priorities to new records |
-| Session Tracker | Every 15 minutes | Groups related records into sessions |
-| Daily Digest | Daily at 6pm | Summarises the day's activity |
-</Accordion>
-
-<Accordion title="Intuition processes" icon="brain">
-| Process | Schedule | What it does |
-|---------|----------|-------------|
-| Learning | Every 15 minutes | Captures observations from conversations and stream events |
-| Reflection | Daily at 2am | Reviews observations and refines instincts |
-| Judgment | Every 15 minutes | Routes inputs using instincts; creates execution tasks |
-| Task Runner | Every 15 minutes | Picks up queued errands, spawns ephemeral agents for execution |
-| Chore Promotion | Weekly (Sunday 3am) | Scans generated chores for promotion to standard library |
-</Accordion>
-
-<Accordion title="Infrastructure processes" icon="server">
-| Process | Schedule | What it does |
-|---------|----------|-------------|
-| Nightly Maintenance | Daily at 3am | Vault cleanup, stream pruning, index rebuilds (Temporal) |
-| Health monitoring | Every 1 minute | Checks service status, disk, memory, connectivity (SaaS-side, not Temporal) |
-| Encrypted backups | Daily at 3am | Restic backup to Hetzner Object Storage (cron, not Temporal) |
-</Accordion>
-</AccordionGroup>
-
-Temporal-based processes can be monitored from the Workflows section of your dashboard. Infrastructure processes (health, backups) run outside Temporal.
-
-<Columns cols={2}>
-  <Card title="Your Specialists" icon="gears" href="/guides/your-ai-agents">
-    Monitor and direct your specialists
+<CardGroup cols={2}>
+  <Card title="Interface" icon="display" href="/architecture/interface">
+    The dashboard, Vault Nebula, and how Sir directs the kinetic layer.
   </Card>
   <Card title="Workflow API" icon="diagram-project" href="/api-reference/workflows/list">
-    Full workflow management endpoints
+    Every endpoint for inspecting and steering Temporal workflows.
   </Card>
-</Columns>
+</CardGroup>

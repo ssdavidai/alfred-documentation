@@ -1,0 +1,64 @@
+---
+title: "Phone Config"
+description: "Tenant phone number, authorised list, and recent voice/SMS activity."
+api: "GET /api/v1/phone/config"
+---
+
+## Overview
+
+Single endpoint backing the dashboard PhonePage. Reads `AGENTPHONE_PHONE_NUMBER` (or alias `TWILIO_PHONE_NUMBER`) from env, the authorised-numbers file, and tails the four phone streams (`voice-call`, `voice-call-outbound`, `sms-inbound`, `sms-outbound`).
+
+## Response
+
+<ResponseField name="phoneNumber" type="string">
+  E.164-formatted tenant number, or null if no AgentPhone subnumber is provisioned.
+</ResponseField>
+
+<ResponseField name="authorizedNumbers" type="array">
+  Phone numbers (normalised) whose inbound SMS gets the openclaw-completion live-reply path.
+</ResponseField>
+
+<ResponseField name="recentActivity" type="array">
+  Up to 30 events newest-first, merged across the four streams. Each: `{kind: "voice"|"sms", direction: "inbound"|"outbound", from?, to?, summary, at}`.
+</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -H "Authorization: Bearer $AAS_API_KEY" \
+  https://alfred.black/api/v1/phone/config
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "phoneNumber": "+15551234567",
+  "authorizedNumbers": ["+15559876543"],
+  "recentActivity": [
+    {
+      "kind": "voice",
+      "direction": "inbound",
+      "from": "+15559876543",
+      "to": "+15551234567",
+      "summary": "Call from +15559876543 — 2m22s",
+      "at": "2026-04-25T11:30:00Z"
+    },
+    {
+      "kind": "sms",
+      "direction": "outbound",
+      "to": "+15559876543",
+      "summary": "SMS to +15559876543: On it, sir.",
+      "at": "2026-04-25T11:25:00Z"
+    }
+  ]
+}
+```
+
+</ResponseExample>

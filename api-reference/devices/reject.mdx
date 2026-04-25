@@ -1,23 +1,27 @@
 ---
-title: "Reject Device"
-description: "Reject a pending device pairing request"
+title: "Reject a device"
+description: "Decline a pending pairing request."
 api: "POST /api/v1/devices/{requestId}/reject"
 ---
 
-Rejects a pending device pairing request, preventing the device from connecting to your Alfred instance.
+Rejects a pending pairing request. The request is removed from the queue and no credentials are issued. Use this for unrecognised requests or for cleaning up stale pending entries.
 
-<Warning>
-  This endpoint uses `requestId` in the URL path, not `deviceId`. The request ID is the identifier of the pending pairing request.
-</Warning>
+## Path parameters
 
 <ParamField path="requestId" type="string" required>
-  The unique identifier of the pending pairing request to reject.
+  The `request_id` from `GET /api/v1/devices` (under `pending`).
 </ParamField>
+
+## Response
+
+<ResponseField name="message" type="string">
+  Confirmation string from the OpenClaw CLI (e.g. `"Device rejected"`).
+</ResponseField>
 
 <RequestExample>
 
 ```bash cURL
-curl -X POST https://alfred.black/api/v1/devices/req_7k9m3p2q1/reject \
+curl -X POST https://alfred.black/api/v1/devices/req-91a3/reject \
   -H "Authorization: Bearer alf_your_key_here"
 ```
 
@@ -25,7 +29,7 @@ curl -X POST https://alfred.black/api/v1/devices/req_7k9m3p2q1/reject \
 
 <ResponseExample>
 
-```json Response
+```json 200 OK
 {
   "message": "Device rejected"
 }
@@ -33,6 +37,6 @@ curl -X POST https://alfred.black/api/v1/devices/req_7k9m3p2q1/reject \
 
 </ResponseExample>
 
-<ResponseField name="message" type="string">
-  A status message confirming the device was rejected.
-</ResponseField>
+<Note>
+  Rejection only affects the named pending request. The originating device may submit a new pairing request immediately afterwards — there is no permanent block list.
+</Note>

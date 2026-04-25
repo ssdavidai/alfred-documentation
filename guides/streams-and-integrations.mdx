@@ -1,228 +1,143 @@
 ---
 title: "Streams & Integrations"
-description: "Connect apps and services to feed data into Alfred's intelligence pipeline"
+description: "Streams are passive data feeds. Connected Apps add actions on top. Here's how both work — pull modes, zero-LLM ingest, and the hourly enrichment pass."
 icon: "radio"
 ---
 
-## Overview
+## Streams vs Connected Apps — what's the difference?
 
-Universal Streams are how Alfred automatically ingests data from the services you already use. Connect your email, calendar, notes, wearable devices, code repositories, and more — Alfred continuously pulls or receives data, creates structured vault records, and enriches them with entities and context.
+**Streams** are passive data feeds. Each stream pulls or receives data from one source on a schedule (or on a webhook), turns each new item into a structured vault record using a zero-LLM Python template, and queues the record for hourly enrichment.
 
-Once connected, each integration becomes a live stream of context that Alfred draws on — and a set of actions Alfred can take on your behalf.
+**Connected Apps** ([see guide](/guides/connected-apps)) are Composio integrations that include both a stream (data in) AND tool actions (actions out). When Sir connects Gmail, the auto-config creates a Gmail stream AND registers Gmail tool actions (`GMAIL_SEND_EMAIL`, `GMAIL_REPLY_TO_THREAD`, …) the agent can invoke.
 
-<Tip>
-For connecting new apps via Composio (the recommended approach for Gmail, Calendar, Notion, GitHub, and 1,000+ others), see the [Connected Apps guide](/guides/connected-apps).
-</Tip>
+A pure stream is data-only. A Connected App is data plus actions. Most users live entirely in the Connected Apps world; pure streams come up when wiring custom webhooks or polling an HTTP endpoint Composio doesn't cover.
 
-## How Streams Work
+---
 
-Every stream uses one of four transport types:
-
-- **Composio** — Alfred polls a connected app via the Composio SDK, using persistent OAuth tokens managed server-side (e.g., Gmail, Google Calendar, GitHub, Notion)
-- **Pull** — Alfred fetches data via direct HTTP calls with SaaS-managed OAuth tokens (legacy, for existing connections)
-- **Push** — An external service sends data to Alfred via webhook (e.g., Polar, Omi)
-- **System** — Internal Alfred activity that generates events automatically (e.g., OpenClaw conversations)
-
-The processing pipeline:
-
-1. Raw data arrives (polled, pushed, or captured) and is stored as JSONL files on your tenant
-2. The **event processor** creates structured vault `event/` records using pure Python templates — **zero LLM calls**
-3. A one-line summary is appended to the daily stream log
-4. **Hourly batch enrichment** adds entities, topic tags, related matters, and priorities via a single LLM call per batch
-5. Deduplication via `source_ref` ensures the same event is never processed twice
-
-<Note>
-Stream events no longer pass through the Curator. Since April 2026, all stream events are processed by zero-LLM Python templates at ingest time. Only manual inbox uploads (files you drop into the vault) still go through the Curator's full 4-stage pipeline.
-</Note>
-
-## Gmail
-
-Alfred connects to your Gmail account via OAuth2 and pulls new messages every 5 minutes.
-
-### Authentication
-
-There are two ways to connect Gmail:
-
-- **Composio (recommended)** — connect via the [Apps page](/guides/connected-apps) during onboarding or anytime. Persistent OAuth managed by Composio — tokens never expire.
-- **Legacy OAuth** — the original flow from signup. Tokens are stored in the SaaS database and may expire. If you have a legacy connection, connecting via Composio will migrate you automatically.
-
-### What gets synced
-
-- Full email content (not just metadata) — subject, body, recipients, and timestamps
-- A **100-day backfill** runs during onboarding to give Alfred historical context (using the legacy OAuth token)
-- New messages are fetched every **5 minutes** via Composio in **append mode** (only emails after the last pull date)
-
-### Processing pipeline
-
-Emails create vault `event/` records instantly via Python templates (zero LLM). The hourly enrichment pass adds entities, tags, and action items. Alfred can also **send emails** on your behalf via the `composio_execute` tool if Gmail is connected via Composio.
-
-<Tip>
-  The 100-day backfill means Alfred understands your recent context from day one. You do not need to manually import old emails.
-</Tip>
-
-## Notion
-
-There are two ways to connect Notion:
-
-- **Composio (recommended)** — connect via the [Apps page](/guides/connected-apps). One OAuth click, persistent tokens.
-- **Legacy API token** — paste a Notion Internal Integration Token in the Streams page. Requires manual token management.
-
-### Legacy setup (API token)
-
-1. Go to [notion.so/profile/integrations](https://www.notion.so/profile/integrations)
-2. Create a new Internal Integration and copy the token
-3. In Alfred, go to **Integrations** and add the Notion integration with your token
-4. In Notion, share the pages you want Alfred to access with your integration
-
-<Warning>
-  Alfred can only see pages that have been explicitly shared with the integration. If you add new pages later, remember to share them too.
-</Warning>
-
-### What gets synced
-
-- Page content fetched via the Notion blocks API
-- Database schemas and properties
-- New and updated content pulled every **15 minutes**
-- All requests use the required `Notion-Version: 2022-06-28` header
-
-## Omi Ambient
-
-Omi is a wearable device that streams ambient audio to Alfred for local transcription. This integration is fully privacy-focused — audio is transcribed on Alfred's infrastructure with no external API calls.
-
-### How it works
-
-1. The Omi device streams raw **PCM16 audio** to Alfred via a webhook
-2. **RMS energy speech detection** identifies speech segments and discards silence
-3. Speech segments are grouped by **60-second gaps** between utterances
-4. Transcription runs locally using **whisper-large-v3** (int8 quantization, CPU)
-5. Transcribed text is emitted as stream events and processed into vault records
-
-### Webhook URL
-
-Configure your Omi device to send audio to:
+## How a stream becomes a vault record
 
 ```
-https://{tenant}.alfred.black/api/v1/streams/omi/audio?token={webhookToken}&uid=omi-device
+External source → stream event (raw JSON) → zero-LLM template → vault record
+                                                     │
+                                                     └── hourly batch enrichment
+                                                         (one LLM call per hour
+                                                         covers all pending records)
 ```
 
-Replace `{tenant}` with your Alfred tenant subdomain and `{webhookToken}` with the token shown on your Integrations page.
+When an event lands, `EventProcessorWorkflow` (every 2 minutes) hands it to `create_stream_vault_record`. That's a pure-Python activity that picks the right template by source type and writes a structured record:
 
-### Quality and retention
+| Source type | Template | Vault record type |
+|---|---|---|
+| `gmail` / `email` / `agentmail` | email template | `event/` |
+| `googlecalendar` (with `start`/`end`) | calendar template | `event/` |
+| `github*` | github template | `event/` |
+| `slack*` | slack template | `event/` |
+| `omi-audio` | omi template (full transcript) | `conversation/` |
+| `voice-call` | voice template (transcript) | `conversation/` |
+| `sms` | sms template | `event/` |
+| `notion` | notion template | `event/` |
+| anything else | generic template | `event/` |
 
-- A **quality gate** filters out low-confidence results: language confidence must exceed 0.5 and word count must be at least 5
-- Raw audio is retained for **48 hours**, then automatically purged
-- No audio is sent to any external transcription service
+Each record is created with `enrichment_status: pending`. Once an hour, `HourlyEnrichmentWorkflow` runs **one** Clerk LLM call that batches every pending record (~200 events × ~80 tokens) into a single prompt, attaches entities and tags, and updates the records. This is a 97% reduction in LLM calls compared to per-event processing — Sir's costs scale flat against volume.
 
 <Note>
-  Because transcription runs entirely on Alfred's infrastructure using a local Whisper model, your ambient audio never leaves the platform. See the <a href="/guides/security">Security</a> page for more details.
+**Zero-LLM ingest**, then **batched enrichment**. The vault is fresh within minutes (the template runs immediately); the AI-derived metadata catches up within the hour. This is why Alfred can show a Slack thread in your Activity feed seconds after it lands, but the cross-record entity links appear only after the hourly pass.
 </Note>
 
-## GitHub Webhooks
+---
 
-Alfred receives push events from GitHub repositories via webhooks with HMAC signature verification.
+## Pull modes
 
-### Setup
+A stream's `pull_mode` tells the puller how to get data each cycle:
 
-1. In your GitHub repository, go to **Settings → Webhooks**
-2. Add a new webhook using the URL shown on your Alfred Integrations page
-3. Set the content type to `application/json`
-4. Enter the webhook secret provided by Alfred for HMAC signature verification
-5. Select the events you want to forward
+| Mode | What it does | Used by |
+|---|---|---|
+| **`snapshot`** | Every pull fetches the full latest state. Dedup happens at the StreamEvent table via the `(streamId, sourceRef)` unique index. | Notion (`NOTION_FETCH_DATA`), the catch-all default |
+| **`append`** | Every pull fetches items newer than `last_pull_ts`. The cursor is a timestamp updated after each successful pull. | Gmail (`GMAIL_FETCH_EMAILS`), Slack, GitHub notifications |
+| **`sync`** | Backfill once with a date window, then use a provider sync token (e.g. Calendar's `nextSyncToken`) for true delta sync. | Google Calendar |
 
-<Tip>
-  Start with push events, pull request events, and issue events for the richest context. Alfred processes all of them into structured vault records.
-</Tip>
+Backfill windows differ by source: Gmail backfills 30 days, Slack 7 days, GitHub 14 days, Calendar 30 days past + 90 days future.
 
-## Polar Payments
+If a sync token expires (Calendar returns 410 Gone), the puller automatically resets to backfill mode and re-establishes the cursor.
 
-Polar payment and subscription events are delivered to Alfred via webhooks with HMAC signature verification.
+---
 
-### Setup
+## Built-in stream sources
 
-1. In your Polar dashboard, configure a webhook pointing to the URL shown on your Alfred Integrations page
-2. Use the provided secret for HMAC signature verification
-3. Select the payment and subscription event types you want to forward
+| Source | How it arrives | Default cadence |
+|---|---|---|
+| **Composio-backed** (Gmail, Calendar, Slack, GitHub, Notion, Drive, …) | The puller calls `composio_execute({action: "..."})` on the tenant's openclaw workers | 5 min for most, 10 min for Notion |
+| **Webhook** | External system POSTs to `/webhooks/:webhookToken` on the SaaS — token is auto-generated per stream and shown in the dashboard | Real-time |
+| **HTTP pull** (custom) | Configure a `pull_endpoint`, optional `auth_config`, optional `cursor_field`. Generic JSON parser by default; per-source parsers available. | Configurable cron |
+| **Omi audio** | The Omi wearable POSTs raw audio chunks; transcribed via Groq Whisper, then ingested as `conversation/` records | Per-chunk, real-time |
+| **OpenClaw sessions** | Every agent session writes its summary to `system-openclaw-sessions` for cross-channel memory | Real-time |
+| **AgentMail (unauthorised senders)** | Sir's `alfred.<username>@mail.alfred.black` inbox; non-authorised senders dispatch here | Webhook |
+| **AgentPhone (unauthorised callers)** | Inbound SMS / voice from numbers not on the authorised list | Webhook |
 
-Alfred processes these events to track payment activity, subscription changes, and customer lifecycle data in your vault.
+Webhook tokens, OAuth credentials, and per-source state all live on Sir's tenant — the SaaS host only proxies. Webhook bodies up to 50 MB are accepted (sufficient for most Slack-attached files and GitHub payloads).
 
-## Custom Webhooks
+---
 
-Any service that can send HTTP POST requests with a JSON body can integrate with Alfred using a custom webhook.
+## Stream lifecycle controls
 
-### How it works
+Every stream — Composio-backed or custom — supports the same controls via the dashboard or directly through ctrl-api:
 
-- POST any JSON payload to the webhook URL shown on your Integrations page
-- Alfred uses a **passthrough parser** — the raw payload is stored as a stream event
-- The event processor classifies the content and the Curator creates appropriate vault records
+| Action | Endpoint |
+|---|---|
+| List streams | `GET /api/v1/streams` |
+| Recent events | `GET /api/v1/streams/events?status=unprocessed` |
+| Push manually | `POST /api/v1/streams/ingest` with `{stream_id, stream_type, raw, summary?}` |
+| Create | `POST /api/v1/streams` with `{id, name, type, source, enabled, webhookToken?}` |
+| Update | `PATCH /api/v1/streams/:id` (any subset of config fields) |
+| Pause | `POST /api/v1/streams/:id/pause` |
+| Resume | `POST /api/v1/streams/:id/resume` |
+| Delete | `DELETE /api/v1/streams/:id` |
+| Prune old events | `POST /api/v1/streams/prune` with `{retention_days?}` (default 7) |
 
-```bash
-curl -X POST https://{tenant}.alfred.black/api/v1/streams/webhook/{streamId} \
-  -H "Content-Type: application/json" \
-  -d '{
-    "source": "my-internal-tool",
-    "event": "deploy_completed",
-    "details": "Deployed v2.4.1 to production"
-  }'
+System streams (those with `system: true`) cannot be paused or deleted — they exist to power core flows like the openclaw sessions feed and the AgentMail / AgentPhone receivers.
+
+---
+
+## What a stream event looks like
+
+```json
+{
+  "id": "ev_2L0vY7…",
+  "stream_id": "gmail-primary",
+  "stream_type": "gmail",
+  "received_at": "2026-04-25T14:22:18.421Z",
+  "source_ref": "msg_18f6c1234abcd",
+  "raw": {
+    "from": "sarah@acme.com",
+    "to": ["sir@example.com"],
+    "subject": "Re: Q3 contract revision",
+    "body": "..."
+  },
+  "summary": "Sarah at Acme replied about the Q3 contract"
+}
 ```
 
-<Tip>
-  Custom webhooks are a quick way to get data from internal tools, CI/CD pipelines, or any service with outgoing webhook support into Alfred without building a dedicated integration.
-</Tip>
+`raw` is the unmodified payload from the source. `summary` is set by the parser when it can derive one cheaply; otherwise enrichment fills it in on the hourly pass. The `(stream_id, source_ref)` pair is the dedup key — replays of the same event don't create duplicate vault records.
 
-## OpenClaw Sessions (System)
+---
 
-Every conversation you have with Alfred — whether through Telegram, the web dashboard, or any other interface — is automatically captured as a system stream.
+## Suggested streams from onboarding
 
-### How it works
+During the welcome pack generation, Alfred scans your email domains and produces a `suggested_streams` list — apps Sir uses heavily that don't have a stream yet. The Apps page surfaces these as one-click connections. See the [Welcome Pack](/guides/welcome-pack) for the full list of detected sources.
 
-- The **alfred-inbox hook** buffers messages during a conversation
-- Messages are flushed after **10 turns** or **5 minutes of idle time**, whichever comes first
-- Flushed conversations are processed by the event processor and the Curator creates conversation records in your vault
+---
 
-This happens automatically. There is nothing to configure — every interaction with Alfred contributes to your knowledge base.
-
-<Note>
-  OpenClaw session capture means Alfred remembers what you have discussed. Decisions made, tasks assigned, and ideas explored during conversations are extracted and linked to relevant vault records.
-</Note>
-
-## Managing Integrations
-
-All integrations are managed from the **Streams** page in your Alfred dashboard.
-
-### Connecting a new integration
-
-1. Click **Connect Integration**
-2. For **OAuth sources** (like Gmail), you are redirected to the provider's consent screen to authorize access
-3. For **API key sources** (like Notion), a dialog appears where you enter the token
-4. For **push sources** (like GitHub, Polar, Omi), Alfred generates a webhook URL for you to configure in the external service
-
-### Monitoring your streams
-
-Each connected integration shows:
-
-- **Event count** — total events received
-- **Last event time** — when the most recent event arrived
-- **Status** — whether the stream is active, paused, or in error
-
-### Controls
-
-- **Pause** — temporarily stop pulling or accepting events from a stream
-- **Resume** — restart a paused stream
-- **Delete** — permanently remove the integration and stop all data ingestion
-
-<Warning>
-  Deleting an integration stops future data ingestion but does not remove vault records that were already created from previous events.
-</Warning>
-
-### Copying webhook URLs
-
-For push-based integrations, use the **copy** button next to the webhook URL. Omi displays your full tenant-specific URL with the authentication token pre-filled.
-
-<Columns cols={2}>
+<CardGroup cols={2}>
+  <Card title="Connected Apps" icon="puzzle" href="/guides/connected-apps">
+    The OAuth side — connecting Gmail, Calendar, Slack, GitHub, Notion, …
+  </Card>
   <Card title="Using the Inbox" icon="inbox" href="/guides/using-the-inbox">
-    Manually share content with Alfred
+    Push files into the vault manually
   </Card>
-  <Card title="Security" icon="shield" href="/guides/security">
-    How Alfred protects your data across all integrations
+  <Card title="Recipes" icon="book-open" href="/guides/recipes">
+    Worked examples — wire a custom webhook, push an event, ship to Slack
   </Card>
-</Columns>
+  <Card title="Monitoring" icon="activity" href="/guides/monitoring">
+    Check stream health and recent pulls
+  </Card>
+</CardGroup>

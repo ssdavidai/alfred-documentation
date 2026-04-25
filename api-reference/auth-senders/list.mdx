@@ -1,0 +1,40 @@
+---
+title: "List Authorised Senders"
+description: "List the email addresses that bypass the stream pipeline and get a live agent reply."
+api: "GET /api/v1/auth/senders"
+---
+
+## Overview
+
+Reads `${VAULT_PATH}/.auth/authorized_senders.json`. Inbound emails from these addresses route to the openclaw main agent as conversational channel events; everyone else lands in the zero-LLM stream pipeline.
+
+Seeded at provision time with the tenant owner's Google OAuth email. Matches are exact, case-insensitive, no domain wildcards.
+
+## Response
+
+<ResponseField name="senders" type="array">Lowercased email addresses, sorted.</ResponseField>
+<ResponseField name="updated_at" type="string">ISO timestamp of the last write.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -H "Authorization: Bearer $AAS_API_KEY" \
+  https://alfred.black/api/v1/auth/senders
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "senders": ["david@szabostuban.com", "miguel@upstring.com"],
+  "updated_at": "2026-04-25T11:00:00Z"
+}
+```
+
+</ResponseExample>

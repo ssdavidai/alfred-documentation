@@ -1,0 +1,50 @@
+---
+title: "AgentMail Status"
+description: "Quick health check for the tenant's AgentMail credentials."
+api: "GET /api/v1/email/status"
+---
+
+## Overview
+
+Reports whether AgentMail is wired up on this tenant. Reads `AGENTMAIL_API_KEY` + `AGENTMAIL_INBOX_ID` from the container env, falling back to `/mnt/encrypted/alfred/.agentmail-credentials.json`.
+
+## Response
+
+<ResponseField name="configured" type="boolean">True iff credentials are present.</ResponseField>
+
+<ResponseField name="inbox_id" type="string">
+  AgentMail inbox id (only present when `configured: true`).
+</ResponseField>
+
+<ResponseField name="inbox_address" type="string">
+  Sir's email address, e.g. `alfred.david@mail.alfred.black` (only when configured).
+</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -H "Authorization: Bearer $AAS_API_KEY" \
+  https://alfred.black/api/v1/email/status
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK (configured)
+{
+  "configured": true,
+  "inbox_id": "ibx_01HXYZABCDEF",
+  "inbox_address": "alfred.david@mail.alfred.black"
+}
+```
+
+```json 200 OK (not configured)
+{ "configured": false }
+```
+
+</ResponseExample>

@@ -1,39 +1,67 @@
 ---
 title: "Terminate Workflow"
-description: "Forcefully terminate a running workflow"
+description: "Forcefully terminate a Temporal workflow execution."
 api: "POST /api/v1/workflows/{wfId}/terminate"
 ---
 
-Immediately terminate a running workflow execution. This is a hard stop -- the workflow will not execute cleanup logic and cannot be resumed. Use [cancel](/api-reference/workflows/cancel) instead if you need graceful shutdown.
+Hard-stops a running workflow. Wraps `temporal workflow terminate --workflow-id <id>`. The workflow's cleanup logic does not run — the execution is killed where it stands and marked `TERMINATED`.
+
+For a graceful shutdown that allows the workflow to handle the cancel signal, use [`cancel`](/api-reference/workflows/cancel) instead.
+
+## Authentication
+
+Bearer token in the `Authorization` header.
+
+## Path parameters
 
 <ParamField path="wfId" type="string" required>
-  The workflow ID to terminate
+  Workflow ID to terminate.
 </ParamField>
 
+## Request body
+
 <ParamField body="reason" type="string" optional>
-  Human-readable reason for termination. Will be recorded in workflow history.
+  Human-readable reason recorded in workflow history.
 </ParamField>
 
 <ParamField body="run_id" type="string" optional>
-  Specific run ID to terminate. If omitted, terminates the most recent run.
+  Pin to a specific run. Omit to terminate the latest run.
 </ParamField>
 
 <RequestExample>
-```bash cURL
-curl -X POST \
+
+```bash With reason
+curl -X POST https://alfred.black/api/v1/workflows/al-judgment-run/terminate \
   -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
-  -d '{
-    "reason": "Manual termination - inbox processing stuck"
-  }' \
-  /api/v1/workflows/curator-sweep-20260226-143022/terminate
+  -d '{"reason": "Stuck on offline LLM gateway"}'
 ```
+
+```bash Pin to a specific run
+curl -X POST https://alfred.black/api/v1/workflows/al-judgment-run/terminate \
+  -H "Authorization: Bearer alf_your_key_here" \
+  -H "Content-Type: application/json" \
+  -d '{"run_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479"}'
+```
+
 </RequestExample>
 
 <ResponseExample>
+
 ```json 200
 {
   "message": "Workflow terminated"
 }
 ```
+
 </ResponseExample>
+
+## When to use
+
+- Workflow is wedged and cleanup is irrelevant (for example a heartbeating activity in a dead container).
+- Recovering from a poison-pill input that crashes the workflow on every retry.
+- Stopping a manually-triggered workflow that should not have been started.
+
+<Warning>
+  Terminate is irreversible. The workflow cannot be resumed; only restarted as a fresh execution. Prefer [`cancel`](/api-reference/workflows/cancel) when the workflow needs to release resources or write a final record.
+</Warning>

@@ -1,0 +1,63 @@
+---
+title: "Get Stream"
+description: "Get a single stream's full config — metadata + pull engine settings."
+api: "GET /api/v1/streams/:id"
+---
+
+## Overview
+
+Merges the `streams.json` metadata entry with the pull-engine config file (if any) into one object. The pull-engine config holds the Composio action, schedule cadence, cursor state, etc.
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  Stream id.
+</ParamField>
+
+## Response
+
+<ResponseField name="stream" type="object">
+  Merged metadata + config. Possible fields include `id`, `name`, `type`, `source`, `enabled`, `status`, `last_event_at`, `event_count`, plus pull engine fields: `pull_endpoint`, `pull_method`, `pull_headers`, `pull_params`, `parser`, `auth_type`, `auth_config`, `cursor_field`, `cursor_value`, `cursor_param`, `schedule_cron`, `schedule_interval_seconds`, `last_pull_at`, `last_pull_status`, `last_pull_count`, `composio_action`, `composio_connection_id`, `composio_toolkit`, `composio_args`, `pull_mode`.
+</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -H "Authorization: Bearer $AAS_API_KEY" \
+  https://alfred.black/api/v1/streams/composio-gmail-gmail-fetch-emails
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "stream": {
+    "id": "composio-gmail-gmail-fetch-emails",
+    "name": "Fetch Emails",
+    "type": "composio",
+    "source": "composio:gmail",
+    "enabled": true,
+    "status": "idle",
+    "last_event_at": "2026-04-25T11:30:00Z",
+    "event_count": 142,
+    "composio_action": "GMAIL_FETCH_EMAILS",
+    "composio_connection_id": "ca_01HXYZ",
+    "composio_toolkit": "gmail",
+    "composio_args": {"max_results": 25},
+    "parser": "composio",
+    "schedule_interval_seconds": 300,
+    "pull_mode": "append",
+    "cursor_value": "2026-04-25T11:29:00Z",
+    "last_pull_at": "2026-04-25T11:30:00Z",
+    "last_pull_status": "ok"
+  }
+}
+```
+
+</ResponseExample>

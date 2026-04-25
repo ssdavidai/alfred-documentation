@@ -1,0 +1,84 @@
+---
+title: "Enable Stream"
+description: "Create a Composio-backed stream that polls a third-party action on a schedule."
+api: "POST /api/v1/integrations/:id/enable-stream"
+---
+
+## Overview
+
+Creates a stream config for a single Composio action (e.g. `GMAIL_FETCH_EMAILS`) and registers it in `streams.json`. The stream id is derived from the toolkit + action slug. Default args come from `RECOMMENDED_STREAMS[toolkit]` if the slug matches, else from `DEFAULT_ARGS[action]`, else `{}`.
+
+You must also create a Temporal schedule that fires `StreamPullerWorkflow` with `{stream_id}` as input. The auto-config endpoint does this in one call when called from the OAuth callback.
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  Composio connection id.
+</ParamField>
+
+## Body Parameters
+
+<ParamField body="action_slug" type="string" required>
+  Composio action slug, e.g. `GMAIL_FETCH_EMAILS`.
+</ParamField>
+
+<ParamField body="poll_interval_seconds" type="number" optional default="300">
+  How often `StreamPullerWorkflow` should run.
+</ParamField>
+
+<ParamField body="stream_name" type="string" optional>
+  Display name for the stream. Defaults to a humanised version of the action slug.
+</ParamField>
+
+## Response
+
+<ResponseField name="stream_id" type="string">
+  The id of the created stream (e.g. `composio-gmail-gmail-fetch-emails`).
+</ResponseField>
+
+<ResponseField name="config" type="object">
+  Full written config including `composio_action`, `composio_connection_id`, `composio_args`, `parser`, `schedule_interval_seconds`.
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Reminder to create the matching Temporal schedule.
+</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X POST -H "Authorization: Bearer $AAS_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"action_slug": "GMAIL_FETCH_EMAILS", "poll_interval_seconds": 300}' \
+  https://alfred.black/api/v1/integrations/ca_01HXYZ/enable-stream
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 201 Created
+{
+  "stream_id": "composio-gmail-gmail-fetch-emails",
+  "config": {
+    "id": "composio-gmail-gmail-fetch-emails",
+    "name": "Fetch Emails",
+    "type": "composio",
+    "source": "composio:gmail",
+    "enabled": true,
+    "composio_action": "GMAIL_FETCH_EMAILS",
+    "composio_connection_id": "ca_01HXYZABCDEFGH",
+    "composio_toolkit": "gmail",
+    "composio_args": {"max_results": 25},
+    "parser": "composio",
+    "schedule_interval_seconds": 300
+  },
+  "message": "Stream created. Create a Temporal schedule for StreamPullerWorkflow with stream_id=composio-gmail-gmail-fetch-emails to start polling."
+}
+```
+
+</ResponseExample>

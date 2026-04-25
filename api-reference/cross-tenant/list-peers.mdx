@@ -1,0 +1,49 @@
+---
+title: "List Peers"
+description: "List the cross-tenant peers configured for this Alfred — empty unless this is Alfred Prime."
+api: "GET /api/v1/cross-tenant/peers"
+---
+
+## Overview
+
+Returns the parsed `CROSS_TENANT_PEERS` env var (a JSON array) with sensitive fields stripped. Empty list on non-Prime tenants.
+
+## Response
+
+<ResponseField name="peers" type="array">
+  Each entry: `{id, label, tailscaleIp}`. The peer's API key + Tailscale hostname stay server-side.
+</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -H "Authorization: Bearer $AAS_API_KEY" \
+  https://alfred.black/api/v1/cross-tenant/peers
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK (Alfred Prime)
+{
+  "peers": [
+    {"id": "miguel", "label": "Miguel Ortiz", "tailscaleIp": "100.72.147.32"},
+    {"id": "rapali", "label": "Zsolt Rapali", "tailscaleIp": "100.121.134.35"}
+  ]
+}
+```
+
+```json 200 OK (non-Prime)
+{ "peers": [] }
+```
+
+</ResponseExample>
+
+<Note>
+This endpoint exists on every tenant, but only David's Alfred Prime instance has `CROSS_TENANT_PEERS` populated, so non-Prime tenants always return an empty list.
+</Note>

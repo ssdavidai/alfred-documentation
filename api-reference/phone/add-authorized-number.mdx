@@ -1,0 +1,38 @@
+---
+title: "Add Authorised Number"
+description: "Append one number to the authorised-phone-numbers list."
+api: "POST /api/v1/phone/authorized-numbers"
+---
+
+## Body Parameters
+
+<ParamField body="number" type="string" required>
+  Phone number to add. Will be normalised and deduped.
+</ParamField>
+
+## Response
+
+<ResponseField name="numbers" type="array">The persisted list after the add.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X POST -H "Authorization: Bearer $AAS_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"number": "+15559876543"}' \
+  https://alfred.black/api/v1/phone/authorized-numbers
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 201 Created
+{ "numbers": ["+15559876543"] }
+```
+
+</ResponseExample>

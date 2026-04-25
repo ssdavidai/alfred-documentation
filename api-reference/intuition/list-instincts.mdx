@@ -1,0 +1,49 @@
+---
+title: "List Instincts"
+description: "List learned action patterns — the rules Alfred has internalised."
+api: "GET /api/v1/learning/instincts"
+---
+
+## Overview
+
+Reads from BOTH `vault/intuition/instincts/` (legacy) and `vault/instinct/` (current). Sorted by name. The `execution` block on each record drives the trust-gradient gate (Tier 1 forced-approval, Tier 3 autonomous) when JudgmentWorkflow fires.
+
+## Response
+
+<ResponseField name="items" type="array">Each instinct record: `{path, name, frontmatter, body, status, created}`. Frontmatter includes the `execution` block (`enabled`, `task_title_template`, `tier`, `requires_approval`).</ResponseField>
+<ResponseField name="total" type="number">Count.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -H "Authorization: Bearer $AAS_API_KEY" \
+  https://alfred.black/api/v1/learning/instincts
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "items": [
+    {
+      "path": "instinct/clean-old-receipts.md",
+      "name": "Clean old receipts",
+      "status": "active",
+      "frontmatter": {
+        "type": "instinct",
+        "execution": "enabled: true\ntask_title_template: 'Archive receipts older than {days} days'\ntier: 2\nrequires_approval: true"
+      },
+      "body": "When receipts older than 90 days are detected..."
+    }
+  ],
+  "total": 28
+}
+```
+
+</ResponseExample>

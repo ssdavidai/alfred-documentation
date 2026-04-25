@@ -1,0 +1,52 @@
+---
+title: "Enable Tool"
+description: "Add a per-action Composio tool slug to the openclaw gateway allowlist."
+api: "POST /api/v1/integrations/enable-tool"
+---
+
+## Overview
+
+Pushes a tool name into `gateway.tools.allow` in `openclaw.json`. In practice the platform now relies on the single `composio_execute` umbrella tool to dispatch every Composio action, so enabling per-action slugs is rare. This endpoint exists for the legacy per-tool toggle pattern and for debugging.
+
+## Body Parameters
+
+<ParamField body="action_slug" type="string" required>
+  Tool name to add to the allowlist.
+</ParamField>
+
+## Response
+
+<ResponseField name="status" type="string">`enabled`.</ResponseField>
+<ResponseField name="action_slug" type="string">Echo.</ResponseField>
+<ResponseField name="tools_count" type="number">Total number of entries in `gateway.tools.allow` after the update.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X POST -H "Authorization: Bearer $AAS_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"action_slug": "GMAIL_SEND_EMAIL"}' \
+  https://alfred.black/api/v1/integrations/enable-tool
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "status": "enabled",
+  "action_slug": "GMAIL_SEND_EMAIL",
+  "tools_count": 14
+}
+```
+
+</ResponseExample>
+
+<Warning>
+Writing `openclaw.json` triggers a debounced gateway restart (~40s). Use `GET /api/v1/openclaw/ready` to wait it out.
+</Warning>

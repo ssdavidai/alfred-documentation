@@ -1,0 +1,53 @@
+---
+title: "List Toolkit Actions"
+description: "List the Composio actions available for a given toolkit."
+api: "GET /api/v1/integrations/:toolkit/actions"
+---
+
+## Overview
+
+Direct passthrough to Composio's v2 `/actions` endpoint, scoped to one toolkit (no connection required). Returns up to 50 actions with slug + description. Use `/integrations/:id/capabilities` instead if you want the action list enriched with live stream state.
+
+## Path Parameters
+
+<ParamField path="toolkit" type="string" required>
+  Toolkit slug (e.g. `gmail`, `notion`).
+</ParamField>
+
+## Response
+
+<ResponseField name="toolkit" type="string">Echo of the path param.</ResponseField>
+
+<ResponseField name="actions" type="array">
+  Each entry: `{slug, description}`.
+</ResponseField>
+
+<ResponseField name="count" type="number">Number of actions returned.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -H "Authorization: Bearer $AAS_API_KEY" \
+  https://alfred.black/api/v1/integrations/notion/actions
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "toolkit": "notion",
+  "actions": [
+    {"slug": "NOTION_FETCH_DATA", "description": "Search across pages and databases."},
+    {"slug": "NOTION_INSERT_ROW_DATABASE", "description": "Insert a row into a Notion database."}
+  ],
+  "count": 2
+}
+```
+
+</ResponseExample>

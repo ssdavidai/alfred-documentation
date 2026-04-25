@@ -1,0 +1,194 @@
+---
+title: "Channels"
+description: "How Slack, Telegram, email, SMS, and voice all converge on the same Alfred — and the authorized-vs-stream split that keeps it safe."
+icon: "messages-question"
+---
+
+<Note>
+The channel layer sits across the agent and data layers. Inbound traffic from any channel either becomes a conversation Alfred answers in person, or a stream event treated as background information.
+</Note>
+
+## One Alfred, every entrance
+
+Sir can reach Alfred from his desk, his phone, his laptop, his workspace tools. Five channels are live today: dashboard chat, Slack DM, Telegram, email, and the phone (SMS + voice). All five converge on the same agent, the same vault, and the same memory.
+
+The architectural decision that shapes every inbound message is this: **only authorized senders get a conversational reply. Everyone else becomes a stream event.**
+
+| Channel | Authorized list | Unauthorized inbound |
+|---|---|---|
+| Email | `/vault/.auth/authorized_senders.json` | `stream_type: "agentmail"` event in JSONL, then hourly enrichment |
+| SMS | `/mnt/encrypted/alfred/.authorized-phone-numbers.json` | `stream_type: "sms"` event |
+| Voice | Same as SMS | Spam-filtered then `<Reject/>` if no match — voice doesn't have a stream fallback because Realtime minutes are billed |
+| Slack DM | OpenClaw's per-workspace user ACL | Dropped at the channel adapter |
+| Telegram | OpenClaw's per-bot chat ACL | Dropped at the channel adapter |
+| Dashboard chat | Sir is already authenticated | n/a |
+
+Sir manages email and SMS authorisation himself: through the dashboard, or by telling Alfred ("authorize my wife's number +1234..."). Both lists are CRUD endpoints on ctrl-api: `/api/v1/auth/senders` (`packages/ctrl/src/api/routes/authSenders.ts`) and `/api/v1/phone/authorized-numbers` (`packages/ctrl/src/api/routes/phone.ts`).
+
+## AgentMail — the email channel
+
+Every tenant gets an email address `alfred.<username>@mail.alfred.black` provisioned at signup. Email runs on a single shared AgentMail pod (`alfred-shared`, on AgentMail's Developer plan), with a single Svix webhook on the SaaS host. The isolation boundary is the **inbox-scoped API key**: each tenant gets a key that can only see and act on their inbox.
+
+### Inbound
+
+Source: `packages/saas/app/src/server/agentmailReceiver.ts`. The flow:
+
+<Steps>
+  <Step title="Svix POST to /webhooks/agentmail on SaaS">
+    AgentMail signs every webhook with the shared signing secret. The receiver verifies on raw bytes — Svix doesn't accept body re-encoding.
+  </Step>
+  <Step title="Tenant lookup by inbox_id">
+    Each AgentMail inbox is mapped to one `Instance` row via `agentmailInboxId`. Stale ids (destroyed tenants, legacy non-fleet inboxes) are silently dropped.
+  </Step>
+  <Step title="Sender extraction">
+    The `from` field is RFC 5322 (`"David Szabo-Stuban <david@szabostuban.com>"`). Parse the angle-bracketed address, lowercase it, compare against the tenant's authorized-senders list (cached for 60s).
+  </Step>
+  <Step title="Dispatch">
+    Authorized → `POST /api/v1/channels/email/inbound` with the full payload (un-stripped `text`, quoted history preserved). Unauthorized → `POST /api/v1/streams/ingest` with `stream_type: "agentmail"` and `extracted_text` (quote-stripped, noise-reduced).
+  </Step>
+</Steps>
+
+The SaaS receiver acks the webhook with `204` immediately and does the dispatch in the background — AgentMail doesn't retry on `204`, and Sir's inbound doesn't get held up by tenant network latency.
+
+### The authorized path
+
+`POST /api/v1/channels/email/inbound` on ctrl-api spawns a one-shot openclaw session with the message preloaded as the initial prompt. The `alfred-email-channel` skill (`packages/openclaw/workspace-template/skills/alfred-email-channel/SKILL.md`) tells the agent how to decide between five actions:
+
+1. **Reply** — only Alfred on To, no Cc, or personal context
+2. **Reply-all** — Alfred on To with Cc and the sender's instruction implies group context
+3. **Forward** — Sir is forwarding a third-party email asking Alfred to handle it
+4. **Execute the request, then confirm** — Sir is asking for an action ("add this to the renovation matter"); do the action, send a short confirmation
+5. **No reply** — newsletters, automated notifications that are still useful as records
+
+### Outbound
+
+Outbound is reached through `self`:
+
+```js
+self({ endpoint: "/api/v1/email/send", method: "POST", body: { to, subject, text, html?, attachments? } })
+self({ endpoint: "/api/v1/email/reply", method: "POST", body: { message_id, text, reply_all?, attachments? } })
+self({ endpoint: "/api/v1/email/forward", method: "POST", body: { message_id, to, subject?, text?, attachments? } })
+```
+
+Plus read endpoints to fetch a single message (`/email/message/:id`), the full thread (`/email/thread/:id`), and attachments (`/email/attachment/:message_id/:attachment_id`).
+
+Attachments are `{ filename, content_base64, content_type }`. The skill carries an explicit guard: never reference an attachment in the body text without including it in the request — claiming "please find attached" without an actual file is a hallucination, and Sir notices.
+
+### The First Brief
+
+At the end of onboarding, Alfred delivers Sir's First Brief by email to his Google address. Sir's reply lands as authorized inbound and bootstraps the conversational channel for him without him having to add himself to anything.
+
+## AgentPhone — voice and SMS
+
+Twilio. One master account at the SaaS layer; per-tenant subnumbers; tenants never hold Twilio credentials. A single SaaS webhook per endpoint (`POST /webhooks/twilio/voice`, `POST /webhooks/twilio/sms`) disambiguates by the `To:` number.
+
+### Inbound SMS
+
+Source: `packages/saas/app/src/server/twilio/webhooks.ts` → `packages/ctrl/src/api/routes/phone.ts`.
+
+<Steps>
+  <Step title="Twilio POSTs to SaaS">
+    Form-encoded. Signature verified with `validateTwilioSignature`. Spam-filtered against `packages/saas/app/src/server/twilio/spam.ts` before any work.
+  </Step>
+  <Step title="Tenant lookup by To: number">
+    `Instance.phoneNumber` unique index.
+  </Step>
+  <Step title="Proxy to ctrl-api /api/v1/phone/sms/inbound">
+    Fire-and-forget; SaaS responds 200 to Twilio immediately.
+  </Step>
+  <Step title="Tenant routes by authorisation">
+    Authorized → `openclawChatCompletion` against the main agent's gateway (synchronous reply, written to per-thread context at `/mnt/encrypted/alfred/streams/sms-phone-<sanitized-from>.jsonl`, plus a `sessions_send` audit-echo for cross-channel memory). Unauthorized → `/api/v1/streams/ingest` with `stream_type: "sms"`, no reply.
+  </Step>
+  <Step title="Authorized: ship the reply via SaaS internal endpoint">
+    `POST ${SAAS_INTERNAL_URL}/api/internal/twilio/send-sms` with the internal HMAC token. SaaS calls Twilio with the master credentials.
+  </Step>
+</Steps>
+
+<Tip>
+The SMS reply path uses openclaw's `/v1/chat/completions`, not `/v1/sessions/message`. Chat-completions returns the reply text in the response body — exactly what we need to hand to Twilio. Sessions/message is fire-and-forget and would succeed without giving us anything to send.
+</Tip>
+
+### Inbound voice
+
+Voice is the one channel that doesn't run on the tenant. The Voice Bridge (`packages/voice-bridge/`) is a Node.js WebSocket service running on the SaaS host, behind Caddy at `voice.alfred.black`. Twilio's Media Stream WebSocket lands there directly — long-lived WS doesn't fit cleanly into Wasp.
+
+<Steps>
+  <Step title="Twilio POSTs /webhooks/twilio/voice on SaaS">
+    SaaS returns TwiML `<Connect><Stream url="wss://voice.alfred.black/voice/<tenantId>">` with a signed HMAC in `<Parameter name="sig">` and the caller number in `<Parameter name="from">`.
+  </Step>
+  <Step title="Voice Bridge accepts the WS upgrade">
+    Path-shape check; no sig verification yet — Twilio strips query strings from Stream URLs, so the sig arrives in the first `start` event's `customParameters`.
+  </Step>
+  <Step title="Verify sig">
+    HMAC-SHA256 over the tenantId, keyed with `VOICE_BRIDGE_INTERNAL_TOKEN`, constant-time comparison. Bad sig → dispose immediately, no tenant lookup, no OpenAI minutes burned.
+  </Step>
+  <Step title="Fetch tenant context + voice context">
+    `GET /api/v1/phone/voice-context` on the tenant returns `MEMORY.md`, the `alfred-voice` skill, open matters, open tasks, recent session summaries across channels, and the action catalogue for every connected Composio toolkit. Cached for 60s on the tenant side.
+  </Step>
+  <Step title="Open OpenAI Realtime WS">
+    `wss://api.openai.com/v1/realtime?model=gpt-realtime` (GA endpoint). g711_ulaw end-to-end — Twilio's audio is forwarded verbatim, no resampling. Session config: instructions assembled from the `alfred-voice` skill plus the context primer, plus the function tools (`self`, `composio_execute`).
+  </Step>
+  <Step title="Bidirectional bridge">
+    Twilio audio → Realtime input. Realtime audio → Twilio output. Function calls (`self`, `composio_execute`) in the Realtime loop dispatch HTTP to the tenant's ctrl-api and feed `function_call_output` back.
+  </Step>
+  <Step title="On hangup">
+    Post the full transcript to `POST /api/v1/phone/transcript` on the tenant, which writes a `voice-call` stream event so the next text turn (Slack, dashboard, email) already knows what was discussed on the phone.
+  </Step>
+</Steps>
+
+The voice agent IS the OpenAI Realtime model itself — there's no openclaw wrapping the voice loop. Function calls happen inside the Realtime conversation; the bridge only proxies the HTTP for them. This is how voice keeps under the 800ms–1.2s round-trip floor.
+
+### Outbound SMS and voice
+
+Both reachable through `self`:
+
+```js
+self({ endpoint: "/api/v1/phone/sms", method: "POST", body: { to, body } })
+self({ endpoint: "/api/v1/phone/call", method: "POST", body: { to, intent } })
+```
+
+Both ship through SaaS internal endpoints with the master Twilio credentials. The tenant never holds Twilio creds.
+
+## Slack and Telegram
+
+Both run as OpenClaw channel adapters in the openclaw container — Slack via Socket Mode, Telegram via the Bot API. Sir connects them through Composio (auto-config produces the openclaw channel config), and inbound DMs / mentions land directly on the main agent.
+
+There's no SaaS-side webhook involved: the openclaw process holds long-lived connections to Slack and Telegram, and the channel adapter handles authorisation per-workspace and per-bot.
+
+### KNOWN_CONTACTS.md
+
+When the agent needs to deliver a message to Sir on Slack or Telegram (not as a reply to a thread Sir started, but proactively — a chore output, a reminder, an alert), it doesn't walk Slack's user directory or page through Telegram updates. It reads `KNOWN_CONTACTS.md` from the workspace.
+
+Source template: `packages/ctrl/src/templates/workspace/KNOWN_CONTACTS.md.njk`. Rendered into `~/.openclaw/workspace/KNOWN_CONTACTS.md` at provision time and updatable via `self({ endpoint: "/api/v1/admin/workspace/KNOWN_CONTACTS.md", method: "PUT" })`. Schema:
+
+```json
+{
+  "sir": {
+    "displayName": "...",
+    "email": "...",
+    "channels": {
+      "slack":      { "userId": "U…", "dmChannelId": "D…" },
+      "telegram":   { "chatId": "…", "botAccount": "default" },
+      "agentmail":  { "address": "…@…" },
+      "agentphone": { "e164": "+…" }
+    }
+  }
+}
+```
+
+Slack and Telegram values populate after the first paired DM (the agent captures the IDs from inbound payloads and asks Sir for permission to save them). Email and phone are set at provision time. The `alfred-channel-delivery` skill tells the agent how to use the cached IDs through `POST /api/v1/notifications` rather than walking directories — saving 25+ turns per delivery.
+
+## Cross-channel memory
+
+Every channel writes back to the same place. Slack DMs become OpenClaw sessions, captured to `system-openclaw-sessions.jsonl`. Email replies write to the `alfred-email-channel` audit and feed the streams pipeline. SMS turns persist to per-thread JSONL files. Voice transcripts post to `/api/v1/phone/transcript` after hangup.
+
+The result: Alfred remembers the morning Slack thread when Sir calls in the afternoon. He remembers last week's email when this week's reply arrives. He doesn't have a separate persona per channel — there's one Alfred, one conversation history, one set of open matters and open tasks, and every channel is a window onto the same butler.
+
+<CardGroup cols={2}>
+  <Card title="Email guide" icon="envelope" href="/guides/connected-apps">
+    Connecting AgentMail, configuring authorized senders.
+  </Card>
+  <Card title="API reference" icon="code" href="/api-reference/introduction">
+    Full email and phone endpoint specifications.
+  </Card>
+</CardGroup>

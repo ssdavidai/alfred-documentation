@@ -1,0 +1,57 @@
+---
+title: "Add Authorised Sender"
+description: "Authorise an email address for live agent replies."
+api: "POST /api/v1/auth/senders"
+---
+
+## Overview
+
+Adds one email to the authorised list. No-op if already present (returns 200 with the unchanged list rather than 201).
+
+## Body Parameters
+
+<ParamField body="email" type="string" required>
+  Valid email (3–254 chars, must contain `@` and a TLD). Stored lowercase.
+</ParamField>
+
+## Response
+
+<ResponseField name="senders" type="array">The persisted list, sorted.</ResponseField>
+<ResponseField name="updated_at" type="string">ISO timestamp.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X POST -H "Authorization: Bearer $AAS_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"email": "miguel@upstring.com"}' \
+  https://alfred.black/api/v1/auth/senders
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 201 Created
+{
+  "senders": ["david@szabostuban.com", "miguel@upstring.com"],
+  "updated_at": "2026-04-25T11:35:00Z"
+}
+```
+
+```json 200 OK (already present)
+{
+  "senders": ["david@szabostuban.com", "miguel@upstring.com"],
+  "updated_at": "2026-04-25T11:00:00Z"
+}
+```
+
+</ResponseExample>
+
+<Note>
+The agent can also call this conversationally via `self({endpoint: "/api/v1/auth/senders", method: "POST", body: {...}})` — Sir says "authorise Miguel" and Alfred makes the call.
+</Note>

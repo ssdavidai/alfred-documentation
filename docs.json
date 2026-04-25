@@ -48,7 +48,8 @@
               "architecture/data",
               "architecture/semantic",
               "architecture/kinetic",
-              "architecture/interface"
+              "architecture/interface",
+              "architecture/channels"
             ]
           },
           {
@@ -63,21 +64,24 @@
             "group": "Guides",
             "pages": [
               "guides/welcome-pack",
-              "guides/billing",
+              "guides/your-first-30-days",
               "guides/your-dashboard",
+              "guides/browsing-your-vault",
+              "guides/your-ai-agents",
               "guides/connected-apps",
               "guides/streams-and-integrations",
               "guides/using-the-inbox",
-              "guides/browsing-your-vault",
-              "guides/your-ai-agents",
+              "guides/email-channel",
+              "guides/voice-channel",
+              "guides/sms-channel",
               "guides/device-pairing",
-              "guides/api-keys",
-              "guides/how-the-api-works",
-              "guides/recipes",
               "guides/intuition",
+              "guides/recipes",
               "guides/monitoring",
               "guides/security",
-              "guides/your-first-30-days"
+              "guides/api-keys",
+              "guides/how-the-api-works",
+              "guides/billing"
             ]
           },
           {
@@ -102,6 +106,7 @@
             "group": "Vault",
             "pages": [
               "api-reference/vault/get-context",
+              "api-reference/vault/get-schema",
               "api-reference/vault/search",
               "api-reference/vault/list-by-type",
               "api-reference/vault/read-record",
@@ -109,10 +114,129 @@
               "api-reference/vault/edit-record",
               "api-reference/vault/move-record",
               "api-reference/vault/delete-record",
-              "api-reference/vault/get-schema",
+              "api-reference/vault/promote-triage",
+              "api-reference/vault/get-graph",
+              "api-reference/vault/get-nebula-data",
+              "api-reference/vault/list-inbox",
               "api-reference/vault/upload-inbox",
-              "api-reference/vault/upload-inbox-bulk",
-              "api-reference/vault/list-inbox"
+              "api-reference/vault/upload-inbox-bulk"
+            ]
+          },
+          {
+            "group": "Streams",
+            "pages": [
+              "api-reference/streams/list",
+              "api-reference/streams/get",
+              "api-reference/streams/create",
+              "api-reference/streams/update",
+              "api-reference/streams/delete",
+              "api-reference/streams/pause",
+              "api-reference/streams/resume",
+              "api-reference/streams/ingest",
+              "api-reference/streams/inbox-scan",
+              "api-reference/streams/list-events",
+              "api-reference/streams/list-stream-events",
+              "api-reference/streams/mark-processed",
+              "api-reference/streams/quarantine",
+              "api-reference/streams/prune",
+              "api-reference/streams/openclaw-sessions-report"
+            ]
+          },
+          {
+            "group": "Connected Apps",
+            "pages": [
+              "api-reference/integrations/list",
+              "api-reference/integrations/catalog",
+              "api-reference/integrations/connect",
+              "api-reference/integrations/connect-api-key",
+              "api-reference/integrations/disconnect",
+              "api-reference/integrations/capabilities",
+              "api-reference/integrations/check-readiness",
+              "api-reference/integrations/auto-config",
+              "api-reference/integrations/enable-stream",
+              "api-reference/integrations/disable-stream",
+              "api-reference/integrations/migrate-stream",
+              "api-reference/integrations/enable-tool",
+              "api-reference/integrations/disable-tool",
+              "api-reference/integrations/list-actions",
+              "api-reference/integrations/execute"
+            ]
+          },
+          {
+            "group": "Email",
+            "pages": [
+              "api-reference/email/status",
+              "api-reference/email/send",
+              "api-reference/email/reply",
+              "api-reference/email/forward",
+              "api-reference/email/get-message",
+              "api-reference/email/get-thread",
+              "api-reference/email/get-attachment",
+              "api-reference/email/channel-inbound"
+            ]
+          },
+          {
+            "group": "Phone",
+            "pages": [
+              "api-reference/phone/config",
+              "api-reference/phone/voice-context",
+              "api-reference/phone/send-sms",
+              "api-reference/phone/place-call",
+              "api-reference/phone/list-authorized-numbers",
+              "api-reference/phone/add-authorized-number",
+              "api-reference/phone/remove-authorized-number",
+              "api-reference/phone/replace-authorized-numbers",
+              "api-reference/phone/sms-inbound",
+              "api-reference/phone/transcript"
+            ]
+          },
+          {
+            "group": "Authorized Senders",
+            "pages": [
+              "api-reference/auth-senders/list",
+              "api-reference/auth-senders/add",
+              "api-reference/auth-senders/remove"
+            ]
+          },
+          {
+            "group": "Chores",
+            "pages": [
+              "api-reference/chores/list",
+              "api-reference/chores/get",
+              "api-reference/chores/trigger",
+              "api-reference/chores/pause",
+              "api-reference/chores/resume",
+              "api-reference/chores/delete",
+              "api-reference/chores/source-audit"
+            ]
+          },
+          {
+            "group": "Approvals",
+            "pages": [
+              "api-reference/approvals/list-pending",
+              "api-reference/approvals/approve",
+              "api-reference/approvals/reject"
+            ]
+          },
+          {
+            "group": "Intuition",
+            "pages": [
+              "api-reference/intuition/status",
+              "api-reference/intuition/list-observations",
+              "api-reference/intuition/get-observation",
+              "api-reference/intuition/list-instincts",
+              "api-reference/intuition/get-instinct",
+              "api-reference/intuition/list-reflections",
+              "api-reference/intuition/list-sessions",
+              "api-reference/intuition/queue",
+              "api-reference/intuition/route",
+              "api-reference/intuition/curator-route",
+              "api-reference/intuition/bootstrap",
+              "api-reference/intuition/enable",
+              "api-reference/intuition/disable",
+              "api-reference/intuition/list-quarantine",
+              "api-reference/intuition/retry-quarantine",
+              "api-reference/intuition/dismiss-quarantine"
             ]
           },
           {
@@ -140,32 +264,11 @@
             "pages": [
               "api-reference/workflows/list",
               "api-reference/workflows/describe",
+              "api-reference/workflows/history",
               "api-reference/workflows/start",
-              "api-reference/workflows/terminate",
               "api-reference/workflows/signal",
               "api-reference/workflows/cancel",
-              "api-reference/workflows/history"
-            ]
-          },
-          {
-            "group": "Intuition",
-            "pages": [
-              "api-reference/learning/status",
-              "api-reference/learning/observations",
-              "api-reference/learning/observation-detail",
-              "api-reference/learning/instincts",
-              "api-reference/learning/instinct-detail",
-              "api-reference/learning/reflections",
-              "api-reference/learning/sessions",
-              "api-reference/learning/queue",
-              "api-reference/learning/route-and-process",
-              "api-reference/learning/route",
-              "api-reference/learning/enable",
-              "api-reference/learning/disable",
-              "api-reference/learning/quarantine",
-              "api-reference/learning/quarantine-retry",
-              "api-reference/learning/quarantine-dismiss",
-              "api-reference/learning/bootstrap"
+              "api-reference/workflows/terminate"
             ]
           },
           {
@@ -174,33 +277,28 @@
               "api-reference/schedules/list",
               "api-reference/schedules/describe",
               "api-reference/schedules/create",
-              "api-reference/schedules/delete",
+              "api-reference/schedules/trigger",
               "api-reference/schedules/pause",
               "api-reference/schedules/unpause",
-              "api-reference/schedules/trigger"
+              "api-reference/schedules/delete"
             ]
           },
           {
-            "group": "Devices",
+            "group": "Cross-tenant",
             "pages": [
-              "api-reference/devices/list",
-              "api-reference/devices/approve",
-              "api-reference/devices/reject",
-              "api-reference/devices/remove",
-              "api-reference/devices/clear",
-              "api-reference/devices/rotate",
-              "api-reference/devices/revoke"
+              "api-reference/cross-tenant/list-peers",
+              "api-reference/cross-tenant/ask"
             ]
           },
           {
             "group": "OpenClaw",
             "pages": [
-              "api-reference/openclaw/health",
               "api-reference/openclaw/status",
+              "api-reference/openclaw/health",
               "api-reference/openclaw/restart",
-              "api-reference/openclaw/skills",
-              "api-reference/openclaw/sessions",
               "api-reference/openclaw/agents",
+              "api-reference/openclaw/sessions",
+              "api-reference/openclaw/skills",
               "api-reference/openclaw/cron",
               "api-reference/openclaw/plugins",
               "api-reference/openclaw/hooks",
@@ -219,6 +317,50 @@
             ]
           },
           {
+            "group": "Models",
+            "pages": [
+              "api-reference/models/list"
+            ]
+          },
+          {
+            "group": "Tools",
+            "pages": [
+              "api-reference/tools/list",
+              "api-reference/tools/invoke"
+            ]
+          },
+          {
+            "group": "Workspace",
+            "pages": [
+              "api-reference/workspace/read-file",
+              "api-reference/workspace/write-file"
+            ]
+          },
+          {
+            "group": "Notifications",
+            "pages": [
+              "api-reference/notifications/send"
+            ]
+          },
+          {
+            "group": "Terminal",
+            "pages": [
+              "api-reference/terminal/connect"
+            ]
+          },
+          {
+            "group": "Devices",
+            "pages": [
+              "api-reference/devices/list",
+              "api-reference/devices/approve",
+              "api-reference/devices/reject",
+              "api-reference/devices/remove",
+              "api-reference/devices/revoke",
+              "api-reference/devices/rotate",
+              "api-reference/devices/clear"
+            ]
+          },
+          {
             "group": "Credentials",
             "pages": [
               "api-reference/credentials/list",
@@ -232,30 +374,19 @@
             ]
           },
           {
-            "group": "Instance",
+            "group": "Instance Admin",
             "pages": [
               "api-reference/admin/health",
               "api-reference/admin/system-info",
               "api-reference/admin/list-containers",
-              "api-reference/admin/restart-container",
-              "api-reference/admin/stop-container",
               "api-reference/admin/start-container",
+              "api-reference/admin/stop-container",
+              "api-reference/admin/restart-container",
               "api-reference/admin/container-logs"
             ]
           }
         ]
       }
     ]
-  },
-  "appearance": {
-    "default": "dark"
-  },
-  "fonts": {
-    "family": "Ubuntu"
-  },
-  "styling": {
-    "latex": true
-  },
-  "logo": "/images/alfred-logo.png",
-  "favicon": "/images/Untitleddesign(59).png"
+  }
 }

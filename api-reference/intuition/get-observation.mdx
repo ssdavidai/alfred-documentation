@@ -1,0 +1,52 @@
+---
+title: "Get Observation"
+description: "Read one observation record by id."
+api: "GET /api/v1/learning/observations/:id"
+---
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  Observation filename (e.g. `2026-04-25-user-correction.md`). Sanitised — no path traversal.
+</ParamField>
+
+## Response
+
+<ResponseField name="path" type="string">Vault-relative path.</ResponseField>
+<ResponseField name="frontmatter" type="object">Parsed frontmatter.</ResponseField>
+<ResponseField name="body" type="string">Markdown body.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -H "Authorization: Bearer $AAS_API_KEY" \
+  https://alfred.black/api/v1/learning/observations/2026-04-25-user-correction.md
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "path": "observation/2026-04-25-user-correction.md",
+  "frontmatter": {
+    "type": "observation",
+    "kind": "CORRECTION",
+    "created": "2026-04-25T10:00:00Z",
+    "assistant_context": "Alfred said: 'The meeting was 30 minutes.'",
+    "routed_by": "alfred"
+  },
+  "body": "Sir corrected the duration..."
+}
+```
+
+```json 404 Not Found
+{ "error": "Observation not found: 2026-04-25-user-correction.md" }
+```
+
+</ResponseExample>

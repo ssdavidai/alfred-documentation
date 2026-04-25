@@ -1,0 +1,69 @@
+---
+title: "Forward Email"
+description: "Forward an inbound message to a new recipient."
+api: "POST /api/v1/email/forward"
+---
+
+## Overview
+
+Forwards an existing AgentMail message to one or more new addresses. Subject, text, and HTML are optional — AgentMail's defaults apply if omitted.
+
+## Body Parameters
+
+<ParamField body="message_id" type="string" required>
+  AgentMail id of the source message.
+</ParamField>
+
+<ParamField body="to" type="string | array" required>
+  Forward target(s).
+</ParamField>
+
+<ParamField body="subject" type="string" optional>
+  Override the forwarded subject (defaults to "Fwd: ...").
+</ParamField>
+
+<ParamField body="text" type="string" optional>
+  Add a note above the forwarded content.
+</ParamField>
+
+<ParamField body="html" type="string" optional>
+  HTML version of the note.
+</ParamField>
+
+<ParamField body="attachments" type="array" optional>
+  Additional attachments. The original message's attachments are forwarded automatically by AgentMail.
+</ParamField>
+
+## Response
+
+AgentMail's raw response (passthrough).
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X POST -H "Authorization: Bearer $AAS_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message_id": "msg_01HXYZABCDEF",
+    "to": "miguel@upstring.com",
+    "text": "Sharing this with you for visibility."
+  }' \
+  https://alfred.black/api/v1/email/forward
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "message_id": "msg_01HXYZFWD456",
+  "thread_id": "thr_01HXYZNEWFWD"
+}
+```
+
+</ResponseExample>

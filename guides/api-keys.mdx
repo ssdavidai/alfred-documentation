@@ -1,148 +1,115 @@
 ---
 title: "API Keys"
-description: "Creating and using API keys to access the Alfred API."
+description: "Sir's per-account API key — where to find it, how to use it, when to rotate."
 icon: "key"
 ---
 
-## Overview
+## What an API key is for
 
-API keys let you access the Alfred API from scripts, automations, and integrations. Each key provides full access to your API endpoints.
+API keys let scripts, automations, and external systems call Sir's Alfred without going through the dashboard's session login. Every call you make with a key is authenticated as Sir, hits Sir's dedicated tenant via the SaaS proxy, and runs against Sir's vault.
 
-## Creating an API key
+Keys are issued per-account, not per-instance. They authenticate you to the SaaS host at `alfred.black`, which then routes the request through Tailscale to your tenant's ctrl-api with the tenant's own internal credentials. You never see the per-instance internal credentials.
 
-1. Go to your [Alfred Black dashboard](https://alfred.black)
-2. Navigate to **Settings > API Keys**
-3. Click **Create**
-4. Give it a descriptive name (e.g., "CI pipeline", "n8n automation", "shell scripts")
-5. Click **Create** and copy the key immediately
-
-<Warning>
-  Your API key is shown only once. Copy it immediately and store it somewhere safe. If you lose it, you'll need to create a new one.
-</Warning>
+---
 
 ## Key format
 
-Alfred API keys use the format:
+Every key looks like `alf_<32 random hex characters>`. Total length is 36 characters. Example: `alf_a1b2c3d4e5f60718293a4b5c6d7e8f90`.
 
-```
-alf_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4
-```
+The dashboard shows you the full key **exactly once** — at creation. After that you only see the prefix (`alf_a1b2c3d4`) and the metadata (name, last-used timestamp).
 
-The `alf_` prefix followed by 32 hexadecimal characters.
+<Warning>
+The full key is only shown at creation time. Copy it immediately into your password manager or your script's secret store. If you lose it, revoke it and create a new one — there's no recovery flow.
+</Warning>
 
-## Making API requests
+---
 
-Include your key in the `Authorization` header as a Bearer token:
+## Creating a key
 
-<CodeGroup>
-```bash cURL
-curl /api/v1/vault/context \
-  -H "Authorization: Bearer alf_your_key_here"
-```
+<Steps>
+  <Step title="Open Settings">
+    Sign in at [alfred.black](https://alfred.black) and click **Settings** in the sidebar.
+  </Step>
 
-```javascript JavaScript
-const response = await fetch('/api/v1/vault/context', {
-  headers: {
-    'Authorization': 'Bearer alf_your_key_here'
-  }
-});
-const data = await response.json();
-```
+  <Step title="Scroll to API Keys">
+    Find the API Keys section. You'll see a list of your existing keys (by name and prefix), with their last-used timestamps.
+  </Step>
 
-```python Python
-import requests
+  <Step title="Click Create Key">
+    Give the key a descriptive name — "GitHub Actions deploy script", "Personal automation laptop", "Read-only monitoring". The name is for your reference only; it doesn't affect what the key can do.
+  </Step>
 
-response = requests.get(
-    '/api/v1/vault/context',
-    headers={'Authorization': 'Bearer alf_your_key_here'}
-)
-data = response.json()
-```
-</CodeGroup>
+  <Step title="Copy the key immediately">
+    The full key appears in a modal. Copy it. The modal will warn you this is the only time you'll see it.
+  </Step>
+</Steps>
 
-All API endpoints use the base path `/api/v1/...`.
+You can have up to **10 keys** per account. If you need more, revoke an unused one first.
 
-## Managing your keys
+---
 
-From the **Settings > API Keys** page in your dashboard, you can:
+## Using a key
 
-- **View all keys** — See names, creation dates, and last used timestamps
-- **Track usage** — Check when each key was last used
-- **Revoke keys** — Delete keys you no longer need
-
-<Note>
-  You can create up to 10 API keys per account.
-</Note>
-
-## Best practices
-
-- **Don't hardcode keys** — Use environment variables instead:
-  ```bash
-  export ALFRED_API_KEY="alf_your_key_here"
-  curl /api/v1/vault/context -H "Authorization: Bearer $ALFRED_API_KEY"
-  ```
-- **Use descriptive names** — Name keys after their purpose so you know which to revoke
-- **Rotate periodically** — Create a new key and revoke the old one every few months
-- **Revoke unused keys** — If you're no longer using an integration, revoke its key
-
-## Example integrations
-
-### Shell script
+Every call to the Alfred API uses Bearer authentication on `https://alfred.black/api/...`:
 
 ```bash
-#!/bin/bash
-ALFRED_API_KEY="${ALFRED_API_KEY:?Set ALFRED_API_KEY}"
-
-# Share content with Alfred
-curl -X POST /api/v1/vault/inbox \
-  -H "Authorization: Bearer $ALFRED_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d "{\"filename\": \"$(date +%Y-%m-%d)-notes.md\", \"content\": \"$1\"}"
+curl https://alfred.black/api/v1/vault/context \
+  -H "Authorization: Bearer alf_a1b2c3d4e5f60718293a4b5c6d7e8f90"
 ```
 
-### Python automation
+The same key works for every endpoint Sir's tenant exposes — vault read/write, streams, learning, workflows, schedules, chores, workers, admin, phone, email. The proxy on the SaaS side handles the routing automatically based on which user's key it is.
 
-```python
-import os
-import requests
+See [How the API Works](/guides/how-the-api-works) for the proxy architecture, and [Recipes](/guides/recipes) for copy-pastable examples.
 
-API_KEY = os.environ['ALFRED_API_KEY']
-HEADERS = {'Authorization': f'Bearer {API_KEY}'}
+---
 
-# Check vault status
-response = requests.get('/api/v1/vault/context', headers=HEADERS)
-print(response.json())
-```
+## Rotation
 
-## Error responses
+API keys don't expire automatically. They're valid until you revoke them. To rotate:
 
-If your key is missing or invalid, you'll receive a `401 Unauthorized` response:
+<Steps>
+  <Step title="Create a new key">
+    Settings → API Keys → Create Key. Give it a fresh name (e.g. "Personal automation laptop — rotated 2026-04").
+  </Step>
+  <Step title="Update your scripts and integrations">
+    Replace the old key everywhere it's referenced. Test that everything still works.
+  </Step>
+  <Step title="Revoke the old key">
+    Click Revoke next to the old key in the dashboard. The revocation is immediate — any subsequent call with the old key returns 401.
+  </Step>
+</Steps>
 
-```json
-{
-  "error": {
-    "code": "UNAUTHORIZED",
-    "message": "Missing or malformed Authorization header"
-  }
-}
-```
+Rotate proactively if a key has been exposed (committed to a public repo, shared in a screenshot, leaked in a log) or if a device that held the key was lost.
 
-## Testing your key
+---
 
-Use the health endpoint to verify your key works:
+## Last-used tracking
 
-```bash
-curl /api/v1/admin/health \
-  -H "Authorization: Bearer alf_your_key_here"
-```
+Every successful API call updates the `lastUsedAt` timestamp on the key. Use this to spot keys you've forgotten about — a key whose last use was three months ago is probably safe to revoke.
 
-A successful response confirms your API key is valid and your Alfred is reachable.
+The timestamp updates fire-and-forget so it doesn't slow down your request, and only on successful authentication (a 401 from a bad key doesn't bump anything).
 
-<Columns cols={2}>
+---
+
+## What a key can NOT do
+
+The key authenticates you to Sir's own tenant. It doesn't grant cross-tenant access (that's a separate Alfred Prime capability, gated by `ALFRED_PRIME=true` and a peer config — not surfaced to API key holders). It doesn't grant access to the SaaS host's admin endpoints. It doesn't bypass the per-instance Tailscale firewall.
+
+If you need a more constrained credential — for instance, a key that can only read the vault, not write — that's not yet a built-in feature. Today every key has the same permissions as Sir himself does in the dashboard. Use one key per integration and revoke aggressively.
+
+---
+
+<CardGroup cols={2}>
+  <Card title="How the API Works" icon="route" href="/guides/how-the-api-works">
+    The proxy chain from your script to your tenant
+  </Card>
+  <Card title="Recipes" icon="book-open" href="/guides/recipes">
+    Worked examples — first calls to make
+  </Card>
+  <Card title="Security" icon="shield-check" href="/guides/security">
+    The full security model
+  </Card>
   <Card title="API Reference" icon="code" href="/api-reference/introduction">
-    See all available endpoints
+    Every endpoint in detail
   </Card>
-  <Card title="Authentication" icon="lock" href="/api-reference/authentication">
-    Full authentication documentation
-  </Card>
-</Columns>
+</CardGroup>

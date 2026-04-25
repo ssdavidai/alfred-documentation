@@ -1,0 +1,35 @@
+---
+title: "Disable Alfred Learn"
+description: "Stop the alfred-learn container and persist ALFRED_LEARN_ENABLED=false."
+api: "POST /api/v1/learning/disable"
+---
+
+## Overview
+
+Sets `ALFRED_LEARN_ENABLED=false` in `.env` and stops the container. Idempotent — already-stopped is fine.
+
+## Response
+
+<ResponseField name="message" type="string">`Alfred Learn disabled`.</ResponseField>
+<ResponseField name="enabled" type="boolean">`false`.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X POST -H "Authorization: Bearer $AAS_API_KEY" \
+  https://alfred.black/api/v1/learning/disable
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{ "message": "Alfred Learn disabled", "enabled": false }
+```
+
+</ResponseExample>

@@ -1,69 +1,117 @@
 ---
 title: "Create Schedule"
-description: "Create a new workflow schedule"
+description: "Register a new Temporal schedule that fires a workflow on a cron cadence."
 api: "POST /api/v1/schedules"
 ---
 
-Create a new schedule that automatically starts workflow executions on a cron-based cadence. You can configure the workflow type, task queue, input data, and overlap behavior.
+Creates a new Temporal schedule. Wraps `temporal schedule create`. The schedule fires the named workflow on the named task queue at every cron tick, with optional overlap policy.
+
+For the `alfred-learn` workflows, the standard schedules are auto-registered on container first boot by `scripts/register_schedules.py`. Use this endpoint for ad-hoc, tenant-specific, or generated chore schedules.
+
+## Authentication
+
+Bearer token in the `Authorization` header.
+
+## Request body
 
 <ParamField body="schedule_id" type="string" required>
-  Unique identifier for this schedule. Must not conflict with existing schedules.
+  Unique schedule identifier. Must not collide with an existing schedule.
 </ParamField>
 
 <ParamField body="workflow_type" type="string" required>
-  The workflow type to execute on each schedule trigger.
+  Registered workflow type to invoke on each fire. Must match a `@workflow.defn(name="...")` value on the worker.
 </ParamField>
 
 <ParamField body="task_queue" type="string" required>
-  The task queue where scheduled workflows will be executed.
+  Task queue the scheduled workflow runs on. For learn workflows: `alfred-learn`.
 </ParamField>
 
 <ParamField body="cron" type="string" required>
-  Cron expression defining the schedule timing. Uses standard 5-field format: `minute hour day month weekday`
+  Cron expression. Standard 5-field format: `minute hour day month weekday`.
 
   Examples:
-  - `0 * * * *` - Every hour at minute 0
-  - `0 2 * * *` - Daily at 2:00 AM
-  - `0 3 * * 0` - Weekly on Sunday at 3:00 AM
-  - `*/15 * * * *` - Every 15 minutes
+  - `0 * * * *` — top of every hour
+  - `0 18 * * *` — daily at 18:00
+  - `0 2 * * *` — daily at 02:00
+  - `0 3 * * 0` — Sundays at 03:00
+  - `*/15 * * * *` — every 15 minutes
 </ParamField>
 
 <ParamField body="input" type="any" optional>
-  Input data passed to each scheduled workflow execution. Will be JSON-serialized.
+  Single input value passed to each scheduled workflow execution. JSON-serialized.
 </ParamField>
 
-<ParamField body="overlap_policy" type="string" optional>
-  Policy for handling overlapping executions when a new run is scheduled while a previous run is still active.
-
-  Values:
-  - `Skip` - Skip the new run (default)
-  - `BufferOne` - Buffer one run, start when current completes
-  - `BufferAll` - Buffer all runs
-  - `CancelOther` - Cancel the running execution and start the new one
-  - `TerminateOther` - Terminate the running execution and start the new one
-  - `AllowAll` - Allow concurrent executions
+<ParamField body="overlap_policy" type="string" optional default="Skip">
+  Behaviour when a new fire arrives while the previous run is still active. Values:
+  - `Skip` — skip the new fire (default)
+  - `BufferOne` — buffer at most one pending fire
+  - `BufferAll` — buffer every pending fire
+  - `CancelOther` — cancel the active run, start the new one
+  - `TerminateOther` — terminate the active run, start the new one
+  - `AllowAll` — allow concurrent runs
 </ParamField>
 
 <RequestExample>
-```bash cURL
-curl -X POST \
+
+```bash Hourly run, no input
+curl -X POST https://alfred.black/api/v1/schedules \
   -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
   -d '{
-    "schedule_id": "my-daily-schedule",
-    "workflow_type": "MyWorkflow",
-    "task_queue": "my-task-queue",
-    "cron": "0 4 * * *",
+    "schedule_id": "weekly-billing-summary",
+    "workflow_type": "WeeklyBillingSummaryWorkflow",
+    "task_queue": "alfred-learn",
+    "cron": "0 9 * * 1",
     "overlap_policy": "Skip"
-  }' \
-  /api/v1/schedules
+  }'
 ```
+
+```bash With input payload
+curl -X POST https://alfred.black/api/v1/schedules \
+  -H "Authorization: Bearer alf_your_key_here" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "schedule_id": "matter-acme-weekly-digest",
+    "workflow_type": "WeeklyMatterDigestWorkflow",
+    "task_queue": "alfred-learn",
+    "cron": "0 8 * * 5",
+    "input": {"matter_slug": "acme-redesign"},
+    "overlap_policy": "Skip"
+  }'
+```
+
 </RequestExample>
 
 <ResponseExample>
+
 ```json 201
 {
-  "message": "Schedule created"
+  "message": "Schedule created",
+  "raw": "Schedule \"weekly-billing-summary\" created."
 }
 ```
+
+```json 400 Missing required field
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "schedule_id, workflow_type, task_queue, and cron are required"
+  }
+}
+```
+
 </ResponseExample>
+
+<ResponseField name="raw" type="string">
+  Trimmed stdout from the Temporal CLI. May be omitted when the CLI emits no output.
+</ResponseField>
+
+## When to use
+
+- Registering generated chore workflows produced by the chore generation pipeline.
+- Adding a one-off recurring summary job for a specific matter or stream.
+- Backfilling a missing standard schedule after a tenant restore.
+
+<Note>
+  The standard `al-*` schedules listed in [list](/api-reference/schedules/list) are created automatically on container boot; do not duplicate them via this endpoint.
+</Note>

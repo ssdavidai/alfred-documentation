@@ -1,23 +1,38 @@
 ---
 title: "Read Record"
-description: "Read the full content of a vault record."
+description: "Returns the parsed frontmatter and full markdown body of a single vault record."
 api: "GET /api/v1/vault/records/{path}"
 ---
 
-## Overview
+## When to use
 
-Returns the full content of a vault record including its metadata and body.
+Fetch one record by its vault-relative path. Use this after listing (e.g., `GET /api/v1/vault/list/{type}`) to load the full body of a record the user clicked on.
+
+The endpoint reads the file directly from the vault filesystem (no `docker exec` overhead) and parses YAML frontmatter using a spec-conformant parser, so date/datetime/bool values come back as the right JSON types instead of strings.
 
 ## Path Parameters
 
 <ParamField path="path" type="string" required>
-  Relative path to the record (e.g., `person/Alice Chen.md`). URL-encode spaces and special characters.
+  Vault-relative path. Forward slashes only. Both forms are accepted:
+
+  - With extension: `matter/alfred-product-development-launch.md`
+  - Without extension: `matter/alfred-product-development-launch`
+
+  URL-encode segments that contain spaces or special characters (e.g., `person/Alice%20Chen.md`). Path traversal (`..`, absolute paths, NUL bytes) is rejected with `400 VALIDATION_ERROR`.
 </ParamField>
 
 ## Response
 
-<ResponseField name="raw" type="string">
-  The full record content (metadata + body) as text. If the output is structured JSON, it is returned directly instead.
+<ResponseField name="path" type="string" required>
+  The resolved vault-relative path, always with `.md` (the server appends it if you didn't).
+</ResponseField>
+
+<ResponseField name="frontmatter" type="object" required>
+  The parsed YAML frontmatter as a JSON object. Empty object (`{}`) if the file has no frontmatter or the frontmatter is malformed (the server is permissive — broken frontmatter never blocks a read). Top-level `null` / `~` / bare-key values are coerced to empty strings for backward compatibility.
+</ResponseField>
+
+<ResponseField name="body" type="string" required>
+  The markdown body — everything after the closing `---`. Leading newlines are stripped. Empty string if the file is just frontmatter.
 </ResponseField>
 
 ## Request Example
@@ -26,23 +41,23 @@ Returns the full content of a vault record including its metadata and body.
 
 ```bash cURL
 curl -X GET \
-  "/api/v1/vault/records/person/Alice%20Chen.md" \
-  -H "Authorization: Bearer alf_your_key_here"
+  "https://alfred.black/api/v1/vault/records/matter/alfred-product-development-launch.md" \
+  -H "Authorization: Bearer $AAS_API_KEY"
+
+# Path with spaces — URL-encode
+curl -X GET \
+  "https://alfred.black/api/v1/vault/records/person/Alice%20Chen.md" \
+  -H "Authorization: Bearer $AAS_API_KEY"
 ```
 
 ```javascript JavaScript
-const recordPath = 'person/Alice Chen.md';
-const encodedPath = encodeURIComponent(recordPath);
-
-const response = await fetch(`/api/v1/vault/records/${encodedPath}`, {
-  method: 'GET',
-  headers: {
-    'Authorization': 'Bearer alf_your_key_here'
-  }
-});
-
-const record = await response.json();
-console.log(record);
+const path = encodeURIComponent('person/Alice Chen.md').replace(/%2F/g, '/');
+const response = await fetch(
+  `https://alfred.black/api/v1/vault/records/${path}`,
+  { headers: { 'Authorization': `Bearer ${process.env.AAS_API_KEY}` } },
+);
+const { frontmatter, body } = await response.json();
+console.log(frontmatter.status, '-', body.slice(0, 200));
 ```
 
 </RequestExample>
@@ -53,26 +68,45 @@ console.log(record);
 
 ```json 200 OK
 {
-  "raw": "---\ntype: person\nrole: ML Engineer\norg: \"[[org/Acme Corp]]\"\nstatus: active\n---\n\n## Background\n\nAlice joined Acme in December 2025 as a senior ML engineer."
+  "path": "matter/alfred-product-development-launch.md",
+  "frontmatter": {
+    "type": "matter",
+    "name": "Alfred Product Development & Launch",
+    "status": "active",
+    "category": "work",
+    "created": "2026-04-08",
+    "key_people": ["[[person/Sir]]"],
+    "alfred_tags": ["alfred-product-development-launch"]
+  },
+  "body": "\n# Alfred Product Development & Launch\n\n> Building Alfred, the AI personal butler / agentic assistant SaaS, from solo prototype to launched product…\n"
+}
+```
+
+```json 404 Not Found
+{ "error": "Record not found" }
+```
+
+```json 400 Bad Request
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Path traversal denied"
+  }
 }
 ```
 
 ```json 401 Unauthorized
-{
-  "error": {
-    "code": "UNAUTHORIZED",
-    "message": "Unauthorized"
-  }
-}
-```
-
-```json 500 Internal Server Error
-{
-  "error": {
-    "code": "EXEC_ERROR",
-    "message": "Command failed with exit code 1"
-  }
-}
+{ "error": { "code": "UNAUTHORIZED", "message": "Invalid API key" } }
 ```
 
 </ResponseExample>
+
+## Tips
+
+<Note>
+The 404 response uses the bare shape `{"error": "Record not found"}` rather than the standard `{"error": {"code": ..., "message": ...}}` envelope. This is a known wart inherited from the read-path being filesystem-direct instead of going through the shared error pipeline.
+</Note>
+
+<Note>
+Wikilinks in the body (`[[other/record]]`) are returned verbatim — the endpoint does not resolve or expand them. Use `GET /api/v1/vault/graph` for an edge list.
+</Note>

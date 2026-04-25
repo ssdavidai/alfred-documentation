@@ -1,0 +1,59 @@
+---
+title: "Scan Inbox"
+description: "Scan the vault inbox directory for new files and ingest each as a system-inbox stream event."
+api: "POST /api/v1/streams/inbox/scan"
+---
+
+## Overview
+
+Walks `vault/inbox/`, dedups against existing `system-inbox` events by `source_ref` (= `inbox:<filename>`), and emits one stream event per new file. Reads only the first 4KB of each file for preview to avoid loading large or binary uploads fully. Hidden files and `.DS_Store`/`Thumbs.db` are skipped.
+
+This is the bridge between the dashboard's drag-and-drop "Add to inbox" flow and the curator pipeline.
+
+## Response
+
+<ResponseField name="ingested" type="number">Count of files newly ingested.</ResponseField>
+
+<ResponseField name="skipped" type="number">Count of files skipped (already ingested or unreadable).</ResponseField>
+
+<ResponseField name="details" type="object">
+  - `ingested[]` — `{filename, event_id}` for each new event.
+  - `skipped[]` — `{filename, reason}` for each skip (`already_ingested` or `unreadable`).
+</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X POST -H "Authorization: Bearer $AAS_API_KEY" \
+  https://alfred.black/api/v1/streams/inbox/scan
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "ingested": 2,
+  "skipped": 1,
+  "details": {
+    "ingested": [
+      {"filename": "meeting-notes.md", "event_id": "550e8400-e29b-..."},
+      {"filename": "receipt.pdf", "event_id": "660e8400-e29b-..."}
+    ],
+    "skipped": [
+      {"filename": "old-doc.md", "reason": "already_ingested"}
+    ]
+  }
+}
+```
+
+</ResponseExample>
+
+<Note>
+Binary uploads (PDF, PNG, audio) are routed by MIME-type detection downstream so they reach `MediaIngestionWorkflow` rather than the curator's text-only pipeline.
+</Note>

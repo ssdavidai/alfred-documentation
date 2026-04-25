@@ -1,0 +1,56 @@
+---
+title: "List Observations"
+description: "Paginated observation records — behavioural patterns extracted by the clerk."
+api: "GET /api/v1/learning/observations"
+---
+
+## Overview
+
+Lists records from `vault/observation/` newest-first.
+
+## Query Parameters
+
+<ParamField query="limit" type="number" optional default="20">Page size (max 200).</ParamField>
+<ParamField query="offset" type="number" optional default="0">Records to skip.</ParamField>
+
+## Response
+
+<ResponseField name="items" type="array">Each record: `{path, name, frontmatter, body, status, created}`.</ResponseField>
+<ResponseField name="total" type="number">Total observations across the directory.</ResponseField>
+<ResponseField name="limit" type="number">Echo.</ResponseField>
+<ResponseField name="offset" type="number">Echo.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -H "Authorization: Bearer $AAS_API_KEY" \
+  "https://alfred.black/api/v1/learning/observations?limit=50&offset=0"
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "items": [
+    {
+      "path": "observation/2026-04-25-user-correction.md",
+      "name": "User correction: meeting duration",
+      "status": "processed",
+      "created": "2026-04-25T10:00:00Z",
+      "frontmatter": {"type": "observation", "kind": "CORRECTION"},
+      "body": "Sir said: 'The meeting was 45 minutes, not 30.'"
+    }
+  ],
+  "total": 412,
+  "limit": 50,
+  "offset": 0
+}
+```
+
+</ResponseExample>

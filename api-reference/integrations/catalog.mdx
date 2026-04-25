@@ -1,0 +1,72 @@
+---
+title: "Browse Catalog"
+description: "List the 1000+ Composio toolkits available to connect."
+api: "GET /api/v1/integrations/catalog"
+---
+
+## Overview
+
+Returns the full Composio toolkit catalogue with pagination, search, and category filtering. The result is cached for one hour.
+
+## Query Parameters
+
+<ParamField query="search" type="string" optional>
+  Case-insensitive substring match against the toolkit slug, name, or description.
+</ParamField>
+
+<ParamField query="category" type="string" optional>
+  Filter to a single category (e.g. `productivity`, `crm`, `dev_tools`). Pass `all` or omit for no filter.
+</ParamField>
+
+## Response
+
+<ResponseField name="toolkits" type="array">
+  Filtered toolkit list. Each entry includes `slug`, `name`, `description`, `category`, `logo`, and `auth_schemes`.
+</ResponseField>
+
+<ResponseField name="categories" type="array">
+  All distinct categories present in the unfiltered catalogue.
+</ResponseField>
+
+<ResponseField name="count" type="number">
+  Filtered count.
+</ResponseField>
+
+<ResponseField name="total" type="number">
+  Unfiltered total.
+</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -H "Authorization: Bearer $AAS_API_KEY" \
+  "https://alfred.black/api/v1/integrations/catalog?search=notion"
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "toolkits": [
+    {
+      "slug": "notion",
+      "name": "Notion",
+      "description": "All-in-one workspace for notes, tasks, wikis, and databases.",
+      "category": "productivity",
+      "logo": "https://composio.dev/static/icons/notion.png",
+      "auth_schemes": ["OAUTH2"]
+    }
+  ],
+  "categories": ["productivity", "crm", "dev_tools", "..."],
+  "count": 1,
+  "total": 1247
+}
+```
+
+</ResponseExample>

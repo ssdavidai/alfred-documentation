@@ -1,45 +1,53 @@
 ---
-title: "Revoke Device Access"
-description: "Revoke specific role access for a paired device"
+title: "Revoke a device role"
+description: "Invalidate a single role on a paired device without removing the device entirely."
 api: "POST /api/v1/devices/{deviceId}/revoke"
 ---
 
-Revokes specific role-based access for a paired device without fully removing it. The device remains paired but loses access to operations requiring the revoked role.
+Revokes one role from a paired device. The device record stays, but the named role can no longer be used. Reach for this when you want to downgrade a device — for example, strip `agent` privileges off a session that should only retain `user` access — without forcing a full re-pairing.
 
-<Note>
-  This endpoint uses `deviceId` in the URL path (not `requestId`). This is the identifier of an already-paired device.
-</Note>
+## Path parameters
 
 <ParamField path="deviceId" type="string" required>
-  The unique identifier of the paired device whose access should be revoked.
+  The `device_id` from `GET /api/v1/devices`.
 </ParamField>
 
+## Body parameters
+
 <ParamField body="role" type="string" required>
-  The role to revoke from the device. Valid values: `agent`, `user`, `admin`.
+  The role to revoke (e.g. `user`, `agent`, `admin`). Must match a role currently held by the device.
 </ParamField>
+
+## Response
+
+<ResponseField name="message" type="string">
+  Confirmation string from the OpenClaw CLI (e.g. `"Access revoked"`).
+</ResponseField>
+
+## Errors
+
+`400 Bad Request` — returned when `role` is missing or not a string.
 
 <RequestExample>
 
 ```bash cURL
-curl -X POST https://alfred.black/api/v1/devices/dev_x9y8z7w6v5/revoke \
+curl -X POST https://alfred.black/api/v1/devices/phn-7f2c/revoke \
   -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
-  -d '{
-    "role": "admin"
-  }'
+  -d '{"role": "agent"}'
 ```
 
 </RequestExample>
 
 <ResponseExample>
 
-```json Response
+```json 200 OK
 {
   "message": "Access revoked"
 }
 ```
 
-```json Validation Error
+```json 400 Validation error
 {
   "error": {
     "code": "VALIDATION_ERROR",
@@ -50,6 +58,6 @@ curl -X POST https://alfred.black/api/v1/devices/dev_x9y8z7w6v5/revoke \
 
 </ResponseExample>
 
-<ResponseField name="message" type="string">
-  A status message confirming the role access was revoked.
-</ResponseField>
+<Note>
+  To replace the token rather than strip a role, use [`POST /api/v1/devices/{deviceId}/rotate`](/api-reference/devices/rotate). To delete the device entirely, use [`DELETE /api/v1/devices/{deviceId}`](/api-reference/devices/remove).
+</Note>

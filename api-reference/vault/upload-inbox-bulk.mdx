@@ -1,79 +1,111 @@
 ---
 title: "Upload to Inbox (Bulk)"
-description: "Upload multiple files to your inbox at once."
+description: "Upload several files to the vault inbox in a single request. Same per-file rules as the single upload endpoint."
 api: "POST /api/v1/vault/inbox/bulk"
 ---
 
-## Overview
+## When to use
 
-Uploads multiple files to your inbox in a single request. The Curator agent will process each file into structured vault records. If any file has an invalid filename or missing content, the entire request fails.
+Send a batch of inbox uploads in one HTTP request. Behaves like `POST /api/v1/vault/inbox` per file: each filename is sanitised, base64 binaries are decoded, and media files emit individual `stream_type: "media"` events.
+
+The whole request fails fast on the first invalid entry — there is no partial-success mode. If file `[2]` is missing `content`, files `[0]` and `[1]` are NOT rolled back (they were already written to disk by the time the validation error fires for `[2]`). Plan accordingly.
 
 ## Body Parameters
 
 <ParamField body="files" type="array" required>
-  Array of file objects to upload.
-  <ParamField body="filename" type="string" required>
-    Name of the file.
-  </ParamField>
-  <ParamField body="content" type="string" required>
-    File contents as a string.
-  </ParamField>
+  Array of file entries. Empty array is allowed (returns `count: 0`).
+
+  <Expandable title="file entry">
+    <ParamField body="filename" type="string" required>
+      Name to store the file under in the inbox. Same sanitisation rules as the single endpoint: `/`, `\`, `:`, `*`, `?`, `"`, `<`, `>`, `|`, `..` are replaced with `_`.
+    </ParamField>
+    <ParamField body="content" type="string" required>
+      File contents. Plain text by default, base64 if `encoding: "base64"` is set.
+    </ParamField>
+    <ParamField body="encoding" type="string" default="utf-8">
+      Set to `"base64"` for binary content.
+    </ParamField>
+    <ParamField body="mime_type" type="string">
+      Optional MIME type hint. Used for media-category detection ahead of filename extension.
+    </ParamField>
+  </Expandable>
 </ParamField>
 
 ## Response
 
-<ResponseField name="message" type="string">
-  Confirmation message.
+<ResponseField name="message" type="string" required>
+  Human-readable confirmation (e.g., `"Uploaded 3 files to inbox"`).
 </ResponseField>
 
-<ResponseField name="filenames" type="array">
-  Array of filenames that were written to the inbox.
+<ResponseField name="filenames" type="string[]" required>
+  Sanitised filenames written to disk, in input order.
+</ResponseField>
+
+<ResponseField name="files" type="array" required>
+  Per-file detail in input order.
+
+  <Expandable title="file result">
+    <ResponseField name="filename" type="string">
+      Sanitised filename.
+    </ResponseField>
+    <ResponseField name="binary" type="boolean">
+      `true` when the entry was base64.
+    </ResponseField>
+    <ResponseField name="media_event_id" type="string">
+      Present only for media files — the id of the emitted media stream event.
+    </ResponseField>
+    <ResponseField name="media_type" type="string">
+      Present only for media files — one of `audio`, `document`, `image`, `video`.
+    </ResponseField>
+  </Expandable>
 </ResponseField>
 
 ## Request Example
 
 <RequestExample>
 
-```bash cURL
+```bash cURL (mixed text + media)
 curl -X POST https://alfred.black/api/v1/vault/inbox/bulk \
-  -H "Authorization: Bearer alf_your_key_here" \
+  -H "Authorization: Bearer $AAS_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "files": [
       {
-        "filename": "meeting-notes-2026-02-26.md",
-        "content": "# Standup Notes\n\n- Alice: ML pipeline work"
+        "filename": "notes-1.md",
+        "content": "# Note 1\n\nIdea about Q2 onboarding.\n"
       },
       {
-        "filename": "project-idea.md",
-        "content": "# New Project Idea\n\nBuild a knowledge graph..."
+        "filename": "notes-2.md",
+        "content": "# Note 2\n\nFollow-up with Zsolt.\n"
       },
       {
-        "filename": "contact-info.txt",
-        "content": "Name: David Lee\nEmail: david@example.com"
+        "filename": "screenshot.png",
+        "content": "iVBORw0KGgoAAAANSUhEUgAA...",
+        "encoding": "base64",
+        "mime_type": "image/png"
       }
     ]
   }'
 ```
 
 ```javascript JavaScript
+const files = await Promise.all(fileList.map(async f => ({
+  filename: f.name,
+  content: btoa(String.fromCharCode(...new Uint8Array(await f.arrayBuffer()))),
+  encoding: 'base64',
+  mime_type: f.type,
+})));
+
 const response = await fetch('https://alfred.black/api/v1/vault/inbox/bulk', {
   method: 'POST',
   headers: {
-    'Authorization': 'Bearer alf_your_key_here',
-    'Content-Type': 'application/json'
+    'Authorization': `Bearer ${process.env.AAS_API_KEY}`,
+    'Content-Type': 'application/json',
   },
-  body: JSON.stringify({
-    files: [
-      { filename: 'meeting-notes-2026-02-26.md', content: '# Standup Notes\n\n...' },
-      { filename: 'project-idea.md', content: '# New Project Idea\n\n...' },
-      { filename: 'contact-info.txt', content: 'Name: David Lee\n...' }
-    ]
-  })
+  body: JSON.stringify({ files }),
 });
-
-const result = await response.json();
-console.log(result);
+const { files: results } = await response.json();
+const mediaEventIds = results.flatMap(r => r.media_event_id ?? []);
 ```
 
 </RequestExample>
@@ -85,10 +117,16 @@ console.log(result);
 ```json 201 Created
 {
   "message": "Uploaded 3 files to inbox",
-  "filenames": [
-    "meeting-notes-2026-02-26.md",
-    "project-idea.md",
-    "contact-info.txt"
+  "filenames": ["notes-1.md", "notes-2.md", "screenshot.png"],
+  "files": [
+    { "filename": "notes-1.md", "binary": false },
+    { "filename": "notes-2.md", "binary": false },
+    {
+      "filename": "screenshot.png",
+      "binary": true,
+      "media_event_id": "evt_01HX9P2K3Z7Q4M",
+      "media_type": "image"
+    }
   ]
 }
 ```
@@ -102,7 +140,7 @@ console.log(result);
 }
 ```
 
-```json 400 Bad Request
+```json 400 Bad Request (invalid entry)
 {
   "error": {
     "code": "VALIDATION_ERROR",
@@ -112,3 +150,17 @@ console.log(result);
 ```
 
 </ResponseExample>
+
+## Tips
+
+<Warning>
+Validation is per-file, but failures are NOT atomic. If file `[2]` is rejected, files `[0]` and `[1]` are already on disk. Either pre-validate client-side, or accept that partial uploads may remain in the inbox after a 400.
+</Warning>
+
+<Note>
+The server reads every entry's `content` whole into memory before writing. For very large batches (hundreds of MB combined), prefer multiple `POST /api/v1/vault/inbox` calls over one mega-bulk request.
+</Note>
+
+<Note>
+Each media file in the batch emits its own stream event — no coalescing. If you need batch-level progress, track the `media_event_id` values from the response.
+</Note>

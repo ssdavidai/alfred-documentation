@@ -1,0 +1,57 @@
+---
+title: "List Chores"
+description: "List every chore — its slug, status, template, schedule, and last-run time."
+api: "GET /api/v1/chores"
+---
+
+## Overview
+
+Reads `vault/chore/*.md` and returns one summary per record. Returns an empty list (not 404) if the chore directory doesn't exist. Records without `type: chore` in frontmatter are filtered out.
+
+## Response
+
+<ResponseField name="chores" type="array">
+  Each entry: `{slug, name, status, template, schedule, schedule_id, last_run}`.
+
+  - `schedule_id` defaults to `chore-<slug>` if not set in the record.
+  - `status` is typically `active`, `paused`, or `completed`.
+  - `template` is the underlying Temporal workflow type (or generated module name).
+  - `schedule` is the human-readable cron expression from the record.
+  - `last_run` is the ISO timestamp of the most recent run, or null.
+</ResponseField>
+
+<ResponseField name="count" type="number">Number of chores returned.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -H "Authorization: Bearer $AAS_API_KEY" \
+  https://alfred.black/api/v1/chores
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "chores": [
+    {
+      "slug": "weekly-cashflow-forecast",
+      "name": "Weekly cashflow forecast",
+      "status": "active",
+      "template": "weekly_cashflow_forecast",
+      "schedule": "0 9 * * MON",
+      "schedule_id": "chore-weekly-cashflow-forecast",
+      "last_run": "2026-04-22T09:00:00Z"
+    }
+  ],
+  "count": 1
+}
+```
+
+</ResponseExample>

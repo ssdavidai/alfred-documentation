@@ -1,0 +1,133 @@
+---
+title: "Get Vault Graph"
+description: "Returns nodes (records), edges (frontmatter relations + body wikilinks), and recent agent activity for graph visualisation."
+api: "GET /api/v1/vault/graph"
+---
+
+## When to use
+
+Powers the dashboard graph view. Builds a single, deduplicated edge list from two sources:
+
+1. **Frontmatter list fields** — every value in `related`, `relationships`, `participants`, `outputs`, `depends_on`, `blocked_by`, `based_on`, `supports`, `challenged_by`, `references`, `project`, `approved_by`, `confirmed_by`, `invalidated_by`, `governed_by`, `cluster_sources`. Each emits an edge labeled with the field name.
+2. **Body wikilinks** — every `[[ref]]` (or `[[ref|alias]]`) in the markdown body. These edges are labeled `body_link`.
+
+Wikilink targets are resolved against either a record's file stem (e.g., `Alice Chen`) or its full type/name path (e.g., `person/Alice Chen`). Unresolved references are dropped silently.
+
+The endpoint also returns the last 500 entries from `vault_audit.log` so the UI can highlight which records were touched recently and by which agent.
+
+## Response
+
+<ResponseField name="nodes" type="array" required>
+  One entry per record in the vault (excluding housekeeping directories).
+
+  <Expandable title="node">
+    <ResponseField name="id" type="string">
+      Vault-relative path with `.md` (forward slashes). Used as both node id and as the `source`/`target` value on edges.
+    </ResponseField>
+    <ResponseField name="type" type="string">
+      The `type` frontmatter field.
+    </ResponseField>
+    <ResponseField name="name" type="string">
+      The `name` field (or `subject` for `conversation`/`input`), falling back to file stem.
+    </ResponseField>
+    <ResponseField name="status" type="string">
+      The `status` frontmatter field, or empty string if absent.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="edges" type="array" required>
+  Deduplicated edges (same `source`+`target`+`relation` collapses to one entry).
+
+  <Expandable title="edge">
+    <ResponseField name="source" type="string">
+      Source node id.
+    </ResponseField>
+    <ResponseField name="target" type="string">
+      Target node id. Always one of the returned nodes (edges to non-existent records are filtered out).
+    </ResponseField>
+    <ResponseField name="relation" type="string">
+      The frontmatter field name that emitted this edge (`related`, `participants`, etc.) or `body_link` for body-wikilink edges.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="activity" type="array" required>
+  Up to 500 most-recent entries from the audit log (`/mnt/encrypted/alfred/vault_audit.log`).
+
+  <Expandable title="activity entry">
+    <ResponseField name="agent" type="string">
+      Tool/scope/agent name from the log entry, or `"unknown"`.
+    </ResponseField>
+    <ResponseField name="file" type="string">
+      Vault-relative path of the touched record.
+    </ResponseField>
+    <ResponseField name="action" type="string">
+      Operation (`create`, `edit`, `delete`, `move`, etc.) from the log entry, or `"unknown"`.
+    </ResponseField>
+    <ResponseField name="ts" type="string">
+      ISO-8601 timestamp from the log entry.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X GET https://alfred.black/api/v1/vault/graph \
+  -H "Authorization: Bearer $AAS_API_KEY"
+```
+
+```javascript JavaScript
+const response = await fetch('https://alfred.black/api/v1/vault/graph', {
+  headers: { 'Authorization': `Bearer ${process.env.AAS_API_KEY}` },
+});
+const { nodes, edges, activity } = await response.json();
+console.log(`${nodes.length} nodes, ${edges.length} edges`);
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "nodes": [
+    { "id": "matter/alfred-product-development-launch.md", "type": "matter", "name": "Alfred Product Development & Launch", "status": "active" },
+    { "id": "task/rebuild-docs.md", "type": "task", "name": "Rebuild API docs", "status": "active" },
+    { "id": "person/Sir.md", "type": "person", "name": "Sir", "status": "active" }
+  ],
+  "edges": [
+    { "source": "matter/alfred-product-development-launch.md", "target": "task/rebuild-docs.md", "relation": "related" },
+    { "source": "task/rebuild-docs.md", "target": "person/Sir.md", "relation": "body_link" }
+  ],
+  "activity": [
+    {
+      "agent": "curator",
+      "file": "task/rebuild-docs.md",
+      "action": "create",
+      "ts": "2026-04-25T20:41:12.000Z"
+    }
+  ]
+}
+```
+
+```json 401 Unauthorized
+{ "error": { "code": "UNAUTHORIZED", "message": "Invalid API key" } }
+```
+
+</ResponseExample>
+
+## Tips
+
+<Note>
+The audit log is read on every request and may not exist on freshly-provisioned tenants. In that case `activity` is an empty array — no error.
+</Note>
+
+<Warning>
+This is the heaviest read endpoint in the vault namespace. It walks every record, parses frontmatter, scans bodies for wikilinks, and reads the audit log. Cache the result for at least a few seconds in any UI that polls.
+</Warning>

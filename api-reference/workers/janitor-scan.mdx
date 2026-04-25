@@ -1,14 +1,16 @@
 ---
-title: "Scan for Issues"
-description: "Run a Janitor vault health scan"
+title: "Janitor Scan"
+description: "Read-only structural sweep of the vault."
 api: "POST /api/v1/workers/janitor/scan"
 ---
 
-Runs a one-time structural health scan of your vault. The Janitor checks for broken links, invalid frontmatter, orphaned records, and other structural issues. This is a read-only operation that reports problems without modifying any files.
+Triggers a one-shot Janitor scan (`alfred janitor scan`). The scanner is structural-only — no LLM agent is invoked, no files are modified. It walks the vault, validates frontmatter, checks every wiki link, and lists every issue it finds.
 
-<Info>
-  This is a scan-only operation. To scan and fix issues automatically, use the [fix endpoint](/api-reference/workers/janitor-fix) instead.
-</Info>
+For an actual repair pass, use [`janitor/fix`](/api-reference/workers/janitor-fix).
+
+## Authentication
+
+Bearer token in the `Authorization` header.
 
 <RequestExample>
 
@@ -22,25 +24,35 @@ curl -X POST https://alfred.black/api/v1/workers/janitor/scan \
 
 <ResponseExample>
 
-```json Structured Response
+```json 200 Structured
 {
   "files_scanned": 423,
-  "issues_found": 12
+  "issues_found": 7,
+  "issues": [
+    {"file": "matters/acme-redesign.md", "type": "broken-link", "detail": "[[unknown-person]] not found"},
+    {"file": "tasks/ship-mvp.md", "type": "missing-frontmatter", "detail": "type field absent"}
+  ]
 }
 ```
 
-```json Raw Response
+```json 200 Raw fallback
 {
-  "raw": "Scanned 423 files, found 12 issues"
+  "raw": "Scanned 423 files. Found 7 issues:\n  matters/acme-redesign.md: broken link [[unknown-person]]\n  tasks/ship-mvp.md: missing 'type' frontmatter\n  ..."
 }
 ```
 
 </ResponseExample>
 
-<Note>
-  If the response contains structured JSON, it is returned directly. Otherwise, the output is returned in a `raw` field.
-</Note>
-
 <ResponseField name="raw" type="string">
-  Human-readable output when structured JSON is not available.
+  Trimmed stdout when the CLI did not return JSON. Present only in the fallback case.
 </ResponseField>
+
+## When to use
+
+- Quick health check after a large bulk import or vault restore.
+- Auditing what Janitor would touch before allowing it to run a repair.
+- Periodic CI-style sweep on a schedule from outside the tenant.
+
+<Note>
+  Scans are cheap and side-effect-free. Run as often as you like — there's no LLM cost.
+</Note>

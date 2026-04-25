@@ -1,95 +1,182 @@
 ---
-title: "Agentic Layer"
-description: "OpenClaw runtime, specialist workers, scope enforcement, and sandboxing."
-icon: "robot"
+title: "Agent"
+description: "OpenClaw, the main Alfred agent, the four vault specialists, the Clerk, and the ephemeral subagents that execute on Sir's behalf."
+icon: "user-tie"
 ---
 
 <Note>
-Part of Alfred's [six-layer architecture](/how-it-works). The Agentic layer hosts the specialists that do the work.
+The agent layer is everything that thinks. The infrastructure layer hosts it; the data, semantic, and kinetic layers are what it acts on.
 </Note>
 
-## Your team
+## A small staff, with clear roles
 
-Alfred runs five specialists that work continuously on your vault. Each one has a defined role, a strict scope, and no ability to exceed its permissions — even if the underlying language model tries.
+Sir does not interact with one monolithic AI. He interacts with a household: a main butler who handles the conversation, four specialists who attend to the vault behind the scenes, a Clerk who is dispatched for analytical tasks, and short-lived subagents who execute discrete actions on connected services.
 
-| Specialist | What they do | When they work |
-|-----------|-------------|------|
-| **Curator** | Processes manual inbox uploads into structured vault records | When files are dropped into the inbox |
-| **Janitor** | Scans for broken links, missing metadata, orphaned records — and repairs them | Periodic sweeps |
-| **Distiller** | Surfaces assumptions, decisions, constraints, contradictions, and synthesized insights | On-demand or scheduled |
-| **Surveyor** | Embeds records as vectors, clusters by meaning, labels clusters, writes relationship links | On-demand or scheduled |
-| **Clerk** | Stateless LLM worker dispatched by other specialists for analytical tasks — classifying inputs, extracting entities, writing summaries | On-demand by other specialists |
+| Role | Where it runs | What it does |
+|---|---|---|
+| Main agent | `openclaw` container, port `18789` | Sir's conversational counterpart — Slack, dashboard chat, email, voice, SMS, Telegram. |
+| Curator | `alfred` container, daemon process | Reads files dropped into the inbox; produces structured vault records with cross-links. |
+| Janitor | `alfred` container, daemon process | Continuously scans the vault for broken wikilinks, missing frontmatter, orphaned records. |
+| Distiller | `alfred` container, daemon process | Reads across records to surface implicit knowledge: assumptions, decisions, constraints, contradictions, syntheses. |
+| Surveyor | `alfred` container, daemon process | Embeds every vault record, clusters by meaning, labels clusters, suggests cross-links. |
+| Clerk | `openclaw-workers` container, port `18790` | Stateless LLM worker dispatched by `alfred-learn` for classification, batch enrichment, daily digests, reflection. |
+| Ephemeral subagents | `openclaw-workers`, scoped per task | Short-lived agents created by the Task Runner with a narrow tool surface to execute a single errand, then deleted. |
 
-## OpenClaw — the agent runtime
+The main agent and the workers are intentionally separate OpenClaw processes (`packages/ctrl/src/templates/docker-compose.yaml.njk`). A long-running batch enrichment in `alfred-learn` cannot stall Sir's chat in `openclaw`.
 
-OpenClaw is Alfred's AI agent gateway. It manages sessions, skills, device pairing, and agent execution. Every specialist runs through OpenClaw, which provides a consistent interface to the LLM backends you've configured.
+## OpenClaw — the gateway
 
-OpenClaw binds to localhost and is reachable externally only via Cloudflare Tunnel (outbound-only from your server — your IP is never exposed).
+Every model call goes through OpenClaw, never direct to the provider. OpenClaw manages:
 
-## Scope enforcement
+- The agent definitions in `openclaw.json` (model, persona, tool allowlist, MCP servers)
+- The workspace (skills, memory files, KNOWN_CONTACTS.md, TOOLS.md)
+- Channel adapters (Slack Socket Mode, Telegram, the AgentMail webhook bridge)
+- Sessions: `sessions_spawn`, `sessions_send`, `sessions_history`, `sessions_list`, `sessions_delete`
+- The MCP server registry — including `alfred-ctrl` (provided by `packages/openclaw/mcp/ctrl-server.mjs`)
 
-Each specialist operates within strictly defined permissions, enforced **in code** before every vault operation. The language model cannot bypass these rules.
+The main agent and workers each have their own `openclaw.json` and their own workspace, even though they share the same image. The init container generates both on first boot, then leaves them alone unless skills change.
+
+## The main agent's tools
+
+The main agent's tool surface is narrow on purpose. It used to carry forty-one prefixed gateway tool entries; that's all gone now. Today the allowlist is roughly:
+
+- The MCP `self` tool — generic proxy to the tenant's own ctrl-api
+- `composio_execute` — single dispatcher for every Composio action across 1,000+ apps
+- The session-control primitives (`sessions_spawn`, etc.)
+- Built-in shell primitives scoped to the workspace (`read`, `write`, `edit`, `grep`, `find`, `ls`)
+- Built-in OpenClaw tools (`web_search`, `web_fetch`, `image`, `pdf`, `tts`, `cron`)
+- On Alfred Prime only: `tenant` and `ask_alfred` for cross-tenant work
+
+`self` is defined in `packages/openclaw/mcp/ctrl-server.mjs` and looks like:
+
+```js
+self({ endpoint: "/api/v1/vault/context" })
+self({ endpoint: "/api/v1/vault/records", method: "POST", body: { type: "task", name: "...", content: "..." } })
+self({ endpoint: "/api/v1/email/send", method: "POST", body: { to, subject, text } })
+```
+
+That single tool is how the agent reads the vault, writes to the vault, manages chores, sends email, sends SMS, inspects workflows, restarts containers, and lists Composio integrations. The endpoint catalogue is in `packages/openclaw/workspace-template/docs/TOOLS.md`, copied into every tenant's workspace by the init container.
+
+<Tip>
+There is no `ctrl_*` tool. The previous prefixed gateway entries never dispatched anywhere because ctrl-api's tool registry uses unprefixed names. They were removed in PR #431. If a skill file or response references `ctrl_composio_execute` or similar, that's a regression — every call must use `self({endpoint: "..."})`.
+</Tip>
+
+## The main agent's skills
+
+Skills live at `/home/node/.openclaw/workspace/skills/<name>/SKILL.md` inside the `openclaw` container. Two source paths feed them:
+
+| Source | Skills | Used by |
+|---|---|---|
+| `packages/openclaw/workspace-template/skills/` | `alfred-vault-operations`, `alfred-chore-management`, `alfred-learning-introspection`, `alfred-ops-health`, `alfred-email-channel`, `alfred-voice`, `alfred-prime-federation` | Main agent (Slack DMs, dashboard chat, email, voice, SMS) |
+| `c/alfred/src/alfred/_bundled/skills/` | `vault-curator`, `vault-janitor`, `vault-distiller` | The Python daemons that run inside the `alfred` container |
+| Auto-generated on Composio connect | `alfred-composio-<toolkit>` (gmail, googlecalendar, github, slack, notion, ...) | Main agent — tells it what each connected app's actions look like |
+
+The init container's step 2 (`packages/openclaw/init/entrypoint.sh`) copies both sets on every boot, hash-guarded so unchanged files are skipped. Adding a new platform skill means adding a directory under `workspace-template/skills/` — no entrypoint change required.
+
+`alfred-prime-federation` is the only skill that's gated: it's only copied when `ALFRED_PRIME=true` is set, so a non-Prime tenant never sees instructions for tools it doesn't have.
+
+## The four vault specialists
+
+The specialists run as Python daemons inside the `alfred` container. Each has its own scope and its own loop interval; none of them touches the filesystem directly — they all go through the `alfred vault` CLI which is itself bounded by the vault's schema and mutation log.
+
+### Curator
+
+Source: `c/alfred/src/alfred/curator/`. Watches `vault/inbox/` for new files. When something arrives — a meeting note dropped from the dashboard, a PDF, a transcribed audio — the curator runs a four-stage pipeline (`pipeline.py`):
+
+1. **Analyze + write note** — one Clerk call reads the file and produces a JSON manifest of entities (people, orgs, projects) plus the body of a `note/` record.
+2. **Entity resolution** — pure Python deduplicates against existing person/org records. Near-matches reuse the existing record's path; new entities get fresh paths.
+3. **Interlink** — pure Python rewrites the note's body and frontmatter to use `[[person/Name]]`, `[[org/Name]]`, `[[matter/slug]]` wikilinks pointing at resolved entities.
+4. **Enrich entities** — for any newly-created entity, one Clerk call per entity fills in body and frontmatter (location, role, recent context).
+
+Curator is the only specialist that creates structured records from unstructured input, and it only ever runs against manual inbox uploads. Stream events take a different path — see [Data](/architecture/data).
+
+### Janitor
+
+Source: `c/alfred/src/alfred/janitor/`. Periodic structural sweep. Reads every `.md` file in the vault and checks it against `alfred.vault.schema`:
+
+- Missing required frontmatter fields (`type`, `name`, `created`)
+- Unknown record types
+- Status values that aren't in the type's allowlist
+- Wikilinks that don't resolve to any file
+- Orphaned records (no inbound links and no recent activity)
+- Records in the wrong directory for their declared type
+
+Issues are classified by severity (`info`, `warning`, `error`) and most are auto-fixed by `autofix.py` — broken wikilinks get re-pointed when there's an unambiguous match, missing fields get filled with defaults, mis-filed records get moved to their correct directory. Anything ambiguous gets logged for Sir to review.
+
+The Janitor is the only specialist allowed to delete records (orphaned auto-generated artifacts only).
+
+### Distiller
+
+Source: `c/alfred/src/alfred/distiller/`. Two-pass extraction (`pipeline.py`):
+
+- **Pass A — per-source extraction.** For each conversation, session, or note, one Clerk call identifies decisions (`"we agreed"`, `"let's go with"`), assumptions (`"should be fine"`, `"we're assuming"`), constraints (`"budget cap"`, `"deadline is"`), and contradictions (disagreements between participants). A Python step deduplicates fuzzy near-matches across sources.
+- **Pass B — cross-learning meta-analysis.** Scans existing learning records for clusters and writes higher-order syntheses that link multiple decisions or contradictions together.
+
+Outputs five record types: `decision`, `assumption`, `constraint`, `contradiction`, `synthesis`. The Distiller can only ever create these five types. It never edits existing records and never deletes anything.
+
+### Surveyor
+
+Source: `c/alfred/src/alfred/surveyor/`. Four-stage embedding + clustering loop (`daemon.py`, 5-second tick):
+
+1. **Embed.** Every vault record is embedded with `nomic-embed-text` running locally in the `ollama` container (`embedder.py`). Long records are chunked at 3,000 characters with 300-character overlap; chunk vectors are mean-pooled and L2-normalized.
+2. **Store.** Vectors land in Milvus Lite (a local vector DB embedded in the same container, no external service).
+3. **Cluster.** Records are clustered by cosine similarity (`clusterer.py`).
+4. **Label + suggest relationships.** A second LLM (currently `xai/grok-4.1-fast` via OpenRouter, `labeler.py`) tags each cluster (`construction/residential`, `finance/invoicing`) and suggests `related-to`, `supports`, `depends-on`, `part-of`, `supersedes`, `contradicts` links between cluster members that don't already wikilink to each other.
+
+Suggested relationships are written back into record frontmatter as `related_*` fields. See [Semantic](/architecture/semantic) for what the agent does with them.
+
+## The Clerk
+
+`packages/learn/src/activities/clerk.py`. Stateless. Always called via OpenClaw's `sessions_spawn` against the workers gateway (`http://openclaw-workers:18790`), never directly. Used by `alfred-learn` for:
+
+- `clerk_classify` — classify an inbox-uploaded file (task / triage / event / note / conversation / braindump / noise)
+- Batch enrichment — one call per ~200 stream-event records, extracting entities and tags
+- Daily digest — end-of-day summary
+- Reflection — nightly synthesis of observations into instincts
+- Session boundary detection — deciding whether two conversations are the same session
+
+The Clerk runs on whatever model the tenant has configured for the `learn-clerk` agent in `openclaw.json`. The current fleet default is `xai/grok-4-1-fast-reasoning` via the shared `XAI_API_KEY`.
+
+## Ephemeral subagents
+
+Source: `packages/learn/src/activities/ephemeral_agent.py`. When the Task Runner picks up an errand for execution, it doesn't hand the work to the main agent or to a generic Clerk — it spawns a fresh agent with a tool allowlist scoped to exactly what the errand's instinct declared.
+
+The flow:
+
+1. `create_ephemeral_agent` writes an `exec-{id}` entry into the workers' `openclaw.json`. The entry inherits the workspace (so the agent can read `USER.md`, `SOUL.md`, vault context) but its `tools.allow` is limited.
+2. `wait_for_agent_ready` polls the workers gateway's health endpoint while it hot-reloads (~10–15 seconds).
+3. `sessions_spawn` against `http://openclaw-workers:18790` runs the errand inside the fresh agent.
+4. `delete_ephemeral_agent` removes the entry once the session completes (or fails).
+
+This means a chore that needs to "send Sir's morning briefing on Slack" runs in a process that has Slack tools and nothing else. There's no risk of the agent improvising a destructive vault delete or a stray HTTP call.
+
+## Scope enforcement, not prompt suggestion
+
+Each specialist's permissions are checked in code, not in a prompt. The constraints in `alfred.vault.ops` and the routes in `packages/ctrl/src/api/routes/vault.ts` are the gate.
 
 | Specialist | Create | Read | Edit | Delete |
-|-----------|--------|------|------|--------|
-| **Curator** | Entity types | All | All | Never |
-| **Janitor** | Never | All | All | Yes |
-| **Distiller** | Learning types only | All | Never | Never |
+|---|---|---|---|---|
+| Curator | Note + entity types | All | Notes + entities it created | Never |
+| Janitor | Never | All | Anything (autofix) | Yes (orphaned auto-generated artifacts only) |
+| Distiller | Learning types only (decision/assumption/constraint/contradiction/synthesis) | All | Never | Never |
+| Surveyor | Never | All | Frontmatter `related_*` fields only | Never |
 
-The Curator can never delete your records. The Janitor can never create new ones. The Distiller can only create learning records. These aren't suggestions in a prompt — they're hard gates in code.
+If the model behind a specialist tries to do something outside its scope — by hallucination, by prompt injection, by a malformed plan — the CLI rejects the call before it reaches the filesystem. The model sees an error; the vault stays consistent.
 
-## The main agent's tool surface
+## Federated tools (Alfred Prime only)
 
-Beyond the five specialists, Alfred's main agent (the one that handles your conversations) has access to **45+ tools** across six categories:
+When a tenant is configured with `ALFRED_PRIME=true` and a `CROSS_TENANT_PEERS` JSON list, the MCP server in `packages/openclaw/mcp/ctrl-server.mjs` registers two extra tools:
 
-- **Vault tools** (11) — read, write, search, list, graph, schema — full vault CRUD
-- **Stream tools** (3) — list streams, view events, manually ingest items
-- **Learning tools** (8) — inspect observations, instincts, reflections, sessions, queue
-- **Workflow tools** (4) — list, trigger, pause, unpause Temporal workflows and schedules
-- **Admin tools** (9) — container management, health checks, model configuration
-- **Connected Apps** (1) — `composio_execute` for executing actions on 1,000+ connected apps
+- **`tenant({ tenant: "miguel", endpoint: "/api/v1/vault/context" })`** — direct CRUD on a peer's ctrl-api over Tailscale. Same endpoint catalogue as `self`. Uses Prime's tokens.
+- **`ask_alfred({ tenant: "miguel", prompt: "..." })`** — hands a prompt to the peer's Alfred and returns his reasoned reply. Uses the peer's tokens. Routed through the peer's `/api/v1/cross-tenant/ask` endpoint.
 
-The `composio_execute` tool is a single gateway to every connected app's actions. Instead of polluting the context with hundreds of individual tool definitions, Alfred reads per-app skill files to know what actions are available, then calls `composio_execute` with the action name and arguments. See [Connected Apps](/guides/connected-apps) for details.
+Today only one tenant is Prime. Most are not — and on a non-Prime tenant these two tools simply do not appear in the agent's tool list, so the agent cannot be tempted to invent them.
 
-## The vault CLI gate
-
-Agents never touch the filesystem directly. Every vault operation goes through the `alfred vault` CLI, which mediates all access:
-
-- **Scope checking** — is this specialist allowed to perform this operation?
-- **Path validation** — is this file inside the vault boundary? (blocks `../`, symlinks, escapes)
-- **Schema validation** — is this a valid record type with correct frontmatter?
-- **Mutation logging** — every create, edit, delete, and move is recorded in an append-only audit trail
-
-Even if an agent's prompt is manipulated, it cannot perform unauthorized operations.
-
-## Prompt injection defense
-
-<Note>
-No AI system can guarantee 100% immunity to prompt injection. Alfred's approach is **defense in depth** — even if the language model is tricked, the damage it can do is bounded by technical enforcement that the model cannot override.
-</Note>
-
-| Layer | Enforcement | What it does |
-|-------|-------------|-------------|
-| Scope | Code | Operations outside the specialist's scope are blocked |
-| Path validation | Code | File access outside the vault boundary is rejected |
-| Schema validation | Code | Invalid record types and status values are rejected |
-| Mutation logging | Code | Every change is recorded in an append-only audit trail |
-| Skill instructions | Prompt | Each specialist receives explicit behavioral constraints |
-
-Layers 1 through 4 are technical controls the language model cannot bypass. Layer 5 adds behavioral guidance on top.
-
-## Third-party access
-
-Your Alfred connects only to configured LLM providers, Hetzner S3 (for backups), Tailscale, and Cloudflare. No third-party plugins (ClawHub installation is disabled by default), no arbitrary API access, no browser extensions. The attack surface is deliberately minimal.
-
-<Columns cols={3}>
-  <Card title="Your Specialists" icon="gears" href="/guides/your-ai-agents">
-    Monitor and direct your specialists
+<CardGroup cols={2}>
+  <Card title="Channels" icon="messages-question" href="/architecture/channels">
+    How Slack, email, SMS, voice, and Telegram all converge on the same agent.
   </Card>
-  <Card title="Device Pairing" icon="mobile" href="/guides/device-pairing">
-    Manage OpenClaw device access
+  <Card title="Kinetic layer" icon="gears" href="/architecture/kinetic">
+    Errands, chores, instincts, and the ephemeral subagents that execute them.
   </Card>
-  <Card title="Security" icon="shield-halved" href="/guides/security">
-    Full threat model and sandboxing details
-  </Card>
-</Columns>
+</CardGroup>

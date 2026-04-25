@@ -1,271 +1,115 @@
 ---
 title: "Your Dashboard"
-description: "A tour of the Alfred Black dashboard — your window into your vault, specialists, and services."
+description: "A tour of what's behind the login — the Vault Nebula homepage, the five-tab Intelligence menu, and the rest of Sir's control surface."
 icon: "layout-dashboard"
 ---
 
-## Overview
+## What you see when you log in
 
-The [Alfred Black dashboard](https://alfred.black) is where you see everything Alfred is doing for you — your vault, your specialists, your devices, and your services. This guide walks through each section.
+The dashboard at [alfred.black](https://alfred.black) is Sir's window into everything Alfred is doing. It proxies through to your dedicated tenant via Tailscale — every page below pulls live from your own ctrl-api, never a shared backend.
 
-## Navigation
+## The Vault Nebula
 
-The sidebar provides access to all dashboard sections:
+Your homepage is the **Vault Nebula** — a real-time visualisation of your knowledge graph. Each cloud is a cluster of related vault records: people, organisations, projects, decisions, meetings, ideas, locations. The Surveyor builds the clusters by embedding every record and grouping by semantic similarity, then labelling each cluster with a generated heading.
 
-- **Home** — Command Center with stats and activity overview
-- **Vault** — Browse and search vault records
-- **Intelligence** — Inbox, Matters, Errands, Chores, and Activity
-- **Streams** — View and manage legacy data pipelines
-- **Apps** — Connected Apps marketplace — connect 1,000+ services via Composio ([learn more](/guides/connected-apps))
-- **Settings** — Account info, subscription management, credentials, API keys
+This is not a static infographic. It updates as the Surveyor re-embeds your vault on its schedule. Hover any cluster to see the records inside; click a record to open it.
 
-Additional pages are accessible from the Home page:
+Beneath the Nebula, the dashboard surfaces:
 
-- **Devices** — Approve or reject OpenClaw device pairing requests
+- **Vault composition** — counts per record type (matter, task, person, org, event, instinct, observation, reflection, …)
+- **Activity feed** — recent API calls, workflow runs, agent sessions
+- **Worker activity charts** — what the Curator, Janitor, Distiller, and Surveyor have been doing
 
-Admin users also see an **Admin** section with analytics, user management, instance management, and provisioning tools.
+---
 
-## Home — Vault Nebula
+## The Intelligence menu — five tabs
 
-The Home page opens with the **Vault Nebula** — a CSS cloud visualization where each cloud represents a cluster of related vault records discovered by the Surveyor. Clouds are sized by record count and colored by cluster theme, giving you an ambient, data-driven map of your world at a glance.
+The Intelligence menu (in the sidebar) is where Sir manages the kinetic layer — what's pending, what's in flight, and what Alfred has learned.
 
-### First Brief
+<Tabs>
+  <Tab title="Inbox">
+    What Alfred has received but not yet fully classified — uploads, fresh stream events, items needing your touch. Each card shows the source, the summary, and the destination Alfred is leaning toward. From here you can promote an inbox item directly into a matter or errand.
+  </Tab>
 
-On your very first login, before the Nebula has data, Alfred displays a **First Brief** — a short welcome message that explains what's happening behind the scenes (Gmail backfill, vault initialization) and what to expect in the next few hours as your vault populates.
+  <Tab title="Matters">
+    Your ongoing concerns. Each matter has a body (the story, written by Opus when the matter was created), a status, and links to every related person, task, decision, conversation, and event. Click a matter to see its full body and the connected records.
 
-### Stat cards
+    Matters are where Sir's life lives in the vault. Open the kitchen renovation, the Q2 launch, your child's school year — each is its own matter with its own thread.
+  </Tab>
 
-Four cards across the top show key metrics:
+  <Tab title="Errands">
+    Discrete actionable items — tasks Alfred has surfaced from your inbox, generated from your patterns, or that Sir created directly. Each errand carries a status (`pending`, `in-progress`, `done`), an owner, optional `requires_approval`, and a body explaining what needs to happen.
 
-| Card | What it shows |
-|------|---------------|
-| **Health** | Overall status (ok, degraded, or down) |
-| **Vault** | Total record count, plus inbox items waiting to be attended to |
-| **Services** | Running services out of total (e.g., "3/3 up") |
-| **Devices** | Number of paired OpenClaw devices, plus pending pairing requests |
+    The errand detail panel shows the full body up top, then the metadata strip — built specifically so Sir can read what needs doing without scrolling.
+  </Tab>
 
-Stats refresh automatically every 30 seconds.
+  <Tab title="Chores">
+    Recurring scheduled workflows. Each chore is a real Python file deployed to your tenant — generated by Opus during onboarding, or written conversationally later. The Chores tab lets you:
 
-### Specialist activity charts
+    - Pause / resume / trigger any chore
+    - Read the full Python source and the dependency audit (which activities it imports, what each one reads or writes, and a live data-readiness probe against the vault directories the activity depends on)
+    - Edit the schedule cron expression
+    - See the per-chore dry-run quarantine status (first 3 runs of every new chore are dry-run; auto-releases after 3 clean runs)
+    - Delete a chore
 
-Below the stat cards, activity charts show recent trends for the Curator, Janitor, and Distiller — giving you visibility into how actively your specialists are working.
+    The dependency audit is Sir's anti-hallucination defence. If a chore claims to produce a "weekly cashflow forecast" but the activities it imports never touch any payment vault records, the audit shows that mismatch before Sir relies on the output.
+  </Tab>
 
-### Quick actions
+  <Tab title="Activity">
+    Everything that has happened recently — every workflow run, every agent session, every chore execution, every API call. Filter by service, by time window, by workflow type.
+  </Tab>
+</Tabs>
 
-A set of shortcut buttons for common tasks:
+---
 
-- **Upload to Vault** — Opens a file upload dialog to share content with Alfred
-- **OpenClaw UI** — Opens the OpenClaw web interface (if available)
+## Other pages in the sidebar
 
-The Quick Actions card also includes a **Devices** section showing pending pairing requests (with approve/reject buttons) and currently paired devices.
+| Page | What it does |
+|---|---|
+| **Apps** | The unified Connected Apps + Streams + Tools surface. Browse the 1,000+ Composio catalogue, manage OAuth connections, see per-app stream + tool controls. |
+| **Inbox** | Drag and drop files (text, markdown, PDF, images, audio, video) directly to the Curator. See what's in flight. |
+| **Devices** | Pair an Omi wearable, manage your other openclaw clients (mobile, desktop), revoke device tokens. |
+| **Phone** | Sir's tenant phone number, authorised callers list, recent calls + SMS, Voice Bridge status. |
+| **Workspace** | Browse the openclaw workspace — Sir's `MEMORY.md`, `USER.md`, `SOUL.md`, the platform `TOOLS.md`, every installed skill. |
+| **Workflows** | Live Temporal workflow inspector — running, recent, failed. Drill into activity history. |
+| **Logs** | Container logs with tail and filter. Switch between ctrl-api, openclaw, alfred-learn, alfred, temporal. |
+| **Terminal** | An in-browser shell into Sir's tenant for ad-hoc operations (with the same auth as the rest of the dashboard). |
+| **Settings** | Account, subscription, API keys, Polar customer portal link. |
 
-### Knowledge graph
+---
 
-An interactive visualization of your vault's structure. It shows record types as nodes, sized by count, with specialist nodes showing their operational status. Toggle the graph on or off with the switch in the card header.
+## Navigation patterns
 
-The graph refreshes every 15 seconds when visible.
+<Note>
+**Read before writing.** Most pages start with a "Recent" or "Open" view. Use the search/filter UI to narrow before you mutate anything — the dashboard's operations all hit your real vault, and there is no undo on a deleted record.
+</Note>
 
-### Activity feed
+- The **back arrow** in any detail page returns you to the list with your filter intact
+- **Cmd+K** (or Ctrl+K) opens the global search across vault records
+- **Esc** closes any modal — file upload, fact verification, chore detail
+- Charts and counters refresh automatically every few seconds; you don't need to reload
 
-A chronological feed of recent vault mutations — records created, edited, moved, or deleted by your specialists.
+---
 
-### Vault composition
+## The reconfiguring banner
 
-A chart at the bottom of the page showing the distribution of record types in your vault. Useful for understanding the shape of your world.
+When you connect (or disconnect) a Composio integration, Alfred briefly restarts the openclaw gateway to register the new tools. During that ~40-second window, the dashboard shows a **"Configuring {toolkit}…"** banner at the top. Don't try to interact with the connected app's tools until the banner clears — the gateway isn't ready yet.
 
-## Apps (Connected Apps)
+The banner uses a `GET /api/v1/openclaw/ready` probe and clears once two consecutive checks return ready. There's also a hard-clear safety net at `untilMs + 5s` so a stuck banner can't block you.
 
-The Apps page is Alfred's integration marketplace. From here you can:
+---
 
-- **Browse 1,000+ apps** — search by name or filter by category (Communication, Productivity, Dev Tools, Finance, etc.)
-- **Connect with one click** — OAuth popup handles everything, credentials stored at Composio
-- **See connected app status** — stream activity, action count, skill file name
-- **Recommended section** — shows Gmail, Calendar, Notion, GitHub if not yet connected via Composio
-- **Disconnect and clean up** — removes streams, schedules, skills, and tool access
-
-For a full guide, see [Connected Apps](/guides/connected-apps).
-
-## Streams (Legacy)
-
-The Streams page shows legacy data pipelines (pre-Composio connections). For new integrations, use the Apps page instead. Existing legacy streams continue to work — when you connect the same app via Composio, the legacy stream is automatically migrated.
-
-For details, see [Streams & Integrations](/guides/streams-and-integrations).
-
-## Intelligence
-
-The Intelligence section has five tabs:
-
-- **Inbox** — items waiting for processing or your review
-- **Matters** — ongoing concerns Alfred is tracking (kitchen renovation, new product launch, etc.)
-- **Errands** — actionable tasks with status lifecycle (todo → active → blocked → done)
-- **Chores** — recurring scheduled workflows (weekly digest, health check-in, etc.)
-- **Activity** — learning observations, judgment decisions, and reflection summaries
-
-## Matters
-
-The Matters page lists your active ongoing concerns — threads of related work Alfred is tracking on your behalf. Each matter shows its linked errands, people, and decisions. You can drill into any matter to see the full timeline.
-
-## Triage
-
-The Triage page surfaces items Alfred couldn't confidently classify. Each item shows a summary and suggested routing. Review, reclassify, or dismiss items here. Routing a triage item teaches Alfred for next time via the intuition system.
-
-## Vault
-
-The Vault page lets you browse and search all records.
-
-- **Filter by type** — Select a record type (person, project, task, decision, etc.) to see only records of that type
-- **Search** — Find records by keyword across your entire vault
-- **View records** — Click any record to see its full content, frontmatter, and relationships
-
-For more details, see [Browsing Your Vault](/guides/browsing-your-vault).
-
-## Services
-
-The Services page has two sections: service management and specialist model configuration.
-
-### Service status
-
-Each service running on your Alfred is shown as a card with:
-
-- **Status indicator** — Green (running), red (exited), or yellow (other)
-- **Service name and description** — What the service does
-- **Control buttons** — Start, Stop, and Restart
-
-The three core services are:
-
-| Service | Description |
-|---------|-------------|
-| **Alfred Worker** | Runs vault maintenance including the Curator, Janitor, Distiller, and Surveyor |
-| **OpenClaw Gateway** | Device connectivity and skill execution |
-| **Temporal Engine** | Workflow orchestration for scheduled and triggered tasks |
-
-### Specialist models
-
-Below the services, you can configure which LLM model each specialist uses. Tabs let you switch between them:
-
-- **Alfred** — The main worker
-- **Curator** — Reads inbox content and creates structured records
-- **Janitor** — Scans and repairs vault structural issues
-- **Distiller** — Surfaces latent knowledge from records
-- **Surveyor** — Embeds and clusters vault content (uses a labeler model and an embedder model)
-- **Clerk** — Stateless LLM worker for analytical tasks (classification, extraction, summarization)
-
-For each specialist, you can pick a model from the dropdown grouped by provider:
-
-| Provider | Key required | Example models |
-|----------|-------------|----------------|
-| **Anthropic** | `ANTHROPIC_API_KEY` | Claude Sonnet 4.5, Claude Haiku 4.5 |
-| **OpenAI** | `OPENAI_API_KEY` | GPT-4.1, GPT-4.1 Mini, o3, o4-mini |
-| **Google** | `GOOGLE_API_KEY` | Gemini 2.5 Pro, Gemini 2.5 Flash |
-| **xAI** | `XAI_API_KEY` | Grok 3, Grok 3 Fast, Grok 3 Mini |
-| **Meta** | via OpenRouter | Llama 4 Maverick, Llama 4 Scout |
-| **DeepSeek** | via OpenRouter | DeepSeek R1, DeepSeek V3 |
-| **Mistral** | via OpenRouter | Mistral Large, Mistral Small |
-
-If you select a model and the required API key is not configured, a dialog prompts you to enter it. You can also enter a custom model ID if your preferred model is not listed.
-
-<Tip>
-  Models from Meta, DeepSeek, and Mistral are accessed through OpenRouter. Set an `OPENROUTER_API_KEY` in Credentials to use them. An OpenRouter key also works as a fallback for Anthropic, OpenAI, Google, and xAI models.
-</Tip>
-
-## Devices
-
-The Devices section (accessible from the Home page Quick Actions area) manages OpenClaw device pairing. When a device (phone, tablet, or other client) requests to pair with your Alfred:
-
-1. The request appears as **pending** in the Devices section
-2. You can **approve** or **reject** it
-3. Approved devices appear in the paired devices list
-4. You can **remove** a paired device at any time
-
-For more details, see the [Device Pairing](/guides/device-pairing) guide.
-
-## Intuition
-
-The Intuition page shows how Alfred is learning from your routing decisions. It has four sections:
-
-### Status bar
-
-Four metrics across the top: events processed today, total observations, active instincts, and auto-route rate (the percentage of inputs Alfred handles autonomously).
-
-### Awaiting Judgment
-
-Inputs that need your routing decision. Each item shows a brief summary, how long ago it arrived, and the best instinct match (if any) with its confidence score. Use the **Route** dropdown to route the input to a vault destination — this creates an observation and teaches Alfred for next time.
-
-### Instincts
-
-Your active and developing instincts. Each instinct shows its observation count, discretion level, and how many inputs it has auto-routed. Instincts marked as "developing" need more observations before Alfred will use them for autonomous routing.
-
-### Activity feed
-
-A chronological log of recent intuition activity: events processed, inputs auto-routed, and reflection outcomes.
-
-For more details on how intuition works, see the [Intuition guide](/guides/intuition).
-
-## Credentials
-
-The Credentials page manages API keys for LLM providers used by your specialists. Each credential shows:
-
-- **Status** — Whether the key is set (green check) or missing (gray X)
-- **Description** — What the key is used for
-- **Masked value** — A preview of the configured key
-- **Used by** — Which specialists or services depend on this key
-
-You can set, update, or remove credentials at any time. Changes restart the Alfred worker automatically so the new keys take effect.
-
-For more details, see the [API Keys](/guides/api-keys) guide (for Alfred API keys) and the [Your Specialists](/guides/your-ai-agents) guide (for provider credentials).
-
-## Logs
-
-The Logs page streams real-time logs from all services running on your Alfred. Use this for monitoring specialist activity or verifying that everything is working correctly.
-
-You can also access logs via the API. See the [Monitoring](/guides/monitoring) guide.
-
-## Settings
-
-The Settings page contains three sections:
-
-### Account
-
-Displays your email, current plan, and subscription status.
-
-### Subscription
-
-Links to the Polar customer portal where you can manage your subscription, update payment methods, view invoices, or cancel. See the [Billing & Subscriptions](/guides/billing) guide for the full lifecycle.
-
-### API Keys
-
-Create and manage API keys for accessing the Alfred API. Each key provides full access to your API endpoints. Keys use the `alf_` prefix format and are shown only once at creation time.
-
-See the [API Keys](/guides/api-keys) guide for usage examples and best practices.
-
-### Terminal
-
-Navigate to **Settings → Terminal** to open a web-based terminal with a proper PTY. This gives you full TUI support — you can run interactive CLI tools like `htop`, `vim`, or the OpenClaw CLI directly in the browser. The terminal connects to your Alfred instance over a secure WebSocket.
-
-### SSH Access
-
-Settings → Terminal now includes a **"Download SSH Key"** button. This downloads a `.pem` private key file that lets you SSH directly into your tenant for full CLI access.
-
-To connect after downloading:
-
-**macOS / Linux:**
-```bash
-chmod 600 ~/Downloads/your-key.pem
-ssh -i ~/Downloads/your-key.pem deploy@<your-hostname>
-```
-
-**Windows (PowerShell):**
-```powershell
-icacls .\your-key.pem /inheritance:r /grant:r "$($env:USERNAME):(R)"
-ssh -i .\your-key.pem deploy@<your-hostname>
-```
-
-<Tip>
-SSH access is useful for running interactive commands like `openclaw configure` that require a real terminal session. Your SSH key is generated per-tenant during provisioning and stored encrypted on the platform.
-</Tip>
-
-<Columns cols={2}>
-  <Card title="Your Specialists" icon="gears" href="/guides/your-ai-agents">
-    Understand what each specialist does
+<CardGroup cols={2}>
+  <Card title="Browsing Your Vault" icon="vault" href="/guides/browsing-your-vault">
+    The deeper tour of the vault browser
   </Card>
-</Columns>
+  <Card title="Connected Apps" icon="puzzle" href="/guides/connected-apps">
+    Wire up Gmail, Calendar, Slack, GitHub, and 1,000+ more
+  </Card>
+  <Card title="Using the Inbox" icon="inbox" href="/guides/using-the-inbox">
+    Drop files, scan binaries, watch Curator process them
+  </Card>
+  <Card title="Monitoring" icon="activity" href="/guides/monitoring">
+    Health, workflows, container status
+  </Card>
+</CardGroup>

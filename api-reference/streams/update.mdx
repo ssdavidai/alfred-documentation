@@ -1,0 +1,84 @@
+---
+title: "Update Stream"
+description: "Patch a stream's metadata and pull-engine config in one call."
+api: "PATCH /api/v1/streams/:id"
+---
+
+## Overview
+
+Updates any subset of metadata (`name`, `type`, `source`, `enabled`, `status`) and pull-engine config fields. Unspecified fields are left alone. Returns the merged result.
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  Stream id.
+</ParamField>
+
+## Body Parameters
+
+All optional. Fields are split between the metadata file and the per-stream config file but you do not need to know which is which — both are written.
+
+<ParamField body="name" type="string" optional>Display name.</ParamField>
+<ParamField body="type" type="string" optional>Stream classification.</ParamField>
+<ParamField body="source" type="string" optional>Source identifier.</ParamField>
+<ParamField body="enabled" type="boolean" optional>Whether the stream is active.</ParamField>
+<ParamField body="status" type="string" optional>e.g. `idle`, `paused`, `error`.</ParamField>
+
+Pull-engine fields (any subset):
+
+<ParamField body="pull_endpoint" type="string" optional />
+<ParamField body="pull_method" type="string" optional />
+<ParamField body="pull_headers" type="object" optional />
+<ParamField body="pull_params" type="object" optional />
+<ParamField body="detail_endpoint" type="string" optional />
+<ParamField body="detail_id_field" type="string" optional />
+<ParamField body="parser" type="string" optional />
+<ParamField body="auth_type" type="string" optional />
+<ParamField body="auth_config" type="object" optional />
+<ParamField body="cursor_field" type="string" optional />
+<ParamField body="cursor_value" type="string" optional />
+<ParamField body="cursor_param" type="string" optional />
+<ParamField body="schedule_cron" type="string" optional />
+<ParamField body="schedule_interval_seconds" type="number" optional />
+<ParamField body="last_pull_at" type="string" optional />
+<ParamField body="last_pull_status" type="string" optional />
+<ParamField body="last_pull_count" type="number" optional />
+<ParamField body="composio_action" type="string" optional />
+<ParamField body="composio_connection_id" type="string" optional />
+<ParamField body="composio_toolkit" type="string" optional />
+<ParamField body="composio_args" type="object" optional />
+<ParamField body="pull_mode" type="string" optional>One of `snapshot`, `append`, `sync`.</ParamField>
+
+## Response
+
+<ResponseField name="stream" type="object">
+  Merged metadata + config after the update.
+</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X PATCH -H "Authorization: Bearer $AAS_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"schedule_interval_seconds": 600}' \
+  https://alfred.black/api/v1/streams/composio-gmail-gmail-fetch-emails
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "stream": {
+    "id": "composio-gmail-gmail-fetch-emails",
+    "schedule_interval_seconds": 600
+  }
+}
+```
+
+</ResponseExample>

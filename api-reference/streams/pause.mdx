@@ -1,0 +1,50 @@
+---
+title: "Pause Stream"
+description: "Mark a stream as paused — stops StreamPullerWorkflow firings against it."
+api: "POST /api/v1/streams/:id/pause"
+---
+
+## Overview
+
+Sets `enabled: false` and `status: "paused"` in `streams.json`. The Temporal schedule is not touched, but `StreamPullerWorkflow` short-circuits when it sees `enabled: false`.
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  Stream id.
+</ParamField>
+
+## Response
+
+<ResponseField name="stream" type="object">The updated stream entry.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X POST -H "Authorization: Bearer $AAS_API_KEY" \
+  https://alfred.black/api/v1/streams/composio-gmail-gmail-fetch-emails/pause
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "stream": {
+    "id": "composio-gmail-gmail-fetch-emails",
+    "enabled": false,
+    "status": "paused"
+  }
+}
+```
+
+```json 400 Bad Request
+{ "error": "Cannot pause a system stream" }
+```
+
+</ResponseExample>

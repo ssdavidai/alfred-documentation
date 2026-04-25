@@ -1,0 +1,53 @@
+---
+title: "Write Workspace File"
+description: "Overwrite one of the canonical workspace files."
+api: "PUT /api/v1/admin/workspace/:filename"
+---
+
+## Overview
+
+Atomically replaces the file's contents in the openclaw workspace. The workspace directory is created if missing.
+
+## Path Parameters
+
+<ParamField path="filename" type="string" required>
+  One of: `USER.md`, `SOUL.md`, `MEMORY.md`, `AGENTS.md`, `TOOLS.md`.
+</ParamField>
+
+## Body Parameters
+
+<ParamField body="content" type="string" required>
+  The new file contents.
+</ParamField>
+
+## Response
+
+<ResponseField name="filename" type="string">Echo.</ResponseField>
+<ResponseField name="message" type="string">`File saved`.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X PUT -H "Authorization: Bearer $AAS_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"content": "## Updated SOUL\n\nAlfred is..."}' \
+  https://alfred.black/api/v1/admin/workspace/SOUL.md
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{ "filename": "SOUL.md", "message": "File saved" }
+```
+
+</ResponseExample>
+
+<Note>
+TOOLS.md is overwritten by the init container on every tenant boot from the platform-template. Edits made here will be replaced on next init unless the source template is also updated.
+</Note>

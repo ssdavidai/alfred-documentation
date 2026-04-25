@@ -1,64 +1,47 @@
 ---
-title: "List Services"
-description: "List all services running on your instance"
+title: "List containers"
+description: "Show every container in the tenant Docker stack with state and health."
 api: "GET /api/v1/admin/containers"
 ---
 
-Retrieve the status of all services running on your Alfred instance. Returns an array of service objects with their current state.
+Returns the status of every container in your Alfred stack. Backs onto `docker compose ps --format json` against the tenant compose file. Useful for the dashboard's instance overview, scripted health monitoring, and post-deploy verification.
+
+## Response
+
+An array of compose container records. Field names are PascalCase straight from Docker Compose.
+
+<ResponseField name="Name"     type="string">Full container name (e.g. `compose-openclaw-1`).</ResponseField>
+<ResponseField name="Service"  type="string">Compose service id (`alfred`, `openclaw`, `alfred-learn`, `temporal`, `init`, `ctrl-api`, `openclaw-workers`, `ollama`).</ResponseField>
+<ResponseField name="State"    type="string">`running`, `exited`, `restarting`, etc.</ResponseField>
+<ResponseField name="Health"   type="string">Container health (`healthy`, `unhealthy`, `starting`) when a healthcheck is defined; empty string otherwise.</ResponseField>
+<ResponseField name="ExitCode" type="integer">Exit code if the container has exited; `0` while running.</ResponseField>
 
 <RequestExample>
 
-```bash curl
-curl -H "Authorization: Bearer alf_your_key_here" \
-  /api/v1/admin/containers
+```bash cURL
+curl -X GET https://alfred.black/api/v1/admin/containers \
+  -H "Authorization: Bearer alf_your_key_here"
 ```
 
 </RequestExample>
 
 <ResponseExample>
 
-```json
+```json 200 OK
 [
-  {
-    "Name": "alfred-init-1",
-    "Service": "init",
-    "State": "exited",
-    "Health": "",
-    "ExitCode": 0
-  },
-  {
-    "Name": "alfred-worker-1",
-    "Service": "worker",
-    "State": "running",
-    "Health": "healthy",
-    "ExitCode": 0
-  },
-  {
-    "Name": "alfred-openclaw-1",
-    "Service": "openclaw",
-    "State": "running",
-    "Health": "",
-    "ExitCode": 0
-  },
-  {
-    "Name": "alfred-temporal-1",
-    "Service": "temporal",
-    "State": "running",
-    "Health": "healthy",
-    "ExitCode": 0
-  },
-  {
-    "Name": "alfred-temporal-ui-1",
-    "Service": "temporal-ui",
-    "State": "running",
-    "Health": "",
-    "ExitCode": 0
-  }
+  { "Name": "compose-init-1",            "Service": "init",            "State": "exited",  "Health": "",         "ExitCode": 0 },
+  { "Name": "compose-ctrl-api-1",        "Service": "ctrl-api",        "State": "running", "Health": "healthy",  "ExitCode": 0 },
+  { "Name": "compose-temporal-1",        "Service": "temporal",        "State": "running", "Health": "healthy",  "ExitCode": 0 },
+  { "Name": "compose-openclaw-1",        "Service": "openclaw",        "State": "running", "Health": "healthy",  "ExitCode": 0 },
+  { "Name": "compose-openclaw-workers-1","Service": "openclaw-workers","State": "running", "Health": "",         "ExitCode": 0 },
+  { "Name": "compose-alfred-1",          "Service": "alfred",          "State": "running", "Health": "",         "ExitCode": 0 },
+  { "Name": "compose-alfred-learn-1",    "Service": "alfred-learn",    "State": "running", "Health": "",         "ExitCode": 0 },
+  { "Name": "compose-ollama-1",          "Service": "ollama",          "State": "running", "Health": "healthy",  "ExitCode": 0 }
 ]
 ```
 
 </ResponseExample>
 
 <Note>
-  Field names use PascalCase. The init service typically shows `State: "exited"` with `ExitCode: 0` after successful vault initialization.
+  The `init` service is a one-shot scaffolder and is expected to show `State: "exited"` with `ExitCode: 0` after a successful run. Anything else there indicates an init failure to investigate.
 </Note>

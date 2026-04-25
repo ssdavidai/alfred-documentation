@@ -1,12 +1,14 @@
 ---
-title: "List Sessions"
-description: "List agent sessions"
+title: "List sessions"
+description: "Show every active and recently completed OpenClaw session."
 api: "GET /api/v1/openclaw/sessions"
 ---
 
-List all agent sessions on your instance. Sessions represent active or recent conversations between your Alfred tools and the AI agent backend.
+Lists OpenClaw sessions. A session is one conversation between a caller (Slack, the dashboard, an inbound email, an ephemeral subagent) and the gateway. Useful for spotting stuck sessions, checking whether something is currently running, and tracking what Alfred has been up to.
 
-The response is returned as structured JSON when available, or as raw text in a `raw` field.
+## How it works
+
+ctrl-API shells into OpenClaw and runs `openclaw sessions`. JSON output is forwarded; non-JSON text is returned in a `raw` field.
 
 <RequestExample>
 
@@ -19,13 +21,28 @@ curl -X GET https://alfred.black/api/v1/openclaw/sessions \
 
 <ResponseExample>
 
-```json Structured Response
+```json Structured
 {
-  "...": "Structure depends on gateway sessions output"
+  "sessions": [
+    {
+      "id": "sess-01HV...",
+      "agent": "main",
+      "status": "running",
+      "started_at": "2026-04-25T08:14:02Z",
+      "channel": "slack"
+    },
+    {
+      "id": "sess-01HV...",
+      "agent": "main",
+      "status": "completed",
+      "started_at": "2026-04-25T08:08:11Z",
+      "channel": "email"
+    }
+  ]
 }
 ```
 
-```json Raw Response
+```json Raw fallback
 {
   "raw": "No active sessions"
 }
@@ -34,5 +51,5 @@ curl -X GET https://alfred.black/api/v1/openclaw/sessions \
 </ResponseExample>
 
 <Note>
-  The response format depends on the gateway's output. If the gateway returns valid JSON, it is passed through as-is. Otherwise, the raw text is returned in a `raw` field.
+  Ephemeral execution subagents spawned by the TaskRunner workflow live on the workers gateway (port 18790) and are not included in this list. The main openclaw gateway only tracks long-lived agents.
 </Note>

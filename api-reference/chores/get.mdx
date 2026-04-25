@@ -1,0 +1,56 @@
+---
+title: "Get Chore"
+description: "Get one chore's full record — frontmatter + body."
+api: "GET /api/v1/chores/:slug"
+---
+
+## Path Parameters
+
+<ParamField path="slug" type="string" required>
+  Chore slug (filename without `.md`).
+</ParamField>
+
+## Response
+
+<ResponseField name="slug" type="string">Echo.</ResponseField>
+<ResponseField name="frontmatter" type="object">All flat scalar fields from the YAML frontmatter (status, template, schedule, schedule_id, name, generated, workflow_class_name, last_run, etc.).</ResponseField>
+<ResponseField name="body" type="string">Markdown body — Sir-facing description, intent, and notes.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -H "Authorization: Bearer $AAS_API_KEY" \
+  https://alfred.black/api/v1/chores/weekly-cashflow-forecast
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "slug": "weekly-cashflow-forecast",
+  "frontmatter": {
+    "type": "chore",
+    "name": "Weekly cashflow forecast",
+    "status": "active",
+    "template": "weekly_cashflow_forecast",
+    "schedule": "0 9 * * MON",
+    "schedule_id": "chore-weekly-cashflow-forecast",
+    "generated": "true",
+    "workflow_class_name": "WeeklyCashflowForecastWorkflow",
+    "last_run": "2026-04-22T09:00:00Z"
+  },
+  "body": "## Intent\n\nEvery Monday at 9am, scan financial events..."
+}
+```
+
+```json 404 Not Found
+{ "error": "chore weekly-cashflow-forecast not found" }
+```
+
+</ResponseExample>

@@ -6,20 +6,22 @@ icon: "credit-card"
 
 ## Overview
 
-Alfred Black is a fully managed butler service. When you subscribe, a dedicated Alfred is provisioned for you automatically. Your subscription controls its lifecycle — from creation through suspension and eventual decommissioning if you cancel.
+Alfred Black is a fully managed butler service. Subscribing provisions a dedicated Hetzner Cloud VPS just for you — a `cx53` server in the EU, encrypted at rest, isolated from every other tenant. Your subscription drives the entire lifecycle: from the first payment through running, suspension, and eventual decommissioning if you cancel.
+
+Payments are handled by [Polar](https://polar.sh) — a modern merchant-of-record built for software businesses.
 
 ## Plans
 
-| Plan | Price | Infrastructure |
-|------|-------|---------------|
-| **Alfred Premium** | $249/mo | Dedicated Hetzner Cloud instance |
-| **Alfred Black** | Custom pricing | White-glove concierge service with a dedicated specialist |
+| Plan | Price | What you get |
+|---|---|---|
+| **Alfred Premium** | $249 / month | Dedicated VPS, the full specialist stack, all five agent personas, every Connected App integration, AgentMail inbox, AgentPhone number |
+| **Alfred Black** | Custom — contact for pricing | Everything in Premium, a dedicated account manager, custom automations and integrations built for you, priority response, personal onboarding |
 
-Both plans include the full Alfred stack: Curator, Janitor, Distiller, Surveyor, OpenClaw gateway, and Temporal workflow engine.
+Premium is self-serve through checkout. Black is contact-only — there is no checkout button; you talk to a human first.
+
+Both plans run on the same `cx53` Hetzner instance type and ship with the same software stack: the Curator, Janitor, Distiller, Surveyor, and Clerk specialists, plus the OpenClaw AI gateway, Temporal workflow engine, and full ctrl-api surface.
 
 ## Subscription lifecycle
-
-Your subscription moves through a series of states:
 
 ```
 Signup -> Payment -> Provisioning -> Running -> (Cancel) -> Suspended -> Decommissioned
@@ -27,114 +29,122 @@ Signup -> Payment -> Provisioning -> Running -> (Cancel) -> Suspended -> Decommi
 
 ### 1. Signup and payment
 
-When you subscribe through [Alfred Black](https://alfred.black), payment is handled via Polar. Once the first payment succeeds, provisioning begins automatically.
+Sir signs up at [alfred.black](https://alfred.black) and pays via Polar's hosted checkout. Once payment succeeds, Polar fires a webhook to the SaaS host and provisioning begins automatically.
 
 ### 2. Provisioning
 
-After payment, Alfred provisions a dedicated environment for you. This takes a few minutes. You can watch the progress from your dashboard — the provisioning screen shows each step as it completes:
+A dedicated `cx53` VPS is created in Hetzner's EU region. The dashboard shows live progress — typically five to ten minutes from payment confirmation to a running instance:
 
 - Server creation
-- DNS configuration
-- Software installation
-- Service startup
-- Health verification
+- DNS configuration (your tenant subdomain on `alfred.black`)
+- LUKS-encrypted volume mount
+- Software installation (Docker stack: ctrl-api, openclaw, temporal, alfred, alfred-learn, ollama)
+- Tailscale + Cloudflare Tunnel attachment
+- Service startup and health verification
+
+You don't touch any of this. The provisioning page narrates the steps as they run.
 
 ### 3. Running
 
-Once provisioning finishes, your Alfred is live. You have full access to:
+Once provisioned, your Alfred is live. You have full access to:
 
 - The dashboard at [alfred.black](https://alfred.black)
-- The Alfred API via your API keys
+- API access via your per-instance API key
 - All five specialists (Curator, Janitor, Distiller, Surveyor, Clerk)
-- OpenClaw device pairing
-- Temporal workflows and schedules
+- The main agent for Slack, web chat, email, voice, and SMS
+- Every Connected App integration via Composio
+- Temporal workflows and your scheduled chores
 
 ### 4. Cancellation
 
-If you cancel your subscription, two things happen:
+If you cancel through the Polar customer portal, two things happen:
 
-- Your subscription status changes to **cancel at period end**, meaning you retain access until the end of your current billing period.
-- Once the billing period ends, the subscription status moves to **deleted**.
+- Your subscription status moves to **cancel at period end** — you keep access until the current billing period ends.
+- Once the billing period ends, the subscription status becomes **deleted**.
 
 ### 5. Suspension
 
-When a subscription is deleted and your Alfred is still running, it's suspended. Suspension stops all services but preserves your data.
+A deleted subscription with a still-running instance triggers suspension. Suspension stops the Docker stack but **preserves your encrypted volume** — your vault, your chore source files, your authorised senders list, your AgentMail credentials, all of it.
 
 <Warning>
-  A suspended Alfred has a **30-day grace period**. During this time, your data remains intact and you can reactivate by resubscribing.
+A suspended Alfred has a **30-day grace period**. During that window, your data is intact and resubscribing brings everything back. After 30 days, the instance and its volume are decommissioned and the data cannot be recovered.
 </Warning>
 
 ### 6. Decommissioning
 
-After the 30-day grace period, suspended environments are decommissioned. All resources are permanently removed.
+After the 30-day grace period, the Hetzner server, the LUKS volume, the Tailscale node, and the DNS records are all permanently removed. Your AgentMail inbox is also released back to the pool.
 
 ### 7. Reprovisioning
 
-If you resubscribe after decommissioning, Alfred provisions a fresh environment for you. The previous data is not recoverable, so resubscribe within the grace period if you want to keep your vault.
+If you resubscribe after decommissioning, a fresh Alfred is provisioned from scratch. The vault starts empty. Your previous data is gone.
+
+If you resubscribe **within** the 30-day grace period, your instance is reactivated with everything preserved.
 
 ## Managing your subscription
 
-1. Go to your [Alfred Black dashboard](https://alfred.black)
-2. Navigate to **Settings**
-3. Under the **Subscription** card, click **Manage Subscription**
+<Steps>
+  <Step title="Open Settings">
+    Sign in to [alfred.black](https://alfred.black) and click **Settings** in the sidebar.
+  </Step>
+  <Step title="Click Manage Subscription">
+    Under the Subscription card, **Manage Subscription** opens the Polar customer portal in a new tab.
+  </Step>
+  <Step title="Update payment, view invoices, or cancel">
+    From the Polar portal you can:
 
-This opens the Polar customer portal where you can:
+    - Update your payment method
+    - View billing history and download invoices
+    - Cancel or reactivate your subscription
+    - Change billing address (for VAT)
+  </Step>
+</Steps>
 
-- Update your payment method
-- View billing history and invoices
-- Cancel or reactivate your subscription
-
-Your current plan and subscription status are displayed on the Settings page under the **Account** card.
-
-## API key management
-
-API keys let you access the Alfred API from scripts, automations, and integrations. Manage them from **Settings** in your dashboard.
-
-1. Navigate to **Settings**
-2. Scroll to the **API Keys** section
-3. Click **Create Key** and give it a descriptive name
-4. Copy the key immediately — it is only shown once
-
-You can view all your keys, see when each was last used, and revoke keys you no longer need.
-
-<Tip>
-  For detailed API key usage including code examples, see the [API Keys guide](/guides/api-keys).
-</Tip>
+Your current plan and subscription status are shown on the Settings page under the Account card.
 
 ## Subscription statuses
 
 | Status | Meaning |
-|--------|---------|
-| **Active** | Subscription is current, your Alfred is running |
-| **Cancel at period end** | Cancellation requested, access continues until billing period ends |
-| **Past due** | Payment failed, will retry |
-| **Deleted** | Subscription ended, your Alfred will be suspended |
+|---|---|
+| **active** | Subscription is current; your Alfred is running |
+| **cancel_at_period_end** | Cancellation requested; access continues until the period ends |
+| **past_due** | A payment attempt failed; Polar will retry |
+| **deleted** | Subscription ended; your Alfred will be suspended |
 
 ## Frequently asked questions
 
 <AccordionGroup>
   <Accordion title="Can I switch plans?">
-    Contact support to switch between Alfred Premium and Alfred Black. Plan changes are handled through the Polar customer portal.
+    Yes. To upgrade from Premium to Black, contact support and we'll migrate you. To downgrade, cancel via the Polar portal and resubscribe at the lower tier — your existing instance is preserved as long as you stay within the grace window.
   </Accordion>
 
   <Accordion title="What happens to my data when I cancel?">
-    Your data is preserved for 30 days after your subscription ends. During this grace period, resubscribing will restore access to your existing vault. After 30 days, the environment is permanently decommissioned.
+    Your encrypted volume is preserved for 30 days after the subscription ends. Resubscribing during the grace period restores access to your existing vault. After 30 days, the volume is wiped and the instance is destroyed permanently.
   </Accordion>
 
   <Accordion title="Can I get my data back after decommissioning?">
-    No. Once an environment is decommissioned after the 30-day grace period, the data cannot be recovered. If you resubscribe, a fresh Alfred is provisioned.
+    No. Once an instance is decommissioned, the volume is destroyed and the data cannot be recovered. If you resubscribe later, a fresh Alfred is provisioned from zero.
   </Accordion>
 
   <Accordion title="What if my payment fails?">
-    Your subscription moves to a **past due** state. Polar will retry the payment. If it continues to fail, the subscription will eventually be canceled.
+    Your subscription moves to **past_due**. Polar will retry the payment automatically. If it continues to fail, the subscription is cancelled and your instance enters the suspension grace period.
+  </Accordion>
+
+  <Accordion title="Where is my data stored?">
+    Your tenant runs on a dedicated `cx53` Hetzner Cloud VPS in the EU (Germany or Finland, depending on availability at provision time). The data volume is LUKS2-encrypted with a per-instance passphrase generated at provision time. See the [Security guide](/guides/security) for the full picture.
   </Accordion>
 </AccordionGroup>
 
-<Columns cols={2}>
+<CardGroup cols={2}>
   <Card title="API Keys" icon="key" href="/guides/api-keys">
-    Create and manage API keys
+    Create and manage your per-instance API key
   </Card>
   <Card title="Your Dashboard" icon="layout-dashboard" href="/guides/your-dashboard">
-    Tour of dashboard features
+    A tour of what's behind the login
   </Card>
-</Columns>
+  <Card title="Security" icon="shield-check" href="/guides/security">
+    How your data is protected
+  </Card>
+  <Card title="Your First 30 Days" icon="route" href="/guides/your-first-30-days">
+    What to expect after the first payment
+  </Card>
+</CardGroup>

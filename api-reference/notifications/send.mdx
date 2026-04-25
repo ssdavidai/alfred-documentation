@@ -1,0 +1,63 @@
+---
+title: "Send Notification"
+description: "Push a notification to Sir via the openclaw sessions_send tool."
+api: "POST /api/v1/notifications"
+---
+
+## Overview
+
+Forwards a message to the openclaw gateway's `sessions_send` tool, which pushes it into the named session (default: `main`). Used by chores, judgment workflows, and integrations to surface alerts to Sir on whichever channel the session is bound to (Slack, dashboard, etc.).
+
+## Body Parameters
+
+<ParamField body="message" type="string" required>
+  The notification body.
+</ParamField>
+
+<ParamField body="urgency" type="string" optional default="normal">
+  Free-form urgency tag. Common values: `low`, `normal`, `high`. Forwarded to the session.
+</ParamField>
+
+<ParamField body="session_id" type="string" optional default="main">
+  Target session id.
+</ParamField>
+
+## Response
+
+<ResponseField name="status" type="string">`sent` or `error`.</ResponseField>
+<ResponseField name="data" type="object">openclaw's raw `sessions_send` response (only on success).</ResponseField>
+<ResponseField name="error" type="string">Error message (only on failure).</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X POST -H "Authorization: Bearer $AAS_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Stripe payout of $1,247 just landed.", "urgency": "low"}' \
+  https://alfred.black/api/v1/notifications
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "status": "sent",
+  "data": {"queued": true, "sessionId": "main"}
+}
+```
+
+```json 500 Internal Server Error
+{ "status": "error", "error": "Gateway request failed: 502" }
+```
+
+</ResponseExample>
+
+<Warning>
+Reads the gateway token from `/alfred-data/.gateway-token`. If that file is missing or empty, returns `400 Bad Request` with "Gateway token not available".
+</Warning>

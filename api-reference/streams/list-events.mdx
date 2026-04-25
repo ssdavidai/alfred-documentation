@@ -1,0 +1,61 @@
+---
+title: "List All Events"
+description: "List recent events across every stream, optionally filtered by processed status."
+api: "GET /api/v1/streams/events"
+---
+
+## Overview
+
+Cross-stream event view used by the Activity tab. Filters by processing status — `unprocessed`, `processed`, or `quarantined` — based on the entry in `processed-events.json`.
+
+## Query Parameters
+
+<ParamField query="status" type="string" optional>
+  One of `unprocessed`, `processed`, `quarantined`. Omit for all.
+</ParamField>
+
+<ParamField query="limit" type="number" optional default="100">
+  Max events to return. Capped at 500.
+</ParamField>
+
+## Response
+
+<ResponseField name="events" type="array">
+  Each entry is a full StreamEvent: `{id, stream_id, stream_type, received_at, source_ref, raw, summary, metadata, tenant_id}`. Plus a derived `_processing_status` if any.
+</ResponseField>
+
+<ResponseField name="count" type="number">Number of events returned.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -H "Authorization: Bearer $AAS_API_KEY" \
+  "https://alfred.black/api/v1/streams/events?status=unprocessed&limit=20"
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "events": [
+    {
+      "id": "550e8400-...",
+      "stream_id": "composio-gmail-gmail-fetch-emails",
+      "stream_type": "email",
+      "received_at": "2026-04-25T11:30:00Z",
+      "source_ref": "msg-abc123",
+      "raw": {"from": "alice@example.com", "subject": "..."},
+      "summary": "Email from alice@example.com"
+    }
+  ],
+  "count": 1
+}
+```
+
+</ResponseExample>

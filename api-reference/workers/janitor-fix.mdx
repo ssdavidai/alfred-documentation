@@ -1,14 +1,16 @@
 ---
-title: "Fix Issues"
-description: "Fix issues found by Janitor scan"
+title: "Janitor Fix"
+description: "Scan the vault and let the Janitor agent repair what it can."
 api: "POST /api/v1/workers/janitor/fix"
 ---
 
-Runs a vault health scan and then automatically fixes the detected issues. The Janitor agent will update frontmatter, repair broken links, and clean up orphaned records.
+Runs `alfred janitor fix`: a full structural scan followed by a Janitor agent pass that repairs the issues it knows how to fix. Examples include backfilling missing frontmatter fields, removing dead wiki links, and merging obvious duplicates.
 
-<Warning>
-  This operation modifies vault files. All changes are tracked in the audit log, but consider backing up your vault first.
-</Warning>
+Files Janitor cannot confidently fix are left untouched and reported back so Sir or another tool can decide what to do.
+
+## Authentication
+
+Bearer token in the `Authorization` header.
 
 <RequestExample>
 
@@ -22,26 +24,37 @@ curl -X POST https://alfred.black/api/v1/workers/janitor/fix \
 
 <ResponseExample>
 
-```json Structured Response
+```json 200 Structured
 {
   "files_scanned": 423,
-  "issues_found": 12,
-  "issues_fixed": 10
+  "issues_found": 7,
+  "files_fixed": 5,
+  "files_deleted": 0,
+  "files_skipped": 2,
+  "skipped": [
+    {"file": "matters/acme-redesign.md", "reason": "ambiguous link target — needs human review"}
+  ]
 }
 ```
 
-```json Raw Response
+```json 200 Raw fallback
 {
-  "raw": "Scanned 423 files, found 12 issues, fixed 10"
+  "raw": "Files scanned: 423\nIssues found: 7\nFiles fixed: 5\nFiles deleted: 0\nSkipped: 2"
 }
 ```
 
 </ResponseExample>
 
-<Note>
-  If the response contains structured JSON, it is returned directly. Otherwise, the output is returned in a `raw` field.
-</Note>
-
 <ResponseField name="raw" type="string">
-  Human-readable output when structured JSON is not available.
+  Trimmed stdout when the CLI did not return JSON. Present only in the fallback case.
 </ResponseField>
+
+## When to use
+
+- After a manual `janitor/scan` shows fixable issues and Sir wants them resolved.
+- As part of a maintenance window after a vault migration.
+- After a Curator pipeline change that may have left stale links.
+
+<Warning>
+  This endpoint mutates vault files. Janitor records each change in its fix log (visible via [`janitor/history`](/api-reference/workers/janitor-history)) but the writes are irreversible without git. If Sir wants a dry run first, use [`janitor/scan`](/api-reference/workers/janitor-scan) and review the issue list.
+</Warning>

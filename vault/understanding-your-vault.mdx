@@ -1,108 +1,117 @@
 ---
 title: "Understanding Your Vault"
-description: "Your vault is a living map of your world — every person, commitment, decision, and insight, connected."
+description: "Your vault is a directory of markdown files — one per person, matter, decision, and event Alfred is tracking on your behalf."
 icon: "vault"
 ---
 
-## What is your vault?
+## What your vault actually is
 
-Your vault is where Alfred keeps everything it knows about your world. It's a living map — a collection of structured records that are all connected to each other through links. Every person, project, task, decision, and insight lives here.
+Your vault is a directory of plain markdown files on a disk Alfred owns. Every person you mention, every matter Alfred is tracking, every email that flows through your accounts, every decision recorded — each one is its own file. The files are organised into folders by type (`person/`, `matter/`, `event/`, `decision/`, and so on), and they reference one another with `[[wikilinks]]`.
 
-Unlike a folder of notes, your vault is **structured** (every record has a type and metadata), **connected** (records link to each other), and **growing** (Alfred continuously adds and refines records as you share content).
+That is the entire system. There is no database behind it.
 
-## How records work
+```
+/vault
+├── person/
+│   ├── jane-doe.md
+│   └── michael-ng.md
+├── matter/
+│   └── kitchen-renovation.md
+├── event/
+│   └── 2026-04-12-a3f9c1b2e8d4.md
+├── task/
+│   └── confirm-rsvp-with-cabinet-supplier.md
+├── decision/
+│   └── proceed-with-carrara-marble.md
+└── conversation/
+    └── 2026-04-02-1676adbd5443.md
+```
 
-Each record in your vault has three parts:
+## Why files-on-disk
 
-1. **Type and metadata** — What kind of record it is (person, task, decision, etc.) along with properties like status, dates, tags, and owners
-2. **Content** — The main body with details, context, and notes
-3. **Connections** — Links to other records in your vault
+A vault on disk gives Sir three things a database cannot.
 
-Here's what a person record looks like:
-
-<Accordion title="Example: Person record">
-**Alice Smith** (type: person)
-
-- **Status:** active
-- **Organization:** linked to Acme Corp
-- **Email:** alice@acme.com
-- **Tags:** engineering, backend
-
-**Content:**
-> Alice is a senior backend engineer who joined Acme in 2025. She leads the Platform v2 migration effort.
-
-**Connected to:**
-- Acme Corp (org)
-- Platform v2 (project)
-- Deploy staging environment (task)
-- Architecture Review (conversation)
-</Accordion>
-
-## How connections work
-
-When Alfred reads a meeting note that mentions "Alice from Acme discussed the Q1 launch," it creates or updates multiple records and links them together:
-
-- The **conversation** record links to Alice (person) and Q1 Launch (project)
-- Alice's **person** record links back to the conversation and to Acme Corp (org)
-- The **project** record links to Alice and the conversation
-
-These bidirectional connections mean you can start from any record and navigate to everything related.
-
-## The four layers
-
-Your vault organizes knowledge into four layers:
-
-### Who and what — Standing entities
-
-Records for the stable elements of your world: people, organizations, projects, locations, accounts, assets, processes, and **matters** (ongoing concerns that group related errands). These persist and accumulate connections over time.
-
-### What happened — Activity records
-
-Records for events, conversations, tasks, notes, and sessions. These capture what occurred and link to the people and things involved.
-
-### What we know — Learning records
-
-Records created by the Distiller that surface hidden knowledge: assumptions being made, decisions taken, constraints in play, contradictions between sources, and synthesized insights.
-
-### How Alfred learns — Intuition records
-
-Records created by Alfred's intuition system: observations of your routing decisions, instincts distilled from those observations, and nightly reflection reports. These grow over time as Alfred learns your preferences and develops the judgment to handle routine decisions on your behalf.
-
-## How your vault grows
-
-Your vault grows from two sources: **streams** (automatic) and **manual sharing** (ad-hoc).
-
-**Streams** are the primary growth engine. Gmail, Notion, Omi, and other integrations continuously feed events into the Event Processor, which classifies them and hands them to the Curator for record creation. During onboarding, a **100-day Gmail backfill** runs automatically — creating an initial vault structure from your recent email history so Alfred has meaningful context from day one.
-
-**Manual sharing** supplements streams with ad-hoc content — meeting notes, pasted research, documents from tools you haven't integrated yet.
-
-In both cases, the pipeline is the same:
-
-1. The Curator identifies people, projects, and events, creating or updating records
-2. New records are linked to existing ones where relevant
-3. The Janitor ensures all connections are valid
-4. The Distiller periodically surfaces deeper knowledge
-5. The Surveyor clusters records by meaning and discovers cross-record relationships
-6. Alfred's intuition observes your routing decisions and refines its instincts
-
-A single meeting note might create 5-10 new records and dozens of connections. Over weeks and months, your vault becomes an increasingly rich and valuable map of your world — and Alfred becomes increasingly capable of managing it on your behalf.
-
-## Vault Nebula
-
-The **Vault Nebula** is the visualization on your dashboard homepage. Each CSS cloud represents a cluster of related records discovered by the Surveyor — sized by record count and colored by theme. It gives you an ambient, at-a-glance picture of what Alfred is tracking across your world.
-
-## Accessing your vault
-
-You can browse and search your vault in two ways:
-
-- **Dashboard** — Use the vault browser to filter by type, search by keyword, and click through connections
-- **API** — Use endpoints like `GET /api/v1/vault/context`, `GET /api/v1/vault/search`, and `GET /api/v1/vault/list/{type}` for programmatic access
-
-<Columns cols={2}>
-  <Card title="Record Types" icon="shapes" href="/vault/record-types">
-    See all 26+ record types in detail
+<CardGroup cols={3}>
+  <Card title="Sir owns the bytes" icon="lock">
+    Every record is a markdown file Sir can read, edit, back up, or take elsewhere. Nothing is locked behind a proprietary schema.
   </Card>
-  <Card title="Record Format" icon="database" href="/vault/vault-schema">
-    Understand the structure of records
+  <Card title="Diffable history" icon="git-branch">
+    Every change Alfred makes is appended to a mutation log. Sir can see what changed, when, and by whom.
   </Card>
-</Columns>
+  <Card title="Obsidian-compatible" icon="book-open">
+    The vault is a valid Obsidian vault. If Sir prefers to browse it that way, Alfred will defer — and reuse Obsidian's live link index when it is running.
+  </Card>
+</CardGroup>
+
+## How records are organised
+
+Every record is a markdown file with a YAML frontmatter block declaring its type and a body containing the prose.
+
+```markdown
+---
+type: matter
+name: Kitchen renovation
+status: active
+created: 2026-03-04
+tags: [home, renovation]
+---
+
+# Kitchen renovation
+
+The whole-floor refit Sir signed off on in February. Carrara marble counters,
+custom cabinet supplier in Brescia, plumbing rough-in scheduled for week 18.
+```
+
+Files live in folders named for their type — `matter/kitchen-renovation.md` for the example above. Some types share a folder (sessions and inputs are placed flexibly), but for the most part you can predict where a record lives from its type alone. See [Record types](/vault/record-types) for the full list.
+
+## How Sir interacts with the vault
+
+There are four ways for Sir to touch the vault. All four route through the same code path — the `alfred vault` CLI on the tenant — so the same scope rules and audit trail apply regardless of which surface Sir uses.
+
+<Tabs>
+  <Tab title="The dashboard">
+    Sir's primary surface. The dashboard reads the vault through the API and renders it as the Vault Nebula homepage, the matter and errand views, and the per-record detail pages. Everything is live — edits Sir makes propagate back to the markdown files immediately.
+  </Tab>
+  <Tab title="A conversation with Alfred">
+    The most natural surface. Sir tells Alfred something — "Jane Doe is the project manager for the kitchen, please add her" — and Alfred performs the vault writes through its tools. Every operation is scope-checked and logged.
+  </Tab>
+  <Tab title="The API">
+    `GET /api/v1/vault/context`, `POST /api/v1/vault/create`, `PATCH /api/v1/vault/edit`. Eighty-six endpoints in total, documented in the [API reference](/api-reference/introduction). Used by the dashboard, by Alfred's agents, and by any integration Sir cares to build.
+  </Tab>
+  <Tab title="Direct file access">
+    Available, but discouraged. Sir can SSH into the tenant and edit the markdown files directly. The [Janitor](/architecture/agent) will eventually notice any structural issues and tidy them — but the writes will not appear in the mutation log, and any specialist mid-operation may overwrite them.
+  </Tab>
+</Tabs>
+
+## How Alfred uses the vault
+
+The vault is the single source of truth for Alfred's understanding of Sir's world. Every specialist reads from it, and most of them write to it under strict permission boundaries.
+
+| Specialist | Reads | Writes |
+|------------|-------|--------|
+| **Curator** | All | Creates entity records from inbox uploads (cannot delete) |
+| **Janitor** | All | Repairs structural issues; can edit and delete, never creates |
+| **Distiller** | All | Creates only learning records (assumption, decision, constraint, contradiction, synthesis) |
+| **Surveyor** | All | Edits only `alfred_tags` and `relationships` frontmatter fields |
+| **Main agent** | All | Full read/write — bounded by the same vault CLI gate |
+
+These permissions are enforced **in code** by `alfred/vault/scope.py` before any operation reaches the filesystem. The Curator cannot delete; the Janitor cannot create; the Distiller cannot edit anyone's body text. See [Agentic Layer](/architecture/agent) for the full enforcement model.
+
+## Encryption and ownership
+
+<Note>
+The vault lives on an encrypted volume on the Hetzner VPS Alfred provisioned for Sir. The disk is encrypted at rest with a key Sir holds; daily backups go to Hetzner S3, also encrypted. Tailscale is the only inbound network path. No third party — including the LLM providers — ever sees the vault contents in bulk; only the records Alfred deliberately includes in a prompt.
+</Note>
+
+The vault is not shared. It is not pooled. It is not multi-tenant. Every subscriber has a dedicated VPS, a dedicated vault, and a dedicated set of credentials. If Sir leaves, Sir takes the vault with him — it is a folder of markdown files, and Alfred will hand it over.
+
+## Where to go next
+
+<CardGroup cols={2}>
+  <Card title="Record types" icon="list" href="/vault/record-types">
+    The complete catalogue of record types Alfred recognises, with examples
+  </Card>
+  <Card title="Vault schema" icon="file-code" href="/vault/vault-schema">
+    Frontmatter conventions, wikilinks, status values, and how to extend
+  </Card>
+</CardGroup>

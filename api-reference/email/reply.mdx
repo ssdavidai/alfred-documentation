@@ -1,0 +1,66 @@
+---
+title: "Reply to Email"
+description: "Reply to an inbound message in the same thread."
+api: "POST /api/v1/email/reply"
+---
+
+## Overview
+
+Posts to AgentMail's `reply` or `reply-all` endpoint depending on `reply_all`. Stays in the same thread as the source message.
+
+## Body Parameters
+
+<ParamField body="message_id" type="string" required>
+  AgentMail id of the message being replied to.
+</ParamField>
+
+<ParamField body="text" type="string" required>
+  Reply body (plain text).
+</ParamField>
+
+<ParamField body="html" type="string" optional>
+  Reply body (HTML).
+</ParamField>
+
+<ParamField body="reply_all" type="boolean" optional default="false">
+  When `true`, hits AgentMail's `reply-all` endpoint instead of `reply`.
+</ParamField>
+
+<ParamField body="attachments" type="array" optional>
+  Same shape as `/send`.
+</ParamField>
+
+## Response
+
+AgentMail's raw response (passthrough).
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X POST -H "Authorization: Bearer $AAS_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message_id": "msg_01HXYZABCDEF",
+    "text": "Yes, Tuesday at 2pm works. — D",
+    "reply_all": false
+  }' \
+  https://alfred.black/api/v1/email/reply
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "message_id": "msg_01HXYZNEW123",
+  "thread_id": "thr_01HXYZGHIJKL",
+  "in_reply_to": "msg_01HXYZABCDEF"
+}
+```
+
+</ResponseExample>

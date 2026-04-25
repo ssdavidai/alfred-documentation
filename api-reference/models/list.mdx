@@ -1,0 +1,82 @@
+---
+title: "List Available Models"
+description: "Dynamic model catalogue across every provider whose API key is configured."
+api: "GET /api/v1/admin/models"
+---
+
+## Overview
+
+Reads the tenant `.env` to detect which provider keys are present (`OPENROUTER_API_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY`, `XAI_API_KEY`), then concurrently fetches each provider's model catalogue. Results are deduplicated (direct provider entries win over OpenRouter mirrors), grouped by provider, and cached for one hour.
+
+Used by the dashboard's model picker and the per-agent `model.primary` config in `openclaw.json`.
+
+## Query Parameters
+
+<ParamField query="refresh" type="string" optional>
+  Pass `true` to bust the 1-hour cache and re-fetch from every provider.
+</ParamField>
+
+## Response
+
+<ResponseField name="groups" type="array">
+  Each entry: `{provider, source: "direct"|"openrouter", models: [...]}`.
+
+  Each model: `{id, name, provider, contextWindow?, maxOutput?, pricing?: {input, output}, source, supportsImages?, supportsReasoning?}`.
+
+  - `pricing` is per 1M tokens, derived from OpenRouter's per-token pricing.
+  - Direct providers sort first (Anthropic, OpenAI, Google, xAI), then OpenRouter.
+  - OpenRouter entries that duplicate a direct entry are tagged `(via OpenRouter)`.
+</ResponseField>
+
+<ResponseField name="cached" type="boolean">True iff the response came from the in-memory cache.</ResponseField>
+
+<ResponseField name="fetchedAt" type="number">UNIX milliseconds when the cache was populated.</ResponseField>
+
+<ResponseField name="modelCount" type="number">
+  Total models across all groups (only when `cached: false`).
+</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -H "Authorization: Bearer $AAS_API_KEY" \
+  https://alfred.black/api/v1/admin/models?refresh=true
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "groups": [
+    {
+      "provider": "anthropic",
+      "source": "direct",
+      "models": [
+        {"id": "anthropic/claude-opus-4-7", "name": "Claude Opus 4.7", "provider": "anthropic", "source": "direct"}
+      ]
+    },
+    {
+      "provider": "x-ai",
+      "source": "direct",
+      "models": [
+        {"id": "x-ai/grok-4", "name": "grok-4", "provider": "xai", "source": "direct"}
+      ]
+    }
+  ],
+  "cached": false,
+  "fetchedAt": 1745580600000,
+  "modelCount": 312
+}
+```
+
+</ResponseExample>
+
+<Warning>
+Each provider fetch has a 10s timeout. If a provider is unreachable, its models silently drop out of the response — the next refresh will retry.
+</Warning>

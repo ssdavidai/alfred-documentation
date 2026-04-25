@@ -1,0 +1,50 @@
+---
+title: "Trigger Chore"
+description: "Fire a chore once, outside its normal cron schedule."
+api: "POST /api/v1/chores/:slug/trigger"
+---
+
+## Overview
+
+Runs `temporal schedule trigger --schedule-id chore-<slug>`, which dispatches an immediate workflow run with the schedule's bound input. Useful for "run that report now" without editing the cron.
+
+## Path Parameters
+
+<ParamField path="slug" type="string" required>
+  Chore slug.
+</ParamField>
+
+## Response
+
+<ResponseField name="slug" type="string">Echo.</ResponseField>
+<ResponseField name="triggered_at" type="string">ISO timestamp of the trigger call.</ResponseField>
+<ResponseField name="message" type="string">Hint to check the Workflows tab for execution status.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X POST -H "Authorization: Bearer $AAS_API_KEY" \
+  https://alfred.black/api/v1/chores/weekly-cashflow-forecast/trigger
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "slug": "weekly-cashflow-forecast",
+  "triggered_at": "2026-04-25T11:40:00Z",
+  "message": "Chore weekly-cashflow-forecast fired manually — check Workflows tab for execution status"
+}
+```
+
+```json 400 Bad Request
+{ "error": "Failed to trigger chore-weekly-cashflow-forecast: schedule not found" }
+```
+
+</ResponseExample>

@@ -1,183 +1,139 @@
 ---
-title: "Interface Layer"
-description: "Every way you interact with Alfred: dashboard, terminal, channels, Talk Mode, Ambient Mode, and the API."
+title: "Interface"
+description: "The dashboard, the Vault Nebula homepage, the channels Sir uses to talk to Alfred, the API, and the MCP tools that wire it all together."
 icon: "display"
 ---
 
 <Note>
-Part of Alfred's [six-layer architecture](/how-it-works). The Interface layer is where you and Alfred meet.
+The interface layer is everything Sir touches. The other layers do the work; this layer is where Sir gives instructions, checks on things, and lives alongside his butler.
 </Note>
 
-## Every interface, one pipeline
+## A single front door, many entrances
 
-Alfred gives you many ways to interact — but they all feed into the same pipeline. Content arrives, specialists process it, your vault grows. Whether you share a meeting note from the dashboard, mention a task on a phone call, or have a passing conversation captured by your wearable, Alfred treats it all the same.
+Every entrance — dashboard, Slack DM, email reply, SMS, phone call, Telegram message — feeds the same agent and the same vault. The persona doesn't change. The capabilities don't change. Whether Sir asks "what's on this afternoon" by typing into the dashboard or by speaking it into a phone, Alfred answers the same way and from the same context.
 
----
+## The dashboard
 
-## The Dashboard
+`https://alfred.black`. Sir's window into everything Alfred is doing. Routed in `packages/saas/app/main.wasp` and built with React under `packages/saas/app/src/dashboard/`.
 
-The [Alfred Black dashboard](https://alfred.black) is your window into everything Alfred is doing. Home shows the Command Center with health, vault stats, specialist activity, and a knowledge graph. Browse your vault, manage streams, review intuition, configure specialist models, and control services — all in one place.
+The sidebar (`DashboardLayout.tsx`):
 
-<Card title="Dashboard tour" icon="layout-dashboard" href="/guides/your-dashboard">
-  Full walkthrough of every dashboard section
-</Card>
+| Section | Path | What's there |
+|---|---|---|
+| **Alfred** | `/dashboard` | The Vault Nebula homepage. |
+| **Command Center** | `/dashboard/command-center` | Health, vault stats, container status, knowledge graph, recent activity. |
+| **Vault** | `/dashboard/vault` | Browse every record by type or path. Open a record to read, edit, link. |
+| **Intelligence** | `/dashboard/tasks` | Five tabs: Inbox, Matters, Errands, Chores, Activity. |
+| **Streams** | `/dashboard/streams` | Configured streams with status, event counts, pause/resume/edit. |
+| **Tools** | `/dashboard/tools` | Per-app inventory of every Composio action available to the agent. |
+| **Apps** | `/dashboard/integrations` | Connect/disconnect Composio apps; per-app stream + tool controls. |
+| **Settings** | `/dashboard/settings` | Models, credentials, identity, billing. |
 
----
+Plus per-tenant pages reached from elsewhere: Phone (`/dashboard/phone`), Devices, Logs, Workspace, Terminal, API Docs.
 
-## Terminal Access
+### The Vault Nebula
 
-Navigate to **Terminal** in your dashboard to open a live terminal session inside your OpenClaw container. From here you can use the OpenClaw TUI and CLI directly — managing agents, skills, sessions, hooks, and configuration without leaving your browser.
+The homepage. Source: `packages/saas/app/src/components/nebula/VaultNebula.tsx`. Pure CSS — no WebGL, no Canvas. Layered radial gradients with an SVG blur filter, generated from real cluster data the Surveyor produced.
 
-This gives you the same access you'd have if you SSH'd into your instance and ran `docker exec` into the OpenClaw container, but through a convenient web interface.
+Each cloud is a cluster of related records. Cloud colour maps to record type — `matter` and `project` in gold, `decision` and `constraint` in deep teal, `contradiction` and `triage` in red, `synthesis` in violet, people and notes in warm cream. Density maps to count. Sir's vault visibly grows over time — new clusters appear, existing ones swell, the colour balance tells him at a glance what kind of work is currently weighing on the household.
 
----
+Every other dashboard page renders the nebula as a faint background at 20% opacity, so Sir always sees his world behind whatever he's reading.
 
-## Messaging Channels
+### The Command Center
 
-Alfred supports messaging via OpenClaw's channel system. Currently available:
+Health, container status, disk, memory, recent workflow runs, recent specialist activity. Pulls from `GET /api/v1/admin/dashboard` plus the per-section endpoints (`/admin/health`, `/admin/containers`, `/admin/system/info`, `/admin/activity`).
 
-| Channel | Status | How it works |
-|---------|--------|-------------|
-| **Slack** | Live | Bot integration via Socket Mode. Connected as a Composio app. |
-| **Dashboard chat** | Live | Built into the Alfred dashboard at alfred.black |
+When the openclaw gateway is restarting (e.g. right after Sir connects a new Composio app, which takes ~40 seconds), the dashboard hides the gateway window behind a "Configuring {toolkit}…" banner driven by `OpenclawStatusContext` polling `/api/v1/openclaw/ready` every two seconds.
 
-<Warning>
-Additional channels (WhatsApp, iMessage, Telegram, Discord) are planned but not yet implemented. When available, a message to Alfred on any channel will be processed the same way as content shared through the dashboard.
-</Warning>
+### The Terminal page
 
----
+`/dashboard/terminal` opens a live terminal inside the openclaw container, with a real PTY allocation, proper `SIGWINCH` for resizes, and the OpenClaw TUI/CLI directly available. Same access as `docker exec -it compose-openclaw-1 bash` over SSH, but in the browser.
 
-## Talk Mode
+## The MCP `self` tool — the agent's API
 
-<Warning>
-Coming soon — Talk Mode is in active development.
-</Warning>
+Every endpoint on the dashboard is also reachable by Alfred himself, through the MCP `self` tool defined in `packages/openclaw/mcp/ctrl-server.mjs`:
 
-Talk Mode gives your Alfred a voice. Alfred can call you for briefings, reminders, and check-ins — and you can call Alfred's dedicated phone number any time you need something.
+```js
+self({ endpoint: "/api/v1/vault/context" })
+self({ endpoint: "/api/v1/vault/records", method: "POST", body: { type: "task", name: "...", content: "..." } })
+self({ endpoint: "/api/v1/email/send", method: "POST", body: { to, subject, text } })
+self({ endpoint: "/api/v1/phone/sms", method: "POST", body: { to, body } })
+self({ endpoint: "/api/v1/admin/dashboard" })
+```
 
-This isn't a robotic assistant reading from a script. Alfred speaks with the voice of a proper butler — calm, warm, precise without being cold. Occasionally dry-witted, never sarcastic. Unflappable in all circumstances.
+Same auth (the tenant's `AAS_API_KEY`), same JSON shapes, same routes. When Sir asks Alfred "is everything OK?", Alfred calls `self({ endpoint: "/api/v1/admin/dashboard" })` and reads what Sir would see on the Command Center. When Sir says "send a follow-up to Robert", Alfred reaches `/api/v1/email/send`. The agent and the dashboard live on the same surface.
 
-<AccordionGroup>
-<Accordion title="Alfred calls you" icon="phone-arrow-up-right">
-Alfred initiates voice calls when the moment calls for it:
+The endpoint catalogue is in `packages/openclaw/workspace-template/docs/TOOLS.md`. Skill files (`workspace-template/skills/alfred-vault-operations`, `alfred-chore-management`, `alfred-learning-introspection`, `alfred-ops-health`, `alfred-email-channel`, `alfred-voice`) tell the agent the patterns for using each section.
 
-- **Morning briefings** — Your day ahead, summarised and delivered by voice
-- **Reminders** — Tasks due, meetings approaching, commitments to keep
-- **Onboarding touchpoints** — During your first days, Alfred checks in to make sure everything is working
-- **The Day 30 envelope** — A milestone moment in your Alfred experience, delivered personally
+## Federated tools (Alfred Prime only)
 
-Alfred doesn't call arbitrarily. Voice calls are reserved for moments where a call is genuinely the right medium.
-</Accordion>
+When a tenant is configured with `ALFRED_PRIME=true` and a `CROSS_TENANT_PEERS` JSON list, two more MCP tools appear:
 
-<Accordion title="You call Alfred" icon="phone-arrow-down-left">
-Pick up the phone and dial Alfred's number any time. Ask questions, share updates, give instructions. Anything you share by voice flows through the same pipeline as text — records are created, your vault grows.
-</Accordion>
+- **`tenant({ tenant: "miguel", endpoint: "...", method?, body?, query? })`** — direct CRUD on a peer's ctrl-api over Tailscale. Same endpoint catalogue as `self`. Uses Prime's tokens.
+- **`ask_alfred({ tenant: "miguel", prompt: "..." })`** — hand a prompt to a peer's Alfred and return the peer's reasoned reply. Uses the peer's tokens. Hits the peer's `POST /api/v1/cross-tenant/ask` endpoint.
 
-<Accordion title="Setting up Talk Mode" icon="sliders">
-Talk Mode is enabled as an integration from your dashboard.
+Today only one tenant is Prime. On a non-Prime tenant the two tools simply aren't in the agent's tool list — there's no surface for the agent to invent a cross-tenant call.
 
-1. Navigate to your dashboard and find the Integrations section
-2. Toggle Talk Mode on — Alfred provisions your dedicated phone number automatically
-3. Follow the guided ElevenLabs voice synthesis setup
-4. Start talking
+The peer list is delivered through the `CROSS_TENANT_PEERS` env var as JSON: `[{ "id": "miguel", "tailscaleHost": "...", "tailscaleIp": "...", "apiKey": "...", "label": "Miguel" }]`. Routing prefers the Tailscale hostname (TLS) over the raw IP.
 
-| Component | Details |
-|-----------|---------|
-| **Dedicated phone number** | Included — no extra provisioning needed |
-| **ElevenLabs voice** | Guided setup; requires an ElevenLabs account |
-| **Inbound calls** | Call Alfred any time |
-| **Outbound calls** | Briefings, reminders, and key moments |
-</Accordion>
-</AccordionGroup>
+## Channels
 
----
+Sir can reach Alfred from anywhere. Five channels are live; all converge on the same agent.
 
-## Ambient Mode
+| Channel | Inbound | Outbound | Where Sir lives |
+|---|---|---|---|
+| Dashboard chat | Built into `/dashboard` | Same page | Sir's browser |
+| Slack DM | OpenClaw's Slack adapter (Composio app) | Slack chat.postMessage via `/api/v1/notifications` | Sir's Slack workspace |
+| Telegram | OpenClaw's Telegram adapter | sendMessage via `/api/v1/notifications` | Sir's phone |
+| Email | AgentMail Svix webhook → tenant `/channels/email/inbound` | `/api/v1/email/send` / `/reply` / `/forward` | `alfred.<username>@mail.alfred.black` |
+| SMS / voice | Twilio webhooks → tenant `/phone/sms/inbound` or Voice Bridge | `/api/v1/phone/sms` / `/phone/call` | Sir's Twilio subnumber |
 
-<Warning>
-Coming soon — Ambient Mode is in active development.
-</Warning>
+The channel that matters most for the architecture is the dispatch split: **authorized senders get a conversational reply; everyone else becomes a stream event**. See [Channels](/architecture/channels) for the full picture.
 
-Connect an [Omi](https://omi.me) wearable device to Alfred for continuous ambient listening. Wear it throughout your day, and every conversation — meetings, phone calls, coffee chats, passing remarks — is captured, transcribed, and processed automatically.
+### Cross-channel memory
 
-You mention "I should call the accountant next week" while having coffee. Alfred hears it. A task appears. No manual entry. No forgotten follow-up.
-
-<AccordionGroup>
-<Accordion title="How Ambient Mode works" icon="signal">
-Ambient Mode runs as a realtime Stream, feeding a Temporal pipeline that turns raw audio into structured intelligence.
-
-1. Your Omi device captures ambient audio and sends it to Alfred via webhook
-2. Alfred processes the audio locally — RMS speech detection, grouping, Whisper transcription
-3. The transcript enters the stream pipeline as a StreamEvent
-4. A vault record is created automatically with the transcript and metadata
-5. Hourly enrichment adds entities, topics, and context
-
-A single conversation can produce tasks, new person records, decisions, commitments, and entity updates.
-</Accordion>
-
-<Accordion title="Setting up Ambient Mode" icon="sliders">
-1. Order your Omi wearable at [omi.me](https://omi.me)
-2. Navigate to your dashboard and find the Integrations section
-3. Toggle Ambient Mode on and follow the pairing instructions
-4. Wear and go — transcripts appear in your Inbox within moments
-
-| Component | Details |
-|-----------|---------|
-| **Omi device** | Required — order at [omi.me](https://omi.me) |
-| **Alfred instance** | Must be running and accessible |
-| **Integration toggle** | Enabled from the dashboard |
-</Accordion>
-
-<Accordion title="Privacy and control" icon="lock">
-You control what happens with ambient data:
-
-- **Pause any time** — disable the stream from your dashboard
-- **Your vault, your data** — all recordings and transcripts live on your dedicated instance
-- **Standard security** — encrypted at rest and in transit, processed only by your specialists
-
-If you're in a conversation you don't want recorded, simply remove the Omi device or pause the stream.
-</Accordion>
-</AccordionGroup>
-
----
-
-## Email (coming soon)
-
-Every Alfred instance will get a dedicated email address via Agentmail.to. Forward emails to Alfred, or have services send directly to your Alfred's address.
-
----
-
-## The API
-
-For programmatic access, Alfred provides a complete REST API with 86 endpoints. Vault operations, worker control, workflow orchestration, intuition management, device pairing, scheduling, and instance administration — all available over your encrypted network.
-
-<Card title="API Reference" icon="code" href="/api-reference/introduction">
-  Full endpoint documentation
-</Card>
-
----
+A conversation Sir starts in Slack at 09:00 is in the agent's context when Sir calls the phone at 14:00. The Voice Bridge fetches `GET /api/v1/phone/voice-context` at call start and primes the OpenAI Realtime session with `MEMORY.md`, the last seven days of session summaries, and Sir's open matters and tasks. Email replies and SMS turns are written back to the streams pipeline so the next channel knows what happened on the previous one.
 
 ## Device pairing
 
-Before any device can interact with your Alfred, it must be paired and approved:
+Before any external client can reach the openclaw gateway, it has to be paired:
 
 <Steps>
-  <Step title="A device requests pairing">
-    A client app initiates a pairing request through the OpenClaw gateway.
+  <Step title="Device requests pairing">
+    A client (the dashboard, a CLI, a custom app) initiates a request through the openclaw gateway.
   </Step>
-  <Step title="You review the request">
-    The request appears as pending in your dashboard.
+  <Step title="Sir reviews">
+    The request appears in the dashboard's Devices page as pending.
   </Step>
   <Step title="Approve or reject">
-    Approval generates a cryptographically random device token, returned once. Rejection discards the request.
+    Approval generates a cryptographically random device token (returned once). Rejection discards the request.
   </Step>
   <Step title="Device connects">
-    The device uses its token for all subsequent interactions.
+    The token is used in the `Authorization` header for every subsequent call.
   </Step>
 </Steps>
 
-Tokens can be rotated periodically (every 90 days recommended) or revoked instantly if a device is lost or compromised.
+Tokens can be rotated (recommended every 90 days) or revoked instantly from the same page.
 
-<Card title="Device Pairing guide" icon="mobile" href="/guides/device-pairing">
-  Full device lifecycle: pairing, approval, rotation, and revocation
+## The REST API
+
+`https://alfred.black/api/v1/*`. Bearer auth with an `alf_...` key Sir creates from the dashboard. The full endpoint surface is the same one the agent uses through `self` — vault CRUD, streams, learning, workflows, schedules, chores, channels, admin, integrations.
+
+Rate-limited at the SaaS proxy. SHA-256 hashes are stored, never plain keys; the original is shown once on creation.
+
+<Card title="API reference" icon="code" href="/api-reference/introduction">
+  Every endpoint, every parameter, every response shape.
 </Card>
+
+## What every interface shares
+
+Every interface — dashboard click, Slack DM, email, SMS, phone call, REST API call — eventually lands on `ctrl-api:3100`. Every read goes through the same vault routes; every write through the same validators; every model call through the same OpenClaw gateway; every external action through the same Composio dispatcher. There's one Alfred, with one memory and one set of capabilities, reachable many ways.
+
+<CardGroup cols={2}>
+  <Card title="Channels" icon="messages-question" href="/architecture/channels">
+    The deep dive on how each channel reaches Alfred and how he reaches back.
+  </Card>
+  <Card title="API reference" icon="route" href="/api-reference/introduction">
+    Programmatic access to every layer.
+  </Card>
+</CardGroup>

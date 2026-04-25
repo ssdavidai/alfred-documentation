@@ -1,69 +1,65 @@
 ---
-title: "Rotate Device Token"
-description: "Rotate authentication token for a paired device"
+title: "Rotate a device token"
+description: "Issue a fresh token for one role on a paired device."
 api: "POST /api/v1/devices/{deviceId}/rotate"
 ---
 
-Rotates the authentication token for a paired device. After rotation, the device will need to re-authenticate with the new token. You can optionally update the device scope during rotation.
+Rotates the token for a specific role on a paired device. The previous token is invalidated and a new one is issued. Use this on any whiff of credential exposure, or as routine hygiene every few months.
 
-<Note>
-  This endpoint uses `deviceId` in the URL path (not `requestId`). This is the identifier of an already-paired device.
-</Note>
+## Path parameters
 
 <ParamField path="deviceId" type="string" required>
-  The unique identifier of the paired device whose token should be rotated.
+  The `device_id` from `GET /api/v1/devices`.
 </ParamField>
+
+## Body parameters
 
 <ParamField body="role" type="string" required>
-  The role to assign to the device. Valid values: `agent`, `user`, `admin`.
+  The role whose token should be rotated (e.g. `user`, `agent`, `admin`).
 </ParamField>
 
-<ParamField body="scope" type="string" optional>
-  Optional scope restrictions for the device token.
+<ParamField body="scope" type="string">
+  Optional new scope to apply during rotation. If omitted, the existing scope is preserved.
 </ParamField>
+
+## Response
+
+<ResponseField name="message" type="string">
+  Confirmation string from the OpenClaw CLI. May embed the new token depending on OpenClaw version — capture it immediately.
+</ResponseField>
+
+## Errors
+
+`400 Bad Request` — returned when `role` is missing or not a string.
 
 <RequestExample>
 
-```bash With Scope
-curl -X POST https://alfred.black/api/v1/devices/dev_a1b2c3d4e5/rotate \
+```bash cURL
+curl -X POST https://alfred.black/api/v1/devices/phn-7f2c/rotate \
   -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
-  -d '{
-    "role": "agent",
-    "scope": "vault:read vault:write"
-  }'
+  -d '{"role": "user"}'
 ```
 
-```bash Role Only
-curl -X POST https://alfred.black/api/v1/devices/dev_a1b2c3d4e5/rotate \
+```bash Rotate and re-scope
+curl -X POST https://alfred.black/api/v1/devices/phn-7f2c/rotate \
   -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
-  -d '{
-    "role": "agent"
-  }'
+  -d '{"role": "user", "scope": "vault:read vault:write"}'
 ```
 
 </RequestExample>
 
 <ResponseExample>
 
-```json Response
+```json 200 OK
 {
   "message": "Token rotated"
 }
 ```
 
-```json Validation Error
-{
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "role is required"
-  }
-}
-```
-
 </ResponseExample>
 
-<ResponseField name="message" type="string">
-  A status message confirming the token was rotated.
-</ResponseField>
+<Warning>
+  Sir's device must be re-onboarded with the new token before the old one expires from any client cache. If the device is offline at rotation time, expect to re-pair it from scratch.
+</Warning>
