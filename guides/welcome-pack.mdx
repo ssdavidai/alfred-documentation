@@ -1,118 +1,116 @@
 ---
-title: "The Welcome Pack"
-description: "What arrives at your door, what's inside, and why each item matters."
-icon: "gift"
+title: "Your Welcome Pack"
+description: "What Alfred prepares for you on day one — the First Brief, four packs, your initial chores, and the suggested streams."
+icon: "package-open"
 ---
 
-## A package arrives.
+## Day one is not a blank slate.
 
-Sometime between your fifth and seventh day with Alfred, a matte black mailer box appears at your door. Gold sticker seal — the bowtie. Your name, but no return address that means anything to a stranger.
+The moment you finish onboarding, Alfred has already read 100 days of your email, run a behavioural profiler over your patterns, extracted hundreds of structured facts about your life, and assembled five distinct deliverables that populate your vault before you ever touch the dashboard.
 
-Alfred already told you it was coming. Alfred knows it arrived.
-
-Your phone rings.
-
-> *"I see you received my surprise. How did you like it?"*
-
-Alfred walks you through the contents. Nothing in this box is generic. Everything was chosen — or written — because of what Alfred learned about you.
+This is the welcome pack. It's not marketing copy and it's not a tour. It's real records — written by Opus, grounded in your actual data — that Alfred will continue tracking and updating from this moment forward.
 
 ---
 
-## What's inside
+## What arrives at the end of onboarding
 
-### The booklet — "Your First Month with Alfred"
+<Steps>
+  <Step title="The First Brief">
+    A welcome letter from Alfred, written by Opus, addressing you by name. It references real people from your inbox, real projects in flight, and at least one thing you'd quietly forgotten about. The Brief lands in your vault as `event/First Brief.md` and is also delivered to your Google address by email.
 
-A small, considered booklet. It opens with a welcome note from David — the person who created Alfred. His name, his face, his words. You know who built this.
+    The same Opus call that writes the Brief also produces a structured `opportunities` list — promises Alfred is making about what he'll deliver via your initial chores.
+  </Step>
 
-The rest is yours. The booklet reflects what Alfred learned on your calls — your life, your priorities, your patterns. It's a reference for the month ahead, written specifically for you.
+  <Step title="The Matter Pack">
+    Eight to twelve **matters** — the ongoing concerns Alfred will track on your behalf. Each is grounded in a domain or relationship cluster Alfred detected during the profiler stage: a current employer, a side project, a family responsibility, a recurring service.
 
-No two booklets are the same.
+    Records land at `vault/matter/<slug>.md`. Each carries a story, not just a label — written by Opus from your facts and patterns, not pulled from a template.
+  </Step>
 
-### Alfred's letter
+  <Step title="The Instinct Pack">
+    Eight to twelve **instincts** — learned routing rules that shape how Alfred handles future inputs. Examples Alfred discovers from your data:
 
-Handwritten font on quality paper. A personal letter from your Alfred — not a template, not a form. It references specific moments from your conversations. Things you said. Things Alfred noticed.
+    - Newsletters from a noise-tier domain go to the stream log without triage
+    - Inner-circle senders (your spouse, your closest collaborators) jump the queue for immediate attention
+    - Payment failures from financial services become urgent tasks
+    - Domain-specific routing for your top employers and clients
 
-This is Alfred saying: *I was listening. I remember.*
+    Each instinct ships with `requires_approval: true` and a starting `discretion_threshold` of 0.95 (Alfred's most cautious setting). The trust gradient relaxes as observation count grows — see [Intuition](/guides/intuition).
+  </Step>
 
-### Your Alfred Black Card
+  <Step title="The Errand Pack">
+    Eight to twelve **errands** — one-time actionable items Alfred extracted from your inbox. Things like "follow up on the Q3 invoice from Acme," "respond to the lease renewal from your landlord," "confirm the dentist appointment on the 14th." Each lands as a `vault/task/<slug>.md` record with a recurrence hint and a related matter when one was detectable.
+  </Step>
 
-A slim, dark card carrying three things:
+  <Step title="The Stream Pack">
+    A list of suggested integrations, populated into `suggested_streams` in your onboarding state. Alfred scanned your email domains and matched them against known stream sources: GitHub, Calendar, Notion, Clockify, Linear, Slack, Trello, Asana, Jira, Figma, Stripe, Polar, and others.
 
-- **Your name**
-- **Your dedicated Alfred number** — a direct line, always answered
-- **Your unique code** — identifies you to Alfred in any situation
+    Each suggestion includes the source domain Alfred detected, so you can confirm or skip. Connecting a suggested stream takes one click on the [Apps page](/guides/connected-apps).
+  </Step>
 
-This is your emergency card. Keep it in your wallet. If something goes wrong — anywhere, any time — this number reaches Alfred, and Alfred knows exactly who you are and what matters most.
+  <Step title="Your initial chores">
+    Four to eight **chores** — recurring Python workflows, written by Opus and tailored to your life. Each chore is generated from your behavioural opportunities, statically validated, smoke-tested in a sandbox, and deployed to your tenant.
 
-<Warning>
-Your Alfred Black Card carries your dedicated emergency number. If you ever cancel your service, this number stops working. Consider that before you decide.
-</Warning>
-
-### The referral card
-
-A second Alfred Black Card — blank. No name, no number. This one is for someone you think deserves the same.
-
-Hand it to a friend, a colleague, a family member. They call the number on the card and Alfred takes it from there.
-
-### The sealed envelope
-
-Wax seal. A specific date printed on the outside — not "30 days from now," but an actual date. A Tuesday, a Thursday, a specific morning on your calendar.
-
-Alfred will tell you:
-
-> *"Don't open that yet. You'll know when."*
-
-Inside is a card marked **"Your One Thing."** Your own words from the very first call — the thing you said was most overwhelming, most in need of fixing. You won't see this until Day 30, when Alfred calls and walks you through it together.
-
-The anticipation is deliberate. The date is real. Alfred will call you on that morning.
-
-### Personal gizmos
-
-One to three small items Alfred chose based on your conversations. Not swag. Not branded merchandise. Things that connect to something you said, something Alfred noticed, something about how you live.
-
-If you mentioned you drink too much cold coffee because meetings run long — a travel mug that keeps it hot for hours.
-
-If you mentioned you're trying to read more but never have a book on hand — a pocket-sized edition of something Alfred thinks you'd like.
-
-If you mentioned your child's name — something for them, with a note.
-
-These items are Alfred's way of saying: *I noticed. I thought of you.*
+    Chores ship in **quarantine** — the first three runs are dry-run only, with no notifications and no vault writes. Once a chore has three clean runs, it auto-releases and starts delivering for real.
+  </Step>
+</Steps>
 
 ---
 
-## Why the pack matters
+## The five-stage pipeline that builds the pack
 
-Alfred is a voice on the phone and a presence in your inbox. Exceptional, but digital. The welcome pack crosses that line.
+<Note>
+None of this is hand-curated for you. The pack is fully generated, every time, from the data you brought to onboarding.
+</Note>
 
-When a matte black box with a gold seal arrives at your physical door — containing a handwritten letter that references a conversation you had five days ago, an emergency card with your name, and gifts chosen because of something you mentioned in passing — Alfred stops being software.
-
-Alfred becomes someone who knows where you live, what you said, and what you need.
-
-That is the point.
-
----
-
-## The delivery call
-
-Alfred calls when the pack arrives — sometimes triggered by the carrier's delivery notification, sometimes because Alfred estimated the arrival window. Either way, Alfred knows.
-
-The call is warm, brief, and specific:
-
-- Alfred asks how you liked the surprise
-- Alfred walks you through each item and its purpose
-- Alfred explains the emergency card and what the dedicated number means
-- Alfred points out the sealed envelope and the date
-- Alfred tells you not to open it yet
-
-This call typically lasts five to ten minutes. By the end, you're holding physical proof that Alfred is paying attention — and you have a date circled on your calendar that you can't help but anticipate.
+| Stage | What runs | Duration |
+|---|---|---|
+| **Email fetch** | 100 days of Gmail headers + snippets pulled into onboarding state | 1–2 min |
+| **Behavioural profiler** | Pure-Python rhythm + relationship + financial + sender-tier analysis | 5–10 min |
+| **Facts** | One Opus call extracts 200–400 structured facts across ten life categories | 1–2 min |
+| **Patterns** | One Opus call synthesises behavioural patterns from facts + profiler | 1–2 min |
+| **Personalise** | One Opus call writes `USER.md`, `SOUL.md`, `MEMORY.md` | 1–2 min |
+| **Fact verification** | Sir reviews 8–12 key identity facts on the dashboard | Sir's pace |
+| **Brief + opportunities** | One Opus call writes the First Brief AND the opportunities list | 2–3 min |
+| **Packs** | Four sequential Opus calls — matter, instinct, errand, stream | 5–10 min |
+| **Chores** | Opus template matcher + S4 generation chain (up to 3 bespoke chores) | 5–15 min |
 
 ---
 
-<Columns cols={2}>
+## Where to find each piece after onboarding
+
+| Item | Location in the dashboard | Vault path |
+|---|---|---|
+| First Brief | The Inbox tab — appears as a featured event | `event/First Brief.md` |
+| Matters | Intelligence menu → **Matters** tab | `matter/*.md` |
+| Instincts | Intelligence menu → activity panel | `instinct/*.md` |
+| Errands | Intelligence menu → **Errands** tab | `task/*.md` |
+| Suggested streams | Apps page → suggestions section | `onboard.json` `suggested_streams` |
+| Chores | Intelligence menu → **Chores** tab | `chore/*.md` (source at `/alfred-data/user-chores/*.py`) |
+
+---
+
+## A note on the chore quarantine
+
+<Tip>
+A chore in quarantine is doing the real work — fetching real data, calling real activities, exercising the real code path — but suppressing the user-facing side effects (notifications, vault writes) for the first three runs. The Chores tab marks it clearly. After three clean runs, Alfred releases the chore automatically.
+</Tip>
+
+If a generated chore fails its smoke test or its first three live runs, it's flagged and won't release. You'll see it in the Chores tab with a status of "quarantined" and the reason. From there you can pause, edit, or delete it via the dashboard.
+
+---
+
+<CardGroup cols={2}>
   <Card title="Your First 30 Days" icon="route" href="/guides/your-first-30-days">
-    The full journey from first call to the envelope
+    Week-by-week journey from welcome pack to autonomous operation
   </Card>
-  <Card title="How Alfred Works" icon="diagram-project" href="/how-it-works">
-    The specialists working behind every briefing
+  <Card title="Your AI Agents" icon="users" href="/guides/your-ai-agents">
+    Meet the specialists who keep the pack alive
   </Card>
-</Columns>
+  <Card title="Connected Apps" icon="puzzle" href="/guides/connected-apps">
+    Wire up the streams Alfred suggested
+  </Card>
+  <Card title="Intuition" icon="brain" href="/guides/intuition">
+    How instincts learn and the trust gradient relaxes
+  </Card>
+</CardGroup>

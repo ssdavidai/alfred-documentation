@@ -1,209 +1,164 @@
 ---
-title: "Your Specialists"
-description: "Meet the Curator, Janitor, Distiller, and Surveyor — and learn how to direct them."
-icon: "gears"
+title: "Your AI Agents"
+description: "Who actually does the work — the main agent, the four vault specialists, the Clerk, and the ephemeral subagents."
+icon: "users"
 ---
 
-## Your team
+## The cast
 
-Alfred runs five specialists that work on your vault:
+Sir doesn't talk to one AI. He talks to a small ensemble, each with a defined role and a different runtime.
 
-| Specialist | Role | When they work |
-|-------|------|------|
-| **Curator** | Processes manual inbox uploads into structured records | When files are dropped into the inbox |
-| **Janitor** | Scans for and repairs structural issues | Periodic sweeps |
-| **Distiller** | Surfaces deeper knowledge from your records | On-demand or scheduled |
-| **Surveyor** | Embeds records, clusters by meaning, discovers relationships | On-demand or scheduled |
-| **Clerk** | Stateless LLM worker dispatched for analytical tasks | On-demand by other specialists |
+| Agent | Role | When it runs | Where |
+|---|---|---|---|
+| **Main agent** | The Alfred who replies to Sir on Slack, web chat, email, voice, and SMS | On every user-facing turn | `openclaw` container |
+| **Curator** | Processes manual inbox uploads into structured vault records | On every inbox event | `alfred` container (vault worker) |
+| **Janitor** | Continuously scans the vault for broken links, structural issues, and inconsistencies | Periodic sweeps | `alfred` container (vault worker) |
+| **Distiller** | Reads between the lines — surfaces assumptions, decisions, constraints, and contradictions | On-demand and scheduled | `alfred` container (vault worker) |
+| **Surveyor** | Embeds records, clusters them by meaning, labels the clusters, discovers relationships | On-demand and scheduled | `alfred` container (vault worker), uses local Ollama embeddings |
+| **Clerk** | Stateless LLM worker for analytical tasks — classification, extraction, summarisation, the hourly enrichment pass | Called by other agents | `openclaw-workers` container |
+| **Ephemeral subagents** | Short-lived agents spawned per-task with scoped tool access | Per task execution | `openclaw-workers` container, lifecycle managed by `TaskRunnerWorkflow` |
 
-## Checking on your specialists
+---
 
-### From the dashboard
+## The main agent — Alfred
 
-Go to your [Alfred Black dashboard](https://alfred.black) and check the **Command Center** — it shows the status of each specialist at a glance.
+This is who Sir actually talks to. The main agent runs on the model configured for `agents.list[main].model.primary` in `openclaw.json` (Sir's tenant chooses this — Grok 4, Gemini 2.5 Pro, Claude, anything OpenClaw can route to).
 
-### Via the API
+His persona is composed from four files in the workspace:
 
-```bash
-curl -s /api/v1/workers/status \
-  -H "Authorization: Bearer alf_your_key_here"
+- `USER.md` — who Sir is (written during onboarding)
+- `SOUL.md` — how Alfred should speak (tone, register, what to call Sir)
+- `MEMORY.md` — long-running notes Alfred maintains about Sir's preferences and life
+- The platform `TOOLS.md` — what tools are available
+
+The main agent has access to:
+
+- The `self` MCP tool — calls Sir's own ctrl-api for vault, streams, learning, workflows, schedules, workers, admin, phone, and email operations
+- `composio_execute` — every Connected App action Sir has authorised
+- `web_search` and `web_fetch` for the world outside the vault
+- `image`, `image_generate`, `video_generate`, `music_generate`, `tts`, `pdf`, `canvas` for media generation
+- `cron` and `sessions_*` for scheduling and session control
+- Standard shell primitives (`bash`, `read`, `write`, `edit`, `grep`, `find`, `ls`) scoped to the workspace
+
+For Alfred Prime tenants only (today, that's just David), the main agent also gets `tenant({tenant, endpoint, ...})` and `ask_alfred({tenant, prompt})` — cross-tenant tools that proxy to peer tenants over Tailscale.
+
+---
+
+## The four vault specialists
+
+These are independent processes inside the `alfred` container, each with their own daemon and their own LLM persona. They share the vault but operate without Sir's prompting.
+
+### Curator
+
+When a file lands in the inbox, Curator runs its 4-stage pipeline:
+
+1. **Analyse** the body — what kind of content is this?
+2. **Resolve entities** — for each person, organisation, project, location mentioned, find the existing vault record or create a new one
+3. **Interlink** — wire the new content's mentions to the resolved entities via vault frontmatter
+4. **Enrich** — derive tags, summary, surface decisions and action items
+
+For binary uploads, the MediaIngestionWorkflow runs first (Whisper for audio, OCR for images, extraction for PDFs), then the Curator picks up the extracted text.
+
+### Janitor
+
+The vault is a living thing — links break when records get renamed, frontmatter goes out of date, an entity might end up referenced two slightly different ways. The Janitor sweeps periodically and fixes:
+
+- Broken `[[Wiki Link]]` references
+- Frontmatter schema violations
+- Orphaned records (no incoming links AND no recent activity)
+- Duplicate entities (same person, two slightly different records)
+
+### Distiller
+
+The Distiller reads what's already in the vault and surfaces what's hiding there:
+
+- **Assumptions** the agent or Sir made implicitly that should be made explicit
+- **Decisions** taken across multiple records but never recorded as a `decision/` entry
+- **Constraints** that limit what's possible (a budget cap, a timeline, a capacity limit)
+- **Contradictions** — two records that disagree, surfaced for Sir's resolution
+
+Each distillation produces vault records of those types, linked back to the source records they were derived from.
+
+### Surveyor
+
+The Surveyor embeds every vault record (using a local Ollama-hosted `nomic-embed-text` model), clusters by semantic similarity using Milvus, labels each cluster with a generated heading (via `x-ai/grok-4.1-fast`), and discovers cross-cluster relationships. The output is what powers the Vault Nebula on the dashboard homepage.
+
+Embeddings are local — no per-token cost. The Milvus index lives at `/mnt/encrypted/alfred/milvus_lite.db` on the tenant.
+
+---
+
+## The Clerk
+
+Stateless LLM worker that runs on the `openclaw-workers` container. The Clerk has no persona, no SOUL, no memory — it does the analytical heavy lifting other agents need:
+
+- Classification (which record type does this go to?)
+- Extraction (pull structured data out of free text)
+- Summarisation (what's the gist of this thread?)
+- The **hourly enrichment pass** — one batched LLM call per hour covers every pending stream record
+
+Every other agent (Curator, Distiller, the main agent when it needs analysis) dispatches to the Clerk through the `clerk.py` activity layer, which routes through the OpenClaw gateway.
+
+---
+
+## Ephemeral subagents
+
+When the TaskRunner workflow needs to execute a discrete task — sending an email, posting to Slack, opening a PR — it spawns a short-lived **ephemeral subagent** on the `openclaw-workers` container with **per-task scoped tool access**. The subagent:
+
+1. Is registered as `exec-<task_id>` in the workers' `openclaw.json`
+2. Comes online when the workers config reloads (~15s)
+3. Receives a single `sessions_spawn` with the task instructions
+4. Runs to completion or timeout
+5. Is deleted immediately after — no state carries over
+
+Each subagent's `tools.allow` list is built from the task's declared tool requirements, not the full main-agent surface. This is the principle of least authority: a subagent that only needs to send one Slack message can't accidentally read every email in your vault.
+
+---
+
+## Where each agent runs
+
+```
+openclaw container
+├── main (your Alfred)
+└── learn-clerk (the Clerk)         ← also reachable from openclaw-workers
+
+openclaw-workers container
+├── learn-clerk                     ← background analytical work
+├── vault-curator
+├── vault-janitor                   ← these five mirror the vault specialists
+├── vault-distiller                 ← so background Temporal activities can
+├── vault-surveyor                  ← invoke them without contending with main
+└── exec-<task_id> (×N)             ← ephemeral subagents per task
+
+alfred container
+├── curator daemon                  ← consumes inbox events
+├── janitor daemon                  ← scheduled sweeps
+├── distiller daemon                ← scheduled and on-demand
+└── surveyor daemon                 ← scheduled clustering
 ```
 
-## Starting, stopping, and restarting
+The split exists so that long-running background work (the Surveyor re-clustering 5,000 records, the hourly Clerk pass enriching 200 events) doesn't compete with Sir's interactive sessions for openclaw's attention.
 
-### From the dashboard
+---
 
-Use the controls on the **Command Center** or **Services** page to start, stop, or restart your specialists.
+## What the agent says you did
 
-### Via the API
+Every main-agent session writes its summary to the `system-openclaw-sessions` stream. That stream is the cross-channel memory primer — when Sir calls Alfred at 5pm, the Voice Bridge bundles the last 7 days of session summaries into the call's instructions so Alfred remembers the morning Slack chat. Same for SMS.
 
-<CodeGroup>
-```bash Start all specialists
-curl -X POST /api/v1/workers/up \
-  -H "Authorization: Bearer alf_your_key_here"
-```
+You can read this stream directly: `GET /api/v1/streams/events?stream_id=system-openclaw-sessions`.
 
-```bash Stop all specialists
-curl -X POST /api/v1/workers/down \
-  -H "Authorization: Bearer alf_your_key_here"
-```
+---
 
-```bash Restart all specialists
-curl -X POST /api/v1/workers/restart \
-  -H "Authorization: Bearer alf_your_key_here"
-```
-</CodeGroup>
-
-## Curator — reads what you share
-
-The Curator watches your inbox and turns raw content into structured vault records.
-
-### Manual run
-
-If you want the Curator to attend to inbox items immediately:
-
-```bash
-curl -X POST /api/v1/workers/process \
-  -H "Authorization: Bearer alf_your_key_here"
-```
-
-### Direct conversation import
-
-Share a conversation directly (bypasses the inbox):
-
-```bash
-curl -X POST /api/v1/workers/ingest \
-  -H "Authorization: Bearer alf_your_key_here" \
-  -H "Content-Type: application/json" \
-  -d '{"content": "Meeting with Alice about the Q1 launch..."}'
-```
-
-## Janitor — keeps your vault in order
-
-The Janitor scans your vault for structural problems: broken links between records, missing metadata, and orphaned records with no connections.
-
-### Run a scan
-
-```bash
-curl -X POST /api/v1/workers/janitor/scan \
-  -H "Authorization: Bearer alf_your_key_here"
-```
-
-### Repair found issues
-
-After scanning, have the Janitor fix what it found:
-
-```bash
-curl -X POST /api/v1/workers/janitor/fix \
-  -H "Authorization: Bearer alf_your_key_here"
-```
-
-### Check Janitor status
-
-```bash
-curl -s /api/v1/workers/janitor/status \
-  -H "Authorization: Bearer alf_your_key_here"
-```
-
-### View scan history
-
-```bash
-curl -s /api/v1/workers/janitor/history \
-  -H "Authorization: Bearer alf_your_key_here"
-```
-
-### Ignore specific files
-
-Tell the Janitor to skip certain files during scans:
-
-```bash
-curl -X POST /api/v1/workers/janitor/ignore \
-  -H "Authorization: Bearer alf_your_key_here" \
-  -H "Content-Type: application/json" \
-  -d '{"path": "note/Personal Notes.md"}'
-```
-
-## Distiller — surfaces what's hidden
-
-The Distiller reads your vault and surfaces latent knowledge: assumptions, decisions, constraints, contradictions, and synthesized insights.
-
-### Run a scan
-
-Identify records that could yield learning records:
-
-```bash
-curl -X POST /api/v1/workers/distiller/scan \
-  -H "Authorization: Bearer alf_your_key_here"
-```
-
-### Run extraction
-
-Have the Distiller surface the knowledge:
-
-```bash
-curl -X POST /api/v1/workers/distiller/run \
-  -H "Authorization: Bearer alf_your_key_here"
-```
-
-### Check Distiller status
-
-```bash
-curl -s /api/v1/workers/distiller/status \
-  -H "Authorization: Bearer alf_your_key_here"
-```
-
-### View extraction history
-
-```bash
-curl -s /api/v1/workers/distiller/history \
-  -H "Authorization: Bearer alf_your_key_here"
-```
-
-## Surveyor — maps your connected world
-
-The Surveyor takes a different approach from the other specialists. Instead of reading individual records, it runs its own four-stage pipeline: **Embed** (represent records as vectors), **Cluster** (group records by meaning), **Label** (name the clusters), and **Write** (add cluster tags and relationship links back to your vault).
-
-<Note>
-  The Surveyor has its own dedicated pipeline and is configured separately via the Surveyor settings in your dashboard.
-</Note>
-
-## OpenClaw session management
-
-Background workers and Clerk subagents create OpenClaw sessions as they carry out tasks. These sessions accumulate over time and are **auto-cleaned** — Alfred periodically prunes completed sessions to keep the session list manageable.
-
-### The alfred-inbox hook
-
-The `alfred-inbox` hook captures completed OpenClaw chat sessions as stream events. When a session ends, the hook packages the conversation and feeds it into the Event Processor, which classifies it and writes relevant vault records. This means your conversations with Alfred's agents contribute to your vault automatically — decisions made, tasks discussed, and context shared all become searchable records.
-
-### Manual cleanup
-
-If you need to clean up sessions manually:
-
-```bash
-curl -X POST /api/v1/openclaw/sessions/cleanup \
-  -H "Authorization: Bearer alf_your_key_here"
-```
-
-## Troubleshooting
-
-**Inbox not being attended to?**
-1. Check the Curator status — is it running?
-2. Try restarting: `POST /api/v1/workers/restart`
-3. Try a manual run: `POST /api/v1/workers/process`
-
-**Vault has structural issues?**
-1. Run a Janitor scan: `POST /api/v1/workers/janitor/scan`
-2. Then repair: `POST /api/v1/workers/janitor/fix`
-
-**Want to surface deeper knowledge?**
-1. Run a Distiller scan: `POST /api/v1/workers/distiller/scan`
-2. Then run extraction: `POST /api/v1/workers/distiller/run`
-
-<Columns cols={2}>
-  <Card title="Worker API Reference" icon="code" href="/api-reference/workers/status">
-    Full worker endpoint documentation
+<CardGroup cols={2}>
+  <Card title="Intuition" icon="brain" href="/guides/intuition">
+    How instincts and the trust gradient work
   </Card>
-  <Card title="Monitoring" icon="chart-line" href="/guides/monitoring">
-    Keep an eye on your Alfred
+  <Card title="Connected Apps" icon="puzzle" href="/guides/connected-apps">
+    What tools the agents have access to
   </Card>
-</Columns>
+  <Card title="Email Channel" icon="mail" href="/guides/email-channel">
+    How the main agent handles inbound email
+  </Card>
+  <Card title="Voice Channel" icon="phone" href="/guides/voice-channel">
+    The Voice Bridge and the Realtime persona
+  </Card>
+</CardGroup>

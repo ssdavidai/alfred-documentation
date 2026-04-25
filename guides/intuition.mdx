@@ -1,270 +1,166 @@
 ---
 title: "Intuition"
-description: "How Alfred learns your preferences and begins handling routine decisions on your behalf."
+description: "How Alfred learns your preferences and starts handling routine decisions on his own — observations, instincts, and the trust gradient."
 icon: "brain"
 ---
 
-## Overview
+## What "intuition" means
 
-Alfred doesn't just organize — over time, it learns. As you route inputs, make decisions, and organize your vault, Alfred quietly observes your preferences. Those observations become instincts — learned patterns that let Alfred handle routine decisions on your behalf, so you only need to weigh in on what truly requires your judgment.
+Intuition is Alfred's ability to act without asking. Day one Alfred asks about everything because he knows nothing. Day thirty Alfred handles routine decisions silently because he's seen the same pattern enough times to be confident. The mechanism that gets him from one to the other is the intuition system: observations, instincts, judgment, and the trust gradient.
 
-This is Alfred's **intuition** — the accumulated understanding of how your world works.
+This is not a feature you turn on. It's always running.
 
-## How intuition develops
+---
 
-Alfred's intuition develops through a natural cycle:
+## The loop
 
-```mermaid
-graph LR
-    A[You route something] --> B[Alfred observes]
-    B --> C[Observations accumulate]
-    C --> D[Nightly reflection]
-    D --> E[Instincts form]
-    E --> F[Alfred exercises judgment]
-    F --> G[Route + create task]
-    F --> H[Uncertain items escalated to you]
-    G --> I[Task Runner executes]
-    I --> J[Consequentials]
-    J --> B
-    H --> A
+```
+Sir does something  →  Observation captured  →  Reflection synthesises observations into instincts
+       ▲                                                            │
+       │                                                            ▼
+       └─── Judgment fires the instinct on the next matching input ←
 ```
 
-### 1. Observation — watching how you work
+Four moving parts:
 
-Every time you route an input, categorize something, or make an organizational decision, Alfred takes note. These notes are called **observations** — records of what you did and why it made sense.
+| Component | What it does | When it runs |
+|---|---|---|
+| **Observation** | Captures a single signal — a routing decision, an instruction, a correction, a confirmation | Continuously, on every signal |
+| **Reflection** | Reads accumulated observations and proposes new instincts (or strengthens existing ones) | Nightly at 2am |
+| **Instinct** | A learned routing rule with input patterns, a destination, a confidence score, and a discretion threshold | Persistent in the vault |
+| **Judgment** | On every new input, scores it against all instincts and decides whether to act autonomously or escalate | Every 2 minutes (and per-input on demand) |
 
-Alfred doesn't guess. It watches. Observations come from three sources:
+---
 
-- **Stream events** — events from Gmail, Notion, Omi, and other integrations are classified by the Event Processor and fed into the observation pipeline automatically
-- **Your conversations** — when you tell Alfred to file something under a project, route an email to a category, or organize an input, the routing decision is captured automatically
-- **Your explicit instructions** — you can add an `alfred_instructions` field to any vault record to teach Alfred directly
+## Three kinds of observation
 
-<Tip>
-  You don't need to do anything special for Alfred to learn. Just use Alfred as you normally would — routing and organizing your inputs — and observations accumulate naturally.
-</Tip>
+The observation hook captures three categories of user signal — beyond the routing decisions Alfred makes on his own:
 
-### 2. Reflection — distilling patterns from experience
+### 1. Instruction
 
-Every night at 2am, Alfred reviews the day's observations against its existing instincts. This is **reflection** — the process of turning individual observations into general patterns.
+Sir teaches Alfred a new rule. "From now on, anything from accounts@acme.com goes straight to the Acme matter." The observation captures the trigger condition and the expected action.
 
-During reflection, Alfred may:
+### 2. Correction
 
-- **Create** a new instinct when it sees the same pattern in at least 3 observations
-- **Strengthen** an existing instinct with new supporting evidence
-- **Merge** two instincts that have converged
-- **Deprecate** an instinct that new evidence contradicts
+Sir corrects a previous decision. "That email about the Q3 contract should have gone to the legal matter, not the general inbox." The observation captures what was wrong, what should have happened, and the assistant's prior context.
 
-Each reflection produces a report stored in your vault — a record of what Alfred learned and why.
+### 3. Confirmation
 
-### 3. Judgment — knowing when to act
+Sir validates Alfred's behaviour. "Good — keep doing that for newsletters from substack senders." The observation strengthens the pattern that was validated.
 
-Once instincts exist, Alfred can exercise **judgment** on new inputs. When something arrives, Alfred scores it against its instincts and decides: handle it, or ask you?
+Each entry includes `assistant_context` — what Alfred said or did just before — so the Reflection has the full picture when synthesising the rule.
 
-This is where **discretion** comes in — a good butler's most important quality. Alfred knows when to act and when to defer.
+---
 
-| Experience | Discretion | What Alfred does |
-|-----------|-----------|-----------------|
-| Fewer than 10 observations | Very cautious | "I've barely seen this before, sir. Your guidance?" — `requires_approval` forced on any tasks |
-| 10-19 observations | Cautious | "I believe I know, but I'd rather confirm." |
-| 20-49 observations | Moderate | "I'm fairly certain this goes here." |
-| 50+ observations, score > 0.75 | Confident | "This is routine." — tasks may auto-execute without approval |
+## What an instinct looks like
 
-Alfred starts by asking about everything. As observations accumulate and instincts form, it gradually handles more on its own — but always errs on the side of asking when uncertain.
-
-### 4. From intuition to action
-
-Instincts don't just route — they can **execute**. When an instinct includes an execution block, Judgment does two things at once: routes the input to the Curator for record creation *and* creates a task for the Task Runner to carry out.
-
-The execution block on an instinct specifies:
-- **tier** — how much power the task gets (1 = read-only, 2 = read-write, 3 = full)
-- **skill_entry** — which methodology to follow
-- **budget_turns** — how many turns the agent gets
-- **requires_approval** — whether you need to approve before execution begins
-
-<Note>
-  New instincts (fewer than 10 observations) always force `requires_approval=true` on their tasks, regardless of the execution block's setting. Alfred won't act autonomously until it has enough experience to be confident. This is the **discretion gate**.
-</Note>
-
-The Task Runner picks up the task, assembles context, and spawns an **ephemeral agent** on the workers runtime. This agent has access to exactly the tools it needs — including `composio_execute` for actions on connected apps. When the task completes, the ephemeral agent is destroyed and a ledger entry is written.
-
-**Example**: you tell Alfred *"from now on, when a payment failure email arrives, reply acknowledging receipt."* Alfred captures this as an observation. Reflection creates an instinct with an execution block specifying `tools_required: ["GMAIL_REPLY_TO_EMAIL"]`. When a matching email arrives, Judgment fires, the Task Runner spawns an ephemeral agent, and that agent calls `composio_execute` to send the reply via your connected Gmail — without your intervention.
-
-Tasks are organized around **Matters** (ongoing concerns) and executed as **Errands** (discrete units of work). Items the system can't confidently classify are routed to **Triage** for your review — and your triage decisions feed back into the observation pipeline, teaching Alfred for next time.
-
-This closes the loop from observation to action: you teach Alfred by routing, Alfred learns through reflection, and eventually Alfred both routes *and* acts on connected apps — with appropriate caution.
-
-## The cold start
-
-When your Alfred is new, its intuition is empty. No observations, no instincts, no autonomous routing.
-
-**Everything escalates to you.** This is by design.
-
-As you work with Alfred — routing inputs, organizing content, making decisions — observations accumulate naturally. After enough observations of the same pattern (at least 3), reflection creates your first instincts. Judgment begins routing the obvious cases. Over days and weeks, Alfred becomes increasingly capable of handling routine decisions without your input.
-
-You don't need to configure anything. Just use Alfred, and intuition develops on its own.
-
-## Sessions
-
-Alfred automatically groups related vault activity into **sessions** — time-bounded periods that represent a focused block of work or conversation.
-
-Session boundaries are detected by time:
-
-- Records within **30 minutes** of each other belong to the same session
-- Records more than **2 hours** apart are always different sessions
-- Records **30 minutes to 2 hours** apart are evaluated for topical continuity
-
-Sessions help you see your work in context — not as isolated records, but as coherent episodes of activity.
-
-## Daily digest
-
-Every evening at 6pm, Alfred prepares a **daily digest** — a summary of what happened today. The digest includes:
-
-- Records created and updated
-- Sessions detected
-- Decisions made
-- Items still awaiting your attention
-
-The digest is written to your vault as an event record, giving you a natural checkpoint to review the day.
-
-## Checking on intuition
-
-### From the dashboard
-
-Go to your [Alfred Black dashboard](https://alfred.black) and navigate to the **Intuition** page. You'll see:
-
-- **Status bar** — processed events today, observation count, active instincts, and auto-route rate
-- **Awaiting Judgment** — inputs that need your routing decision, with the best instinct match shown for context
-- **Instincts** — your active and developing instincts with observation counts and discretion levels
-- **Activity feed** — recent processing, routing, and reflection events
-
-### Via the API
-
-<CodeGroup>
-```bash Check intuition status
-curl -s /api/v1/learning/status \
-  -H "Authorization: Bearer alf_your_key_here" | jq .
-```
-
-```bash List active instincts
-curl -s /api/v1/learning/instincts \
-  -H "Authorization: Bearer alf_your_key_here" | jq .
-```
-
-```bash View items awaiting judgment
-curl -s /api/v1/learning/queue \
-  -H "Authorization: Bearer alf_your_key_here" | jq .
-```
-
-```bash Route an input manually
-curl -X POST /api/v1/learning/route \
-  -H "Authorization: Bearer alf_your_key_here" \
-  -H "Content-Type: application/json" \
-  -d '{"input_id": "event-abc123", "destination": "project/client-onboarding"}'
-```
-</CodeGroup>
-
-### View reflection history
-
-See what Alfred learned during its nightly reflections:
-
-```bash
-curl -s /api/v1/learning/reflections \
-  -H "Authorization: Bearer alf_your_key_here" | jq .
-```
-
-## The background processes
-
-Intuition runs on seven automated processes. You don't need to manage them — they run on schedules and take care of themselves.
-
-| Process | Schedule | What it does |
-|---------|----------|-------------|
-| **Event Processor** | Every 15 minutes | Reads incoming stream events, creates vault records via zero-LLM templates |
-| **Hourly Enrichment** | Every 1 hour | Batched LLM call to add entities, tags, and priorities to recent event records |
-| **Session Tracker** | Every 15 minutes | Groups related records into sessions |
-| **Daily Digest** | Daily at 6pm | Summarises the day's activity |
-| **Learning** | Every 15 minutes | Captures observations from conversations and stream events |
-| **Reflection** | Daily at 2am | Reviews observations and refines instincts |
-| **Judgment** | Every 15 minutes | Routes inputs using instincts; creates execution tasks |
-| **Task Runner** | Every 15 minutes | Picks up queued errands, spawns ephemeral agents for execution on connected apps |
-
-All processes are managed by the Temporal Engine and can be monitored from the Workflows section of your dashboard.
-
-## Teaching Alfred directly
-
-Beyond routing inputs through conversation, you can teach Alfred explicitly by adding an `alfred_instructions` field to any vault record:
+Here's the structure of an instinct record (the YAML frontmatter — the body adds the routing logic in prose):
 
 ```yaml
+type: instinct
+name: route-noise-to-log
+status: active
+description: "Auto-route noise-tier senders to stream log"
+input_patterns:
+  sender_domains: [marketing.acme.com, newsletter.foo.com, ...]
+  subject_keywords: []
+  attachment_types: []
+  input_types: [email]
+routing_rule:
+  destination_type: stream
+  destination: "tier2 stream-log"
+  process: archive
+  default_assignee: ""
+confidence_score: 0.9
+observation_count: 47
+discretion_threshold: 0.85
+matching_weights:
+  domain: 0.30
+  keywords: 0.30
+  input_type: 0.15
+  attachment: 0.15
+  tags: 0.10
+```
+
+When a new email arrives, the JudgmentWorkflow:
+
+1. Loads every active instinct
+2. Extracts metadata from the input (sender domain, subject keywords, attachments, type)
+3. Scores each instinct against the input using the matching_weights
+4. Picks the highest-scoring match
+5. Compares the score to the instinct's `discretion_threshold`
+6. If the score wins, Alfred routes autonomously. If it loses, Alfred escalates to Sir.
+
 ---
-type: input
-name: Vendor Invoice March
-alfred_instructions: "This is a recurring vendor invoice — route to process/invoice-processing"
+
+## The trust gradient
+
+The discretion threshold is not fixed. It scales with evidence — the more observations an instinct has accumulated, the lower the threshold (the more autonomous Alfred becomes).
+
+| Observations | Discretion threshold | Butler equivalent |
+|---|---|---|
+| **< 5** | 0.95 | "I've barely seen this before, sir. Your guidance?" |
+| **5–9** | 0.90 | "I believe I know, but I'd rather confirm." |
+| **10–19** | 0.85 | "I'm fairly certain this goes here." |
+| **20–49** | 0.80 | "I've seen this many times. Handling it." |
+| **50+** | 0.75 | "This is routine. Already done." |
+
+A brand-new instinct (created from a single instruction) starts at 0.95 — Alfred almost always asks. As the same pattern accumulates more observations across multiple incidents, the threshold relaxes. By 50 observations, Alfred handles it silently.
+
+The instinct can override the gradient by setting an explicit `discretion_threshold`. The onboarding instinct pack sets cautious defaults (0.85–0.95 depending on type) and lets the gradient relax them naturally over time.
+
 ---
-```
 
-Alfred picks up the instruction, creates an observation, and executes the routing. This is useful when you want to establish a pattern quickly or give Alfred a direct instruction to act on.
+## Approval flow for execution tasks
 
-## Enabling and disabling
+For instincts that don't just route inputs but **execute** something on Sir's behalf (send a message, schedule a meeting, update a Notion page), the trust gradient is reinforced by an explicit approval gate:
 
-Intuition is enabled by default. If you'd prefer Alfred to work without learning your preferences:
+- New execution instincts ship with `requires_approval: true`
+- The TaskRunner workflow checks `task.approved == true` before running
+- Approve / Reject buttons in the dashboard set the flag directly on the task record
+- Once the instinct accumulates enough observations and clean executions, Reflection can flip `requires_approval: false` and the trust gradient takes over
 
-<CodeGroup>
-```bash Disable intuition
-curl -X POST /api/v1/learning/disable \
-  -H "Authorization: Bearer alf_your_key_here"
-```
+This is deliberate friction. New autonomous execution requires Sir to explicitly green-light the first instances; once enough have run cleanly, the gate relaxes.
 
-```bash Re-enable intuition
-curl -X POST /api/v1/learning/enable \
-  -H "Authorization: Bearer alf_your_key_here"
-```
-</CodeGroup>
+---
 
-Disabling pauses all seven processes but preserves your existing observations and instincts. Re-enabling picks up where Alfred left off.
+## Where to see it
 
-## Troubleshooting
+| Surface | What it shows |
+|---|---|
+| Intelligence menu → activity panel | Recent observations and reflections |
+| `GET /api/v1/learning/observations` | The full observation list |
+| `GET /api/v1/learning/instincts` | Every instinct with confidence + observation count |
+| `GET /api/v1/learning/reflections` | Nightly reflection syntheses |
+| `GET /api/v1/learning/status` | Counts + last-run times for learning, reflection, judgment |
 
-**Alfred isn't learning from my routing decisions?**
-1. Check that intuition is enabled: `GET /api/v1/learning/status`
-2. Observations are captured from conversations — make sure you're routing inputs through Alfred (not editing vault files directly)
-3. Check the observation count — new instincts require at least 3 observations of the same pattern
+For inspecting how a specific judgment landed, the `JudgmentWorkflow`'s recent runs in the Workflows tab show the input, every instinct's score, and the final routing decision (or escalation).
 
-**Inputs aren't being auto-routed?**
-1. Check whether any instincts exist: `GET /api/v1/learning/instincts`
-2. New instincts start with high discretion thresholds — Alfred needs confidence before acting autonomously
-3. Continue routing inputs manually — each routing decision strengthens Alfred's instincts
+---
 
-**Want to see what Alfred reflected on?**
-```bash
-curl -s /api/v1/learning/reflections \
-  -H "Authorization: Bearer alf_your_key_here" | jq .
-```
+## Resetting an instinct
 
-**Quarantined events?**
+If Alfred's learned the wrong thing — autonomously routing emails Sir wanted to triage himself — open the instinct record and either:
 
-Events that fail processing twice are quarantined. View and manage them:
+- **Pause it** (set `status: paused` via `PATCH /api/v1/vault/records/instinct/<slug>.md`)
+- **Delete it** (Sir's vault, Sir's call) and let Reflection re-derive a better one from observations
+- **Reduce its confidence** by lowering `confidence_score`, which de-prioritises it in Judgment scoring
 
-<CodeGroup>
-```bash View quarantined events
-curl -s /api/v1/learning/quarantine \
-  -H "Authorization: Bearer alf_your_key_here" | jq .
-```
+A correction observation immediately fed in ("this should not have been auto-routed") will shape the next nightly Reflection toward fixing the rule.
 
-```bash Retry a quarantined event
-curl -X POST /api/v1/learning/quarantine/EVENT_ID/retry \
-  -H "Authorization: Bearer alf_your_key_here"
-```
+---
 
-```bash Dismiss a quarantined event
-curl -X POST /api/v1/learning/quarantine/EVENT_ID/dismiss \
-  -H "Authorization: Bearer alf_your_key_here"
-```
-</CodeGroup>
-
-<Columns cols={2}>
-  <Card title="Record Types" icon="shapes" href="/vault/record-types">
-    See observation, instinct, and reflection record types
+<CardGroup cols={2}>
+  <Card title="Welcome Pack" icon="package-open" href="/guides/welcome-pack">
+    The instinct pack Alfred ships on day one
   </Card>
-  <Card title="Your Specialists" icon="gears" href="/guides/your-ai-agents">
-    Monitor and direct your specialists
+  <Card title="Your AI Agents" icon="users" href="/guides/your-ai-agents">
+    Where Reflection and Judgment fit in the agent stack
   </Card>
-</Columns>
+  <Card title="Your First 30 Days" icon="route" href="/guides/your-first-30-days">
+    What the trust gradient looks like over time
+  </Card>
+  <Card title="Monitoring" icon="activity" href="/guides/monitoring">
+    Watch instincts in flight
+  </Card>
+</CardGroup>

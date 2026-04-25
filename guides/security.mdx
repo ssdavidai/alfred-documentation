@@ -1,408 +1,150 @@
 ---
 title: "Security"
 description: "How Alfred Black protects your data, your vault, and your privacy — from infrastructure to encryption to agent sandboxing."
-icon: "shield-halved"
+icon: "shield-check"
 ---
 
-## Overview
+## The short version
 
-Alfred Black handles your most personal information — your relationships, your commitments, your decisions. Security isn't a feature. It's the foundation.
+| Layer | How it's protected |
+|---|---|
+| **Infrastructure** | Dedicated `cx53` Hetzner VPS in the EU per tenant. No shared servers, no multi-tenancy. |
+| **Data at rest** | LUKS2 encryption on the data volume with a per-instance auto-generated passphrase |
+| **Network ingress** | Hetzner firewall allows only SSH (22) + ICMP. All Alfred services bind to localhost. |
+| **External access** | Tailscale tailnet (WireGuard) and Cloudflare Tunnel only. No public IP exposure of services. |
+| **API auth** | Per-account Bearer keys (`alf_…`), SHA-256 hashed at rest, AES-256-GCM encrypted internal credentials |
+| **Third-party credentials** | Composio holds OAuth tokens server-side. Sir's tenant only stores connection IDs. |
+| **Per-tenant isolation** | `COMPOSIO_USER_ID` enforced server-side; explicit ownership verification on every connection lookup |
+| **Audit** | Every API call logged. Every agent session captured to a queryable stream. |
+| **Data residency** | EU only — Hetzner Germany or Finland depending on availability at provision time |
 
-This page explains how every layer of Alfred's infrastructure is designed to keep your data private, your vault safe, and your world protected.
+---
 
-## Your Alfred is yours alone
+## Infrastructure isolation
 
-Every Alfred Black subscriber gets a **dedicated, isolated server**. Your data never shares hardware, databases, or services with anyone else.
+Every paying subscriber gets a dedicated Hetzner Cloud `cx53` VPS. Not a container, not a shared instance — a dedicated VM. There is no shared compute, no shared storage, no shared database between tenants. The only shared infrastructure is:
 
-| Property | Detail |
-|----------|--------|
-| **Server** | Dedicated Hetzner Cloud instance (cx33 default, upgradeable) |
-| **Storage** | LUKS2 full-disk encryption (AES-256-XTS) |
-| **Network** | Private Tailscale mesh (WireGuard-based VPN) |
-| **Exposure** | Zero public-facing ports — no inbound access from the internet |
+- The SaaS host at `alfred.black` (which proxies but does not store vault data)
+- The shared AgentMail pod (which holds inbound mail briefly before it's dispatched to the tenant — keys are inbox-scoped per tenant)
+- The shared Twilio account at the SaaS layer (with per-tenant subnumbers)
+- The shared Composio API key (with per-tenant `user_id` for isolation)
 
-Your Alfred is not a container on a shared cluster. It's a dedicated machine, encrypted at rest, accessible only through a private network.
+Each tenant's dedicated VM is provisioned in the EU — Hetzner Germany or Finland depending on availability at provision time.
 
-## Encryption
+---
 
-### At rest
+## Encryption at rest
 
-Your vault and all associated data are stored on a LUKS2-encrypted volume using AES-256-XTS. The encryption key is generated per instance during provisioning.
+The data volume on every tenant is encrypted with **LUKS2** (Linux Unified Key Setup, version 2). The passphrase is generated per-instance at provisioning time and never reused.
 
-### In transit
+- Vault records (`/mnt/encrypted/vault`)
+- Stream events and configs (`/mnt/encrypted/alfred/streams`)
+- OpenClaw config and workspace (`/mnt/encrypted/openclaw`)
+- Workers config (`/mnt/encrypted/openclaw-workers`)
+- Temporal SQLite database (`/mnt/encrypted/temporal`)
+- AgentMail credentials (`/mnt/encrypted/alfred/.agentmail-credentials.json`)
+- Composio user ID fallback (`/mnt/encrypted/alfred/.composio-user-id`)
+- Authorised senders list (`/vault/.auth/authorized_senders.json`)
+- Authorised phone numbers (`/mnt/encrypted/alfred/.authorized-phone-numbers.json`)
 
-All communication is encrypted:
+All of it lives on the encrypted volume. At rest, the volume content is unreadable without the LUKS passphrase. The passphrase is uploaded post-provision via SSH (never via Hetzner cloud-init `user_data`, which is readable through the metadata API), held in memory by `systemd` for the volume's lifetime, and backed up encrypted to S3 for disaster recovery.
 
-- **SaaS to your Alfred**: Tailscale (WireGuard) — encrypted, authenticated, and private
-- **Your browser to the dashboard**: HTTPS (TLS 1.3) via Cloudflare
-- **OpenClaw device connections**: HTTPS via Cloudflare Tunnel (outbound-only from your server)
+---
 
-### API key storage
+## Network model
 
-Your API keys are never stored in plain text. When you create an API key:
+Inbound to Sir's tenant:
 
-1. The full key (`alf_...`) is shown to you once
-2. A **SHA-256 hash** is computed and stored in the database
-3. The original key is discarded — it cannot be recovered
+| Port | Service | Who can reach it |
+|---|---|---|
+| **22** | SSH | Anyone — but only the per-instance ed25519 deploy key is authorised |
+| **ICMP** | ping | Anyone — for liveness checks only |
+| **3100** | ctrl-api | Localhost only. Reachable externally **only** through Tailscale or Cloudflare Tunnel. |
+| **18789** | openclaw gateway | Localhost only. |
+| **18790** | openclaw-workers gateway | Localhost only. |
+| **7233** | Temporal gRPC | Localhost only. |
+| **8233** | Temporal UI | Localhost only. |
+| **11434** | Ollama (embeddings) | Localhost only. |
 
-When you make an API request, your key is hashed and compared against the stored hash. The key itself is never persisted.
+The Hetzner Cloud Firewall enforces this at the network edge — port 3100 is not reachable from the public internet, full stop. The only public-internet-accessible Alfred surface is `https://alfred.black`, which proxies requests through Tailscale (authenticated) to your tenant.
 
-### Tenant credentials
+---
 
-The internal credentials connecting the SaaS to your Alfred are encrypted at rest using **AES-256-GCM** with:
+## Agent sandboxing
 
-- A unique 12-byte initialization vector per encryption
-- A GCM authentication tag for integrity verification
-- Decryption only in memory during request forwarding — never logged, never cached
+Every Alfred agent's tool surface is controlled at multiple layers:
 
-## Network architecture
+1. **`gateway.tools.allow`** — the openclaw config explicitly lists every tool the main agent (and every other agent) can invoke. New tools must be added; nothing is implicit.
+2. **MCP `self`** — the agent's primary ctrl-api access is one tool, not 41 prefixed tools. The endpoint catalogue is documented in the workspace `TOOLS.md`. The agent can only hit endpoints ctrl-api exposes; ctrl-api cannot reach beyond the tenant.
+3. **Composio gateway** — third-party app actions go through `composio_execute`. Composio holds credentials; Sir's tenant only holds connection IDs.
+4. **Ephemeral subagents** — the TaskRunner spawns short-lived agents per task with **scoped tool access**. A subagent that only needs Slack can't read your email.
+5. **Workspace shell scope** — `bash`, `read`, `write`, `edit`, `find` are scoped to `/home/node/.openclaw/workspace`. The agent can't `cat /etc/passwd`.
+6. **Self-restart guardrail** — restarting `openclaw` or `ctrl-api` requires `X-Confirm-Self-Restart: yes`, preventing the agent from accidentally killing its own session.
+7. **Confirm-before-destruct** — the workspace skills explicitly require Sir's confirmation before delete, terminate, cancel, or live-chore-trigger operations.
 
-Your Alfred has **no public IP addresses and no open ports** facing the internet.
+---
 
-```
-                  ┌──────────────────────────────────┐
-                  │         Your Alfred               │
-                  │    (dedicated, encrypted server)   │
-                  │                                    │
-                  │  ┌──────────┐  ┌──────────────┐  │
-                  │  │ Alfred   │  │   OpenClaw    │  │
-You ──HTTPS──→    │  │ Worker   │  │   Gateway     │  │
-  Cloudflare ──→  │  │ 127.0.0.1│  │  127.0.0.1   │  │
-                  │  └──────────┘  └──────────────┘  │
-                  │  ┌──────────┐  ┌──────────────┐  │
-SaaS Proxy ──→    │  │ Temporal │  │  Tenant API   │  │
-  Tailscale ──→   │  │ Engine   │  │  port 3100    │  │
-                  │  │ 127.0.0.1│  │  127.0.0.1   │  │
-                  │  └──────────┘  └──────────────┘  │
-                  │                                    │
-                  │  Tailscale (WireGuard) ◄──────────┘
-                  │  Cloudflare Tunnel (outbound only)  │
-                  └──────────────────────────────────┘
-```
+## Per-tenant Composio isolation
 
-### Tailscale mesh
+Composio is the most security-critical shared dependency. Every tenant has a unique `COMPOSIO_USER_ID` (typically `alfred-<slug>-<instance-id>`), enforced server-side:
 
-Your Alfred communicates with the SaaS layer through [Tailscale](https://tailscale.com), a WireGuard-based mesh VPN. This means:
+- ctrl-api refuses to start if `COMPOSIO_USER_ID` is unset or `"default"`
+- Every Composio call passes `user_id` to filter results
+- Every connection lookup by ID **verifies ownership** — Composio's server-side filter has been observed to silently return cross-tenant accounts, so ctrl-api re-checks ownership on every read
+- Connection IDs that don't belong to the tenant return 404 (not 403, to prevent enumeration)
 
-- **No inbound ports open** — your server accepts connections only from the private Tailscale network
-- **End-to-end encryption** — WireGuard provides authenticated encryption between nodes
-- **Identity-based access** — each node is cryptographically identified, preventing impersonation
+This invariant is non-negotiable. If you ever see another tenant's connected app on your Apps page, that's a bug — file a ticket immediately.
 
-### Cloud firewall
+---
 
-Each instance is protected by a Hetzner Cloud firewall that permits only:
+## Per-tenant AgentMail isolation
 
-| Port | Protocol | Purpose |
-|------|----------|---------|
-| 41641/udp | UDP | Tailscale WireGuard tunnel |
-| ICMP | ICMP | Health diagnostics |
+The shared AgentMail pod is the inbound delivery layer. Isolation runs through **inbox-scoped API keys**:
 
-SSH access is restricted to pre-authorized IP ranges and disabled by default for all other sources.
+- One master AgentMail API key lives only on the SaaS host (in env + macOS Keychain). Never on tenants.
+- Each tenant gets its own inbox-scoped key at provision time, derived from the master.
+- The tenant's key can read/send for its inbox only — it can't enumerate, read, or modify any other tenant's inbox.
+- Webhook delivery from AgentMail to the SaaS uses Svix signature verification with a shared secret.
 
-### Service binding
+Sir's tenant stores its inbox-scoped key at `/mnt/encrypted/alfred/.agentmail-credentials.json` and in the tenant `.env`. Both locations are on the LUKS-encrypted volume.
 
-All services on your Alfred bind to `127.0.0.1` (localhost only):
+---
 
-- Tenant API: `127.0.0.1:3100`
-- OpenClaw Gateway: `127.0.0.1:18789`
-- Temporal Engine: `127.0.0.1:7233`
+## Data residency
 
-No service listens on a public interface. External access is only possible through Tailscale (for the SaaS proxy) or Cloudflare Tunnel (for OpenClaw device connectivity, outbound-only).
+All Alfred Black tenants run on Hetzner Cloud in the EU — Germany (Falkenstein, Nuremberg, or Helsinki area) depending on which region had capacity at provision time. The SaaS host at `alfred.black` is also in Germany.
 
-## Authentication
+Sir's vault, his streams, his email metadata, his transcripts — all of it lives within the EU. AgentMail's inbox storage is also EU-hosted; Composio's storage region depends on the upstream third-party (Gmail = Google's region, Notion = Notion's region, etc.). The Twilio account that powers AgentPhone is US-located but operates as a passthrough — voice and SMS content flows through Twilio briefly before reaching Sir's tenant.
 
-### Dashboard authentication
+GDPR rights (access, deletion, portability) are honoured. Cancel within the 30-day grace period and your data is preserved; cancel outside it and the data is destroyed in full.
 
-The Alfred Black dashboard uses email and password authentication with:
+---
 
-- **Argon2** password hashing — the current gold standard for password storage
-- Email verification required on signup
-- Secure, time-limited password reset tokens
-- HTTP-only session cookies with SameSite protection
+## Audit logging
 
-### API key authentication
+Every authenticated API call hits the activity log on Sir's tenant. The log is queryable through `GET /api/v1/admin/activity` and rendered in the dashboard's Activity tab. For longer-term audit, the `system-openclaw-sessions` stream captures every main-agent session (every Slack DM, every web chat, every voice call, every email reply, every SMS) with its summary, channel, and tool calls.
 
-API requests are authenticated using Bearer tokens:
+This is a forensic surface as much as a memory primer. If Sir wants to know what Alfred did between 9pm and midnight last Thursday, it's all there.
 
-```
-Authorization: Bearer alf_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4
-```
+---
 
-Security properties:
-- Keys generated with `crypto.randomBytes(16)` — 128 bits of entropy
-- Stored as **SHA-256 hashes** only — raw keys are never persisted
-- Maximum **10 keys per account** — limits attack surface
-- Each key tracks `lastUsedAt` for activity monitoring
-- Keys can be revoked instantly from your dashboard
+## Reporting issues
 
-### Tenant API authentication
+Found a security concern? Email security@alfred.black with details. Don't post sensitive findings publicly — let us patch first.
 
-Your Alfred's internal API uses timing-safe token comparison (`crypto.timingSafeEqual`) to prevent timing attacks on authentication.
+---
 
-### Payment webhook verification
-
-Payment events from Polar are verified using cryptographic signature validation before any action is taken. Invalid signatures are rejected.
-
-## Conversational access (OpenClaw)
-
-Alfred uses [OpenClaw](https://openclaw.com) as the gateway for conversational access — the interface you use when you pair a device and talk to Alfred directly. Because OpenClaw connects a language model to your vault, it introduces a surface area that demands careful layering.
-
-### How you connect
-
-Your devices reach Alfred through a **Cloudflare Tunnel** — an outbound-only encrypted channel from your server to Cloudflare's edge network.
-
-```
-Your device → Cloudflare Edge (TLS 1.3) → Cloudflare Tunnel → localhost:18789
-```
-
-This means:
-- **No inbound port is opened** — the tunnel is initiated from your Alfred, not from the outside
-- **Your server's IP is never exposed** — your device only sees Cloudflare
-- **DDoS and WAF protection** — Cloudflare's network sits in front of every connection
-
-### Device pairing
-
-Before any device can talk to your Alfred, it must be **paired and approved**:
-
-1. A device requests pairing through the OpenClaw gateway
-2. The request appears in your dashboard as **pending**
-3. You approve or reject it
-4. On approval, a cryptographically random **device token** is generated and returned once
-5. The device uses this token for all subsequent connections
-
-Every conversation requires a valid device token. Tokens can be **revoked instantly** from your dashboard — cutting off access immediately. You can also **rotate** a device's token if you suspect it's been compromised, without removing the device.
-
-### What the agent can do
-
-When you talk to Alfred through OpenClaw, the language model can interact with your vault — but only through a tightly controlled gate.
-
-The agent **does not have direct filesystem access**. Every vault operation goes through the `alfred vault` CLI, a mediation layer that enforces rules before any read or write touches your data:
-
-```
-You → OpenClaw → Language Model → alfred vault CLI → Your Vault
-                                        ↑
-                              Scope check, path validation,
-                              schema validation, mutation log
-```
-
-The agent can:
-- **Read** records, search your vault, and get context
-- **Create** or **edit** records (when running as the Curator)
-- **Fix** or **remove** broken records (when running as the Janitor)
-- **Surface** learning records (when running as the Distiller)
-
-What it **cannot** do:
-- **Access files outside your vault** — path traversal is blocked at the CLI layer
-- **Bypass its scope** — a Curator session cannot delete, a Janitor session cannot create, a Distiller session can only create learning types
-- **Run arbitrary commands** — the agent's only tool is the vault CLI, not a general-purpose shell
-- **Access the network** — the OpenClaw container has no outbound internet access except to configured LLM providers
-- **Escape its container** — no privilege escalation, no Docker socket, no system capabilities
-
-### Third-party integrations
-
-Alfred uses external LLM providers (like OpenRouter, Anthropic, or OpenAI) to power the language model behind conversations. These are the **only** third-party services your Alfred connects to.
-
-- **No third-party plugins** — Alfred ships only its own curated skills (Curator, Janitor, Distiller). Third-party skill installation from ClawHub is **disabled by default**.
-- **No arbitrary API access** — the agent cannot make outbound HTTP requests to services you haven't configured
-- **Provider credentials** are stored on your encrypted volume (LUKS2) with restricted file permissions (mode 0600)
-- **You choose the model** — you can select which language model each specialist uses from your dashboard
-
-### Prompt injection defenses
-
-Prompt injection — where malicious content in your data tricks the language model into doing something unintended — is one of the most discussed risks in AI systems. Alfred defends against this at multiple layers.
-
-<Note>
-  No AI system can guarantee 100% immunity to prompt injection. Alfred's approach is **defense in depth** — even if the language model is tricked, the damage it can do is bounded by technical enforcement that the model cannot override.
-</Note>
-
-**Layer 1 — Scope enforcement (code-level)**
-
-Even if the model is manipulated, it physically cannot perform operations outside its scope. A Curator session cannot delete records. A Distiller session cannot edit your existing data. These rules are checked in code before every operation — not by the model, but by the vault CLI itself.
-
-**Layer 2 — Path validation (code-level)**
-
-Every file path is resolved to its absolute form and verified to be within your vault directory. Attempts to reference `../`, symlinks, or paths outside the vault boundary are rejected. This is enforced at the filesystem level, not by the model.
-
-**Layer 3 — Schema validation (code-level)**
-
-Record types are validated against a fixed set of 22 known types. Status values are checked against per-type allowed values. List fields must be arrays. Invalid frontmatter is rejected. The model cannot invent new record types or set impossible statuses.
-
-**Layer 4 — Mutation logging (code-level)**
-
-Every write operation — every create, edit, move, and delete — is recorded in an append-only audit log with timestamps and attribution. If something unexpected happens, you have a complete record of what changed, when, and which specialist did it.
-
-**Layer 5 — Skill instructions (prompt-level)**
-
-Each specialist receives detailed instructions that define its role, boundaries, and acceptable behavior. These include explicit constraints: "never access the filesystem directly," "never delete unless it's garbage," "never modify source records." While prompt-level defenses are not absolute, they significantly reduce the likelihood of unintended behavior.
-
-**The key insight:** Layers 1 through 4 are **technical controls enforced in code**. The language model cannot bypass them regardless of what instructions it receives. Layer 5 adds behavioral guidance on top. Even in a worst-case prompt injection scenario, the blast radius is bounded by the technical layers beneath.
-
-## Specialist sandboxing
-
-Alfred's specialists (Curator, Janitor, Distiller, Surveyor) are constrained by multiple layers of security — whether they're running as background workers or through an OpenClaw conversation.
-
-### Scope enforcement
-
-Each specialist has strict rules about what vault operations it can perform:
-
-| Specialist | Create | Read | Edit | Move | Delete |
-|-----------|--------|------|------|------|--------|
-| **Curator** | Yes | Yes | Yes | Inbox only | No |
-| **Janitor** | No | Yes | Yes | No | Yes |
-| **Distiller** | Learning types only | Yes | No | No | No |
-
-- The **Curator** can create and edit records but cannot delete anything — preventing data loss during intake
-- The **Janitor** can edit and remove broken records but cannot create new ones — limiting its blast radius to fixes only
-- The **Distiller** can only create learning records (assumptions, decisions, constraints, contradictions, syntheses) — it cannot modify your existing records
-
-These rules are enforced in code before every vault operation. A specialist that attempts an unauthorized action receives a scope error and the operation is blocked.
-
-### Path traversal prevention
-
-Every vault file operation passes through path validation that:
-
-1. Resolves the full path (eliminating `..`, symlinks, and relative references)
-2. Verifies the resolved path is within the vault directory
-3. Rejects any path that would escape the vault boundary
-
-This prevents a compromised or misbehaving agent from accessing files outside your vault.
-
-### Subprocess isolation
-
-Specialists run as isolated subprocesses with:
-
-- **No shell execution** — commands are passed as clean argument arrays, preventing shell injection
-- **Unique session files** — each invocation gets its own temporary mutation log
-- **Restricted tool access** — specialists are limited to the vault CLI only, with every operation mediated and validated
-- **Timeouts** — each specialist invocation has a configurable timeout (default 300 seconds) to prevent runaway execution
-
-### Session isolation
-
-Each specialist invocation receives a unique, temporary session file. Mutations are tracked per-session, and sessions are cleaned up after processing. Concurrent invocations cannot interfere with each other.
-
-## Container hardening
-
-Services on your Alfred run in Docker containers with defense-in-depth hardening:
-
-| Protection | Detail |
-|-----------|--------|
-| **Privilege escalation** | `no-new-privileges: true` on all containers |
-| **Capabilities** | `cap_drop: ALL` — all Linux capabilities removed, only specific ones added back where strictly necessary |
-| **Memory limits** | 2GB per container — prevents memory exhaustion |
-| **PID limits** | 256 processes per container — prevents fork bombs |
-| **Network** | All containers bound to localhost only |
-
-## Audit trail
-
-Every vault mutation is recorded in an append-only audit log:
-
-```json
-{
-  "ts": "2026-02-28T14:30:45.123456+00:00",
-  "tool": "curator",
-  "op": "create",
-  "path": "person/Alice Smith.md",
-  "detail": "inbox/meeting-notes.md"
-}
-```
-
-The audit log records:
-- **Timestamp** — when the operation occurred
-- **Specialist** — which specialist performed the operation (curator, janitor, distiller)
-- **Operation** — what was done (create, modify, delete)
-- **Path** — which record was affected
-- **Detail** — source context (e.g., which inbox item triggered the creation)
-
-This log is append-only — entries cannot be modified or deleted. It provides a complete, tamper-evident history of every change to your vault.
-
-## Health monitoring
-
-The SaaS layer checks your Alfred's health every 2 minutes:
-
-- Service status (running, degraded, down)
-- Disk usage
-- Memory usage
-- Container health
-
-Health checks are authenticated and travel over the encrypted Tailscale network. Results are stored for your dashboard's Command Center view.
-
-## SSH access
-
-Each tenant has SSH keys generated during provisioning. Users can download their private key from the dashboard to connect directly to their Alfred instance.
-
-### Downloading your key
-
-Navigate to **Settings → Terminal** and click **"Download SSH Key"**. This downloads a `.pem` file containing your private key.
-
-### Connecting
-
-```bash
-ssh -i <key>.pem deploy@<your-hostname>
-```
-
-Set correct file permissions before connecting — `chmod 600` on macOS/Linux, or `icacls` on Windows (see the [Dashboard guide](/guides/your-dashboard#ssh-access) for full instructions).
-
-### Key security
-
-| Property | Detail |
-|----------|--------|
-| **Generation** | Keys are generated per-tenant during instance provisioning |
-| **Storage** | Private keys are stored encrypted on the platform and delivered over HTTPS |
-| **Isolation** | Keys are never shared between tenants — each instance has its own key pair |
-| **Access level** | SSH provides full access to the tenant VPS as the `deploy` user |
-
-<Warning>
-SSH gives you full access to your Alfred's server. You can run any command, modify configuration, and access your vault directly on disk. Use responsibly — changes made via SSH are not tracked in the dashboard audit log.
-</Warning>
-
-## Data lifecycle
-
-### During your subscription
-
-- Your vault is stored on encrypted disk
-- Automatic encrypted backups run daily
-- All access is authenticated and logged
-
-### After cancellation
-
-- Your data is preserved for **30 days** after your subscription ends
-- During the grace period, resubscribing restores access immediately
-- After 30 days, the environment is permanently decommissioned and all data is destroyed
-
-### Data portability
-
-Your vault is an Obsidian-compatible collection of Markdown files. You can pair a device to access your vault directly and maintain your own local copies at any time.
-
-## Summary
-
-| Layer | Protection |
-|-------|-----------|
-| **Infrastructure** | Dedicated server per subscriber, no shared resources |
-| **Storage** | LUKS2 full-disk encryption (AES-256-XTS) |
-| **Network** | Tailscale WireGuard mesh, zero public ports, cloud firewall |
-| **Transit** | TLS 1.3 (browser), WireGuard (API), Cloudflare Tunnel (devices) |
-| **API keys** | SHA-256 hashed, never stored in plain, 10 per account max |
-| **Credentials** | AES-256-GCM encrypted at rest, decrypted only in memory |
-| **Passwords** | Argon2 hashing with email verification |
-| **OpenClaw gateway** | Device pairing with approval, per-device tokens, instant revocation |
-| **OpenClaw connection** | Outbound-only Cloudflare Tunnel, no exposed server IP |
-| **Vault CLI gate** | All agent vault access mediated through validated CLI — no direct filesystem |
-| **Specialist scope** | Per-specialist operation restrictions enforced in code |
-| **Prompt injection** | Defense in depth: scope, path, schema, and audit layers enforced in code |
-| **Third-party access** | Only configured LLM providers, no plugins, no arbitrary network access |
-| **File access** | Path traversal prevention on every vault operation |
-| **Containers** | Hardened: no-new-privileges, dropped capabilities, resource limits |
-| **Audit** | Append-only mutation log with timestamps and attribution |
-| **Monitoring** | Health checks every 2 minutes over encrypted channel |
-
-<Columns cols={3}>
-  <Card title="How the API Works" icon="route" href="/guides/how-the-api-works">
-    Understand the full request path and proxy architecture
+<CardGroup cols={2}>
+  <Card title="Billing" icon="credit-card" href="/guides/billing">
+    The 30-day grace period and decommissioning model
   </Card>
   <Card title="API Keys" icon="key" href="/guides/api-keys">
-    Create and manage your API keys
+    How keys are stored and rotated
   </Card>
-  <Card title="Device Pairing" icon="mobile" href="/guides/device-pairing">
-    Pair devices and manage conversational access
+  <Card title="How the API Works" icon="route" href="/guides/how-the-api-works">
+    The full proxy architecture
   </Card>
-</Columns>
+  <Card title="Connected Apps" icon="puzzle" href="/guides/connected-apps">
+    How Composio isolation works
+  </Card>
+</CardGroup>

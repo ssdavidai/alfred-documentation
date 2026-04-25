@@ -1,123 +1,122 @@
 ---
 title: "Browsing Your Vault"
-description: "How to explore, search, and read the records Alfred keeps for you."
+description: "How to explore, search, and read every record Alfred keeps for you — through the dashboard or the API."
 icon: "vault"
 ---
 
-## Overview
+## What's in the vault
 
-Your vault grows with everything you share with Alfred. Here's how to explore it — from your dashboard or via the API.
+Sir's vault is a structured library of every fact, event, person, decision, and idea Alfred has ever recorded. Records are stored as Markdown files with YAML frontmatter, organised by type, on the LUKS-encrypted volume of your dedicated VPS. The dashboard renders them; the agent reads and writes them; you can also query them directly through the API.
 
-## Dashboard vault browser
+There are around 20 record types. The most important:
 
-Your [Alfred Black dashboard](https://alfred.black) includes a vault browser where you can:
+| Type | What it represents |
+|---|---|
+| `matter` | An ongoing concern — a project, a relationship, a responsibility you're carrying |
+| `task` | A discrete actionable item (errand) — pending, in-progress, done |
+| `chore` | A recurring scheduled workflow definition |
+| `note` | Free-form text — meeting notes, research, observations |
+| `person` | Someone Sir interacts with |
+| `org` | An organisation (employer, client, vendor) |
+| `event` | Something that happened — emails, calendar events, voice calls, GitHub notifications, slack messages |
+| `conversation` | Multi-speaker dialogue — meetings, voice calls, Omi recordings |
+| `decision` | A choice that was made, with rationale |
+| `assumption` | Something believed but not proven |
+| `constraint` | A limit on what's possible (budget, timeline, capacity) |
+| `synthesis` | A higher-order conclusion derived from multiple records |
+| `contradiction` | Two records that disagree, surfaced for resolution |
+| `reflection` | A nightly synthesis of recent activity |
+| `observation` | A signal the learning system captured (instruction, correction, confirmation) |
+| `instinct` | A learned routing rule |
+| `project` | A specific initiative within a matter |
+| `idea` | A captured thought |
+| `location` | A place |
+| `account` / `asset` | Financial records |
 
-- **Filter by type** — Use the dropdown to show only people, tasks, decisions, or any other record type
-- **Search by keyword** — Find records matching a search term
-- **Click to view** — Open any record to see its full content and connections
+---
 
-## API methods
+## Three ways to browse
 
-### Get a vault overview
+<Tabs>
+  <Tab title="Vault Nebula (homepage)">
+    The Vault Nebula is the dashboard's entry point — a real-time visualisation of your knowledge graph. Each cloud is a Surveyor-built cluster of related records. Hover to see what's inside, click to drill into individual records.
 
-See a summary of your vault — how many records of each type, recent activity, and overall statistics.
+    The Nebula is the right starting point when Sir wants to see "what is Alfred currently tracking" at a glance, without knowing which specific records to query.
+  </Tab>
 
-```bash
-curl -s /api/v1/vault/context \
-  -H "Authorization: Bearer alf_your_key_here" | jq .
-```
+  <Tab title="Intelligence menu (typed views)">
+    The five tabs of the Intelligence menu — Inbox, Matters, Errands, Chores, Activity — give you typed views with proper filtering and sort. This is where Sir lives day-to-day:
 
-### List records by type
+    - Matters tab → all `matter/` records, status filter, full body in the detail panel
+    - Errands tab → all `task/` records, status + owner filter
+    - Chores tab → all `chore/` records, with source + dependency audit
+    - Inbox → events Alfred hasn't fully classified yet
+    - Activity → workflow runs, agent sessions, API activity
+  </Tab>
 
-Browse all records of a specific type:
+  <Tab title="Vault Browser (everything else)">
+    For record types not covered by the Intelligence tabs (`person`, `org`, `event`, `decision`, `assumption`, `constraint`, `synthesis`, `contradiction`, `reflection`, `observation`, `instinct`, …) the Vault Browser is the universal interface. Filter by type, search by name or body, view the full record with its frontmatter and connected records.
+  </Tab>
+</Tabs>
 
-<CodeGroup>
-```bash cURL
-curl -s /api/v1/vault/list/person \
-  -H "Authorization: Bearer alf_your_key_here" | jq .
-```
+---
 
-```javascript JavaScript
-const response = await fetch('/api/v1/vault/list/person', {
-  headers: { 'Authorization': 'Bearer alf_your_key_here' }
-});
-const people = await response.json();
-```
+## Searching
 
-```python Python
-import requests
+Two search surfaces:
 
-response = requests.get(
-    '/api/v1/vault/list/person',
-    headers={'Authorization': 'Bearer alf_your_key_here'}
-)
-people = response.json()
-```
-</CodeGroup>
+- **Cmd+K (or Ctrl+K)** — global fuzzy search across all records, by name and body. Best for quick lookups: "find that note about the kitchen renovation."
+- **Vault search via API** — `GET /api/v1/vault/search?q=...` for full-text search. Optional `&type=matter` filters to a record type. The agent uses this constantly through `self({endpoint: "/api/v1/vault/search", query: {q: "..."}})`.
 
-Replace `person` with any record type: `task`, `project`, `decision`, `assumption`, etc.
+For glob-style searches by file path, the API also accepts `?glob=` (e.g. `?glob=matter/*acme*`). For grep-style content search, `?grep=` runs against record bodies.
 
-### Search your vault
+---
 
-Find records matching a keyword or pattern:
+## Reading a single record
 
-<CodeGroup>
-```bash Search by keyword
-curl -s "/api/v1/vault/search?grep=Platform+v2" \
-  -H "Authorization: Bearer alf_your_key_here" | jq .
-```
+Click any record in the dashboard or call `GET /api/v1/vault/records/{path}` (where `path` is vault-relative, e.g. `matter/kitchen-renovation.md`). The detail view shows:
 
-```bash Search by file pattern
-curl -s "/api/v1/vault/search?glob=project/*.md" \
-  -H "Authorization: Bearer alf_your_key_here" | jq .
-```
-</CodeGroup>
+- The full body — Markdown rendered, with internal `[[Wiki Links]]` resolving to other vault records
+- The frontmatter — type, status, dates, custom fields
+- The relationships — every other record that links to this one (back-references)
+- A timeline — recent edits, related events, related sessions
 
-### Read a specific record
+For matters specifically, the body preview goes up to 3000 characters by default, so the story is visible without expanding.
 
-Get the full content of any record by its path:
+---
 
-```bash
-curl -s "/api/v1/vault/records/person/Alice%20Smith.md" \
-  -H "Authorization: Bearer alf_your_key_here" | jq .
-```
+## The Surveyor's clusters
 
-## Example workflows
+The Surveyor (one of your specialists) periodically:
 
-### "Find everything about Project X"
+1. Embeds every vault record using a local Ollama-hosted `nomic-embed-text` model
+2. Clusters by semantic similarity using Milvus
+3. Labels each cluster with a generated heading (via `x-ai/grok-4.1-fast`)
+4. Discovers cross-cluster relationships and writes them as vault `synthesis/` records
 
-```bash
-# Search across all record types
-curl -s "/api/v1/vault/search?grep=Project+X" \
-  -H "Authorization: Bearer alf_your_key_here" | jq .
-```
+Embeddings happen locally — no embedding cost goes to OpenRouter. The Surveyor's index lives at `/mnt/encrypted/alfred/milvus_lite.db`.
 
-### "See all open tasks"
+When Sir adds a flood of new records (a big upload, a new Connected App with backfill), the Surveyor re-runs and the Nebula updates within a few minutes.
 
-```bash
-curl -s /api/v1/vault/list/task \
-  -H "Authorization: Bearer alf_your_key_here" | jq .
-```
+---
 
-### "Review recent decisions"
+## Direct file access (advanced)
 
-```bash
-curl -s /api/v1/vault/list/decision \
-  -H "Authorization: Bearer alf_your_key_here" | jq .
-```
+The vault is just Markdown files on disk at `/mnt/encrypted/vault/<type>/<slug>.md`. If Sir SSHes into the tenant (with the deploy key) you can `ls` and `cat` records directly. **Don't write to the filesystem this way** — bypass the ctrl-api and you bypass the Janitor's structural checks, the entity resolution, and the back-reference index. Use the API or the dashboard instead. Reading is fine.
 
-### "What assumptions are we making?"
+---
 
-```bash
-curl -s /api/v1/vault/list/assumption \
-  -H "Authorization: Bearer alf_your_key_here" | jq .
-```
-
-<Columns cols={2}>
-  <Card title="Record Types" icon="shapes" href="/vault/record-types">
-    See all 26 record types
+<CardGroup cols={2}>
+  <Card title="Your Dashboard" icon="layout-dashboard" href="/guides/your-dashboard">
+    Where the Nebula and the Intelligence menu live
   </Card>
-  <Card title="API Reference: Vault" icon="code" href="/api-reference/vault/get-context">
-    Full vault API documentation
+  <Card title="Your AI Agents" icon="users" href="/guides/your-ai-agents">
+    Who builds and maintains the records you're browsing
   </Card>
-</Columns>
+  <Card title="Recipes" icon="book-open" href="/guides/recipes">
+    Worked examples — search, list, fetch a record by path
+  </Card>
+  <Card title="API Reference" icon="code" href="/api-reference/introduction">
+    Every endpoint for reading and writing vault records
+  </Card>
+</CardGroup>

@@ -1,146 +1,144 @@
 ---
 title: "Device Pairing"
-description: "Connect your apps and tools to your Alfred."
-icon: "mobile"
+description: "Pair an Omi wearable, mobile app, or other openclaw client to Sir's tenant — and revoke when the device leaves."
+icon: "smartphone"
 ---
 
-## Overview
+## What pairing does
 
-Devices are apps and tools that connect directly to your Alfred — like Obsidian on your laptop or a mobile app. Device pairing lets you control which devices have access.
+Pairing a device gives it a token to talk to Sir's openclaw gateway. Once paired, the device can stream data in (audio chunks from an Omi, a mobile app's clipboard, a desktop's clipboard) and the agent can address it (push a notification, request a transcription).
 
-## How it works
+Each device has:
+
+- A **device ID** — generated at pair time, persistent
+- A **role** — what the device is allowed to do (e.g. `omi`, `mobile`, `desktop`, `cli`)
+- An optional **scope** — narrowing the role's permissions
+- A **token** — the bearer credential the device uses
+
+Tokens can be rotated without re-pairing. Devices can be revoked individually or in bulk.
+
+---
+
+## Pair an Omi wearable
+
+The Omi is the canonical pairing case. The Omi is a physical wearable that records ambient audio and ships chunks to Alfred for transcription, speech detection, and (where the audio captures multi-topic dialogue) braindump extraction. Audio is held for 48 hours then expires.
 
 <Steps>
-  <Step title="A device requests to pair">
-    A client app initiates a pairing request with your Alfred.
+  <Step title="Open Devices in the dashboard">
+    Click **Devices** in the sidebar. You'll see currently paired devices with their roles and last-seen timestamps.
   </Step>
-  <Step title="Review the request">
-    The request appears as "pending" in your dashboard or via the API.
+
+  <Step title="Click Add Device → Omi">
+    The dashboard shows a one-time pairing code. Codes are short-lived — get the code into the Omi app within a few minutes.
   </Step>
-  <Step title="Approve or reject">
-    Approve to grant access, or reject to discard the request.
+
+  <Step title="Enter the code in the Omi app">
+    On Sir's phone, in the Omi companion app, choose "Pair with Alfred Black" and type the code. The Omi posts the device-request to Sir's tenant via the openclaw gateway.
   </Step>
-  <Step title="Device connects">
-    Approved devices receive credentials and can interact with your vault.
+
+  <Step title="Approve the request">
+    The dashboard's Devices page shows the pending request. Approve it to issue the token.
+
+    Equivalent API call:
+
+    ```bash
+    curl https://alfred.black/api/v1/devices/<requestId>/approve \
+      -X POST \
+      -H "Authorization: Bearer alf_..."
+    ```
+
+    Add `--data '{"latest": true}'` to approve the most recent pending request without specifying its ID.
+  </Step>
+
+  <Step title="Verify it's streaming">
+    Once approved, the Omi starts shipping audio. Within a couple of minutes you should see `omi-audio` events in the Streams tab and `conversation/` records in the vault as transcripts arrive (Groq Whisper turns each chunk around in roughly 3 seconds).
   </Step>
 </Steps>
 
-## Managing devices from the dashboard
+---
 
-Go to your [Alfred Black dashboard](https://alfred.black) and navigate to the **Devices** page to:
+## Pair other devices
 
-- **View pending requests** — See devices waiting for approval
-- **Approve or reject** — Grant or deny access to each device
-- **See paired devices** — View all currently connected devices
-- **Remove devices** — Revoke access from previously paired devices
+The same flow works for any openclaw client. Available roles depend on what your tenant has registered:
 
-## Managing devices via the API
+- `mobile` — a phone client app
+- `desktop` — Sir's laptop
+- `cli` — a command-line tool that needs to authenticate as a device rather than as Sir
 
-### List all devices
+Each pairing follows the same pattern: client requests pairing → request appears in Sir's dashboard → Sir approves → token issued.
 
-See both pending and paired devices:
+The dashboard's Devices page lets you:
 
-```bash
-curl -s /api/v1/devices \
-  -H "Authorization: Bearer alf_your_key_here" | jq .
-```
+- **List** all paired devices and pending requests
+- **Approve** a pending request
+- **Reject** a pending request
+- **Remove** a device (revokes its token, the device must re-pair)
+- **Rotate** a device's token (issues a new one, invalidates the old)
+- **Revoke** specific role access (e.g. drop `mobile` from a desktop client)
+- **Clear** all devices, or only pending requests
 
-### Approve a device
+---
 
-Approve a pending pairing request:
+## Token rotation
 
-```bash
-curl -X POST /api/v1/devices/req_abc123/approve \
-  -H "Authorization: Bearer alf_your_key_here"
-```
-
-### Reject a device
+If a device's token is suspected of being compromised — phone lost, laptop stolen, log file leaked — rotate it from the dashboard or the API:
 
 ```bash
-curl -X POST /api/v1/devices/req_abc123/reject \
-  -H "Authorization: Bearer alf_your_key_here"
-```
-
-The request is permanently discarded. The device must initiate a new pairing request.
-
-### Remove a paired device
-
-```bash
-curl -X DELETE /api/v1/devices/dev_xyz789 \
-  -H "Authorization: Bearer alf_your_key_here"
-```
-
-<Warning>
-  Removing a device is permanent and revokes access immediately. The device must re-pair to regain access.
-</Warning>
-
-### Rotate device credentials
-
-Regenerate credentials for a specific device:
-
-```bash
-curl -X POST /api/v1/devices/dev_xyz789/rotate \
-  -H "Authorization: Bearer alf_your_key_here" \
+curl https://alfred.black/api/v1/devices/<deviceId>/rotate \
+  -X POST \
+  -H "Authorization: Bearer alf_..." \
   -H "Content-Type: application/json" \
-  -d '{"role": "user"}'
+  -d '{"role": "omi"}'
 ```
 
-<Tip>
-  Rotate credentials periodically (every 90 days) for security.
-</Tip>
+The old token is invalidated immediately. Provide the new token to the device through whatever pairing UI it offers.
 
-### Revoke device access
+---
 
-Immediately revoke a device's access:
+## Revocation
+
+Revoking a device cuts it off from Sir's tenant. Existing data the device has already sent (Omi recordings, mobile uploads) stays in the vault — revocation only affects future communication.
 
 ```bash
-curl -X POST /api/v1/devices/dev_xyz789/revoke \
-  -H "Authorization: Bearer alf_your_key_here" \
+curl https://alfred.black/api/v1/devices/<deviceId> \
+  -X DELETE \
+  -H "Authorization: Bearer alf_..."
+```
+
+For role-specific revocation (drop one role but keep others):
+
+```bash
+curl https://alfred.black/api/v1/devices/<deviceId>/revoke \
+  -X POST \
+  -H "Authorization: Bearer alf_..." \
   -H "Content-Type: application/json" \
-  -d '{"role": "user"}'
+  -d '{"role": "mobile"}'
 ```
 
-### Clear all pending requests
+---
 
-Remove all pending device requests at once:
+## When pairing fails
 
-```bash
-curl -X POST /api/v1/devices/clear \
-  -H "Authorization: Bearer alf_your_key_here"
-```
+The most common failure mode is an expired pairing code — codes are short-lived for security. If pairing times out, generate a fresh code and retry.
 
-To clear only pending requests (leaving paired devices intact):
+If the device can reach `alfred.black` but the pairing request never appears in your dashboard, check:
 
-```bash
-curl -X POST /api/v1/devices/clear \
-  -H "Authorization: Bearer alf_your_key_here" \
-  -H "Content-Type: application/json" \
-  -d '{"pending_only": true}'
-```
+- Sir is logged into the right account (the device pairs to the user, not to a specific browser session)
+- The instance is `running` — pairing requires the openclaw gateway to be up
 
-## Endpoint summary
+---
 
-| Operation | Method | Path | Identifier |
-|-----------|--------|------|------------|
-| **List** | GET | `/api/v1/devices` | — |
-| **Approve** | POST | `/api/v1/devices/:requestId/approve` | `requestId` |
-| **Reject** | POST | `/api/v1/devices/:requestId/reject` | `requestId` |
-| **Remove** | DELETE | `/api/v1/devices/:deviceId` | `deviceId` |
-| **Rotate** | POST | `/api/v1/devices/:deviceId/rotate` | `deviceId` |
-| **Revoke** | POST | `/api/v1/devices/:deviceId/revoke` | `deviceId` |
-| **Clear** | POST | `/api/v1/devices/clear` | — |
-
-## Security
-
-<Warning>
-  Only approve devices you recognize. If you see an unfamiliar pairing request, reject it immediately.
-</Warning>
-
-- Review pending requests regularly
-- Remove devices you no longer use
-- Rotate credentials if you suspect a device may be compromised
-- Use the revoke endpoint for immediate access removal in emergencies
-
-<Card title="Devices API Reference" icon="code" href="/api-reference/devices/list">
-  Full device endpoint documentation
-</Card>
+<CardGroup cols={2}>
+  <Card title="Streams & Integrations" icon="radio" href="/guides/streams-and-integrations">
+    What the Omi audio stream actually does
+  </Card>
+  <Card title="Security" icon="shield-check" href="/guides/security">
+    How devices are isolated and audited
+  </Card>
+  <Card title="API Reference" icon="code" href="/api-reference/introduction">
+    Full devices endpoint catalogue
+  </Card>
+  <Card title="Voice Channel" icon="phone" href="/guides/voice-channel">
+    The other voice surface — your tenant's phone number
+  </Card>
+</CardGroup>
