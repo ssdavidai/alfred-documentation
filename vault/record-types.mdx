@@ -1,407 +1,248 @@
 ---
 title: "Record Types"
-description: "Detailed reference for all 26 vault record types — the building blocks of your world."
-icon: "shapes"
+description: "Every entity type Alfred recognises, what each one means, and when records of that type get created."
+icon: "list"
 ---
 
-## Overview
+Every record in your vault declares a `type` in its frontmatter. The type determines which folder the file lives in, which status values are valid, which fields the dashboard renders, and which specialist can touch it.
 
-Alfred manages 26 distinct record types organized into five layers: **Standing Entities** (8) for the stable elements of your world, **Activity Records** (9) for what happens, **Execution Types** (1) for how work gets done, **Learning Types** (5) for the deeper knowledge the Distiller surfaces, and **Intuition Types** (3) for the patterns Alfred learns from how you work.
+Alfred recognises **twenty-six types** — the original nineteen from the underlying [`alfred`](https://github.com/ssdavidai/alfred) vault package, plus seven extensions added by the platform for the kinetic and intuition layers (matter, chore, ledger_entry, triage, observation, instinct, reflection).
 
-### The Matter / Errand / Triage lifecycle
+The canonical list lives in two files:
 
-Three record types form the core execution lifecycle:
+- `c/alfred/src/alfred/vault/schema.py` — the original nineteen
+- `c/alfred-platform/packages/ctrl/src/api/routes/vault.ts` — the platform's full list of twenty-six
 
-- **Matter** — an ongoing concern that groups related errands (e.g., "Hetzner migration," "Q2 launch"). Matters persist until resolved.
-- **Task (Errand)** — a discrete unit of work belonging to a matter. The `owner` field determines who acts: `alfred` means the Task Runner executes automatically; `human` means the item appears on your dashboard for you to handle.
-- **Triage** — an item Alfred couldn't confidently classify. Triage items surface on your dashboard for human review. When you reclassify them, the routing decision feeds back into the intuition system.
+This page groups them by purpose.
 
-### Stream events as record sources
+## People and places
 
-Stream events from Gmail, Notion, Omi, and other integrations create **activity records** automatically. An incoming email becomes a conversation record; a Notion page update becomes a note; an Omi recording becomes a session. The Event Processor classifies each event and the Curator structures it — no manual sharing required.
+Records about the people, organisations, and locations Alfred is tracking on Sir's behalf.
 
-## Standing Entities
-
-Records representing the people, organizations, and resources in your world.
-
-<AccordionGroup>
-
-<Accordion title="person — People and Contacts" icon="user">
-**What it represents:** Individuals, contacts, team members, or stakeholders.
-
-**When it's created:** The Curator creates person records when people are mentioned in your content — meeting attendees, email contacts, team members referenced in notes.
-
-**Example:** You share standup notes mentioning "Alice reviewed Bob's PR." Alfred creates person records for Alice and Bob (or updates them if they already exist) and links both to the conversation.
-
-**Status values:** `active`, `inactive`
-
-**Key fields:** name, status, org (link to organization), email, tags
-</Accordion>
-
-<Accordion title="org — Organizations" icon="building">
-**What it represents:** Companies, teams, departments, or organizational entities.
-
-**When it's created:** The Curator creates org records when companies or teams are mentioned in your content.
-
-**Example:** Meeting notes reference "the Acme Corp partnership." Alfred creates an org record for Acme Corp and links it to relevant people and projects.
-
-**Status values:** `active`, `inactive`
-
-**Key fields:** name, status, website, location, tags
-</Accordion>
-
-<Accordion title="project — Projects and Initiatives" icon="diagram-project">
-**What it represents:** Projects, initiatives, or multi-task efforts.
-
-**When it's created:** The Curator creates project records when initiatives or efforts are discussed in your content.
-
-**Example:** Standup notes mention "Platform v2 migration is on track." Alfred creates a project record linked to the people working on it and any related tasks.
-
-**Status values:** `active`, `paused`, `completed`, `abandoned`, `proposed`
-
-**Key fields:** name, status, owner (link to person), tags
-</Accordion>
-
-<Accordion title="location — Locations" icon="location-dot">
-**What it represents:** Physical or virtual locations.
-
-**When it's created:** The Curator creates location records when places are mentioned in meetings, events, or notes.
-
-**Example:** "The offsite will be at the SF Conference Center." Alfred creates a location record and links it to the event.
-
-**Status values:** `active`, `inactive`
-
-**Key fields:** name, status, tags
-</Accordion>
-
-<Accordion title="account — Accounts" icon="key">
-**What it represents:** Accounts, subscriptions, or service credentials.
-
-**When it's created:** The Curator creates account records when services or subscriptions are discussed.
-
-**Example:** Notes mention "our AWS Production account needs a billing review." Alfred creates an account record linked to the relevant people and tasks.
-
-**Status values:** `active`, `suspended`, `closed`, `pending`
-
-**Key fields:** name, status, owner (link to person), tags
-</Accordion>
-
-<Accordion title="asset — Assets and Resources" icon="box">
-**What it represents:** Physical or digital assets and resources.
-
-**When it's created:** The Curator creates asset records when specific resources are discussed.
-
-**Example:** "The production database server needs a memory upgrade." Alfred creates an asset record linked to the task and owner.
-
-**Status values:** `active`, `retired`, `maintenance`, `disposed`
-
-**Key fields:** name, status, owner (link to person), tags
-</Accordion>
-
-<Accordion title="process — Processes and Workflows" icon="diagram-next">
-**What it represents:** Defined processes, procedures, or workflows.
-
-**When it's created:** The Curator creates process records when operational procedures are described.
-
-**Example:** "We need to update the deployment pipeline to include staging." Alfred creates a process record and links it to the project and people involved.
-
-**Status values:** `active`, `proposed`, `design`, `deprecated`
-
-**Key fields:** name, status, owner (link to person), tags
-</Accordion>
-
-<Accordion title="matter — Ongoing Concerns" icon="folder-open">
-**What it represents:** An ongoing concern that groups related errands — a thread of activity Alfred tracks on your behalf. The Hetzner matter, the invoice matter, the onboarding matter.
-
-**When it's created:** The Curator creates matter records when a recurring concern is identified across multiple inputs, or when you explicitly tell Alfred to track something as an ongoing matter.
-
-**Example:** Several emails and tasks relate to migrating infrastructure to Hetzner. Alfred groups them under a matter record, linking related errands, people, and decisions so the full picture is always one click away.
-
-**Status values:** `active`, `resolved`, `archived`
-
-**Key fields:** name, status, related (links to grouped records), tags
-</Accordion>
-
-</AccordionGroup>
-
-## Activity Records
-
-Records capturing events, work, interactions, and execution results.
-
-<AccordionGroup>
-
-<Accordion title="conversation — Conversations and Discussions" icon="comments">
-**What it represents:** Meetings, discussions, or dialogue threads.
-
-**When it's created:** The Curator creates conversation records from meeting notes, email threads, or chat exports you share.
-
-**Example:** You share standup notes. Alfred creates a conversation record for the meeting, links it to all participants, and creates separate records for tasks and decisions mentioned.
-
-**Status values:** `active`, `waiting`, `resolved`, `closed`, `archived`
-
-**Key fields:** subject, status, participants (links to people), tags
+| Type | Folder | Status values | When created |
+|------|--------|---------------|--------------|
+| `person` | `person/` | `active`, `inactive` | Curator extracts from inbox uploads; main agent on request |
+| `org` | `org/` | `active`, `inactive` | Curator extracts from inbox uploads; main agent on request |
+| `location` | `location/` | `active`, `inactive` | Mostly manual; occasionally extracted from calendar events |
 
 <Note>
-  Conversations use `subject` instead of `name` as their title field.
-</Note>
-</Accordion>
-
-<Accordion title="note — General Notes" icon="note-sticky">
-**What it represents:** Observations, research, or freeform content.
-
-**When it's created:** The Curator creates note records for general content that doesn't fit neatly into a more specific type.
-
-**Example:** You share a brainstorm document. Alfred creates a note record and links it to the relevant projects and people mentioned.
-
-**Status values:** `draft`, `active`, `review`, `final`
-
-**Key fields:** name, status, tags
-</Accordion>
-
-<Accordion title="task — Execution Primitives" icon="check">
-**What it represents:** A unit of work — an errand to be carried out, either by Alfred or by you. Tasks are the execution backbone of the Kinetic layer.
-
-**When it's created:** The Curator creates tasks from action items in your content. Instincts with execution blocks create tasks automatically when Judgment matches them. You can also create tasks directly from your dashboard.
-
-**Example:** An instinct fires on a new vendor invoice. Judgment creates a task: "Process invoice from Acme Corp," assigns it to Alfred at tier 1, and links the skill `skill/invoice-processing` as the methodology. The Task Runner picks it up, follows the skill, and marks it done — creating a ledger entry with what happened.
-
-**Status values:** `queued`, `active`, `blocked`, `done`, `cancelled`
-
-**Key fields:** name, status, owner (`alfred` or `human`), tier (1–3), skill_entry (link to skill), matter (link to matter), source_event, source_instinct, agent_id, budget_turns, requires_approval, depends_on, blocked_by, tags
-
-<Note>
-  Tasks owned by `alfred` are executed automatically by the Task Runner. Tasks owned by `human` appear on your dashboard for you to handle. See the [Kinetic layer](/architecture/kinetic) for how execution works.
-</Note>
-</Accordion>
-
-<Accordion title="triage — Needs Human Review" icon="hand">
-**What it represents:** An item Alfred couldn't confidently classify — it needs your review before it can be properly filed.
-
-**When it's created:** When the Curator encounters content it can't confidently route to a specific record type. Rather than guessing, Alfred sets it aside as a triage item for your attention.
-
-**Example:** You share a screenshot with no clear context. Alfred can't tell if it's a task, a note, or part of a conversation — so it creates a triage record and surfaces it on your dashboard for review.
-
-**Status values:** `unprocessed`, `reviewed`, `resolved`
-
-**Key fields:** subject, status, tags
-</Accordion>
-
-<Accordion title="ledger_entry — Completion Records" icon="receipt">
-**What it represents:** A factual record of what happened when an errand completed. Timestamped and traceable — the paper trail for Alfred's work.
-
-**When it's created:** The Task Runner creates a ledger entry whenever a task reaches `done` status. It captures what was accomplished, which artifacts were produced, and how the work connected to the broader matter.
-
-**Example:** After processing the Acme Corp invoice, Alfred writes a ledger entry: "Extracted amount ($4,200), due date (April 15), created payment reminder task. Linked to matter/acme-billing."
-
-**Consequentials:** Ledger entries can spawn follow-up errands — called **consequentials**. When a completed task reveals additional work (e.g., "invoice processed, but payment reminder needs scheduling"), the Task Runner creates a new errand linked to the same matter. This chains work naturally without manual intervention.
-
-**Status values:** _(no status constraint)_
-
-**Key fields:** name, task (link to completed task), matter (link to matter), artifacts, consequentials (links to follow-up tasks), tags
-</Accordion>
-
-<Accordion title="event — Events" icon="calendar">
-**What it represents:** One-time events, conferences, launches, or occurrences.
-
-**When it's created:** The Curator creates event records when specific scheduled occurrences are mentioned.
-
-**Example:** "The annual team offsite is April 10th." Alfred creates an event record with the date, location, and participants linked.
-
-**Status values:** _(no status constraint)_
-
-**Key fields:** name, date, location, participants (links to people), tags
-</Accordion>
-
-<Accordion title="session — Working Sessions" icon="clock">
-**What it represents:** Time-bounded activity periods or work blocks.
-
-**When it's created:** Created automatically by the Session Tracker, which groups related vault activity into time-bounded sessions every 5 minutes. Sessions are also created by the Curator when focused work periods are described.
-
-**Example:** Alfred detects 4 vault records created within 20 minutes about database migration. It groups them into a session with the topic summary 'Database migration planning' and links to all member records.
-
-**Status values:** `active`, `paused`, `finished`
-
-**Key fields:** name, status, topic_summary, idle_minutes, participants, records (links to session members), tags
-</Accordion>
-
-<Accordion title="input — Incoming Items" icon="inbox">
-**What it represents:** Raw items in the inbox waiting to be attended to.
-
-**When it's created:** Created when content is shared with Alfred, before the Curator attends to it.
-
-**Example:** You upload a document via the API. An input record tracks it until the Curator creates structured records from it.
-
-**Status values:** `unprocessed`, `processed`, `deferred`
-
-**Key fields:** subject, status, tags
-
-<Note>
-  Inputs use `subject` instead of `name` as their title field.
-</Note>
-</Accordion>
-
-<Accordion title="run — Execution Runs" icon="play">
-**What it represents:** Execution runs, operations, or batch operations.
-
-**When it's created:** Created to track operational runs and batch work.
-
-**Status values:** `active`, `completed`, `blocked`, `cancelled`
-
-**Key fields:** name, status, outputs (links to results), tags
-</Accordion>
-
-</AccordionGroup>
-
-## Execution Types
-
-Records that define how work gets done.
-
-<AccordionGroup>
-
-<Accordion title="skill — Reasoning Methodologies" icon="book-open">
-**What it represents:** A plain-English methodology file that teaches Alfred how to approach a type of work. Skills describe reasoning patterns, not data — they're the "how" behind task execution.
-
-**When it's created:** You author skill files when you want Alfred to follow a specific methodology for a recurring type of work. Skills can also be generated by the Distiller when it identifies a repeatable process in your vault.
-
-**Example:** You write a skill called "Invoice Processing" that describes how to extract amounts, validate line items, and create payment reminders. When a task references this skill, the Task Runner follows the methodology step by step.
-
-**Status values:** _(no status constraint)_
-
-**Key fields:** name, domain (`input_processing`, `execution`, `propagation`, `preference`, `process`), tier (1–3), related_skills (links to other skills), tags
-
-<Note>
-  Skill files live in the `skill/` folder of your vault. They're plain English — no code required.
-</Note>
-</Accordion>
-
-</AccordionGroup>
-
-## Learning Types
-
-Records created by the Distiller that capture deeper knowledge surfaced from your vault.
-
-<AccordionGroup>
-
-<Accordion title="assumption — Implicit Assumptions" icon="thought-bubble">
-**What it represents:** Assumptions lurking in your records that haven't been explicitly validated.
-
-**When it's created:** The Distiller surfaces implicit assumptions when analyzing your conversations, decisions, and project records.
-
-**Example:** From project discussions, the Distiller surfaces: "We're assuming users prefer mobile-first design — this hasn't been validated with data."
-
-**Status values:** `active`, `challenged`, `invalidated`, `confirmed`
-
-**Key fields:** name, status, based_on (source records), challenged_by, confirmed_by, invalidated_by, tags
-</Accordion>
-
-<Accordion title="decision — Decisions and Rationale" icon="scale-balanced">
-**What it represents:** Choices that were made, along with the reasoning behind them.
-
-**When it's created:** Both the Curator (from explicit mentions) and the Distiller (from implicit context) create decision records.
-
-**Example:** Meeting notes mention "Decision: use token bucket algorithm for rate limiting." Alfred captures the decision, who approved it, and what it was based on.
-
-**Status values:** `draft`, `final`, `superseded`, `reversed`
-
-**Key fields:** name, status, based_on (source records), approved_by, tags
-</Accordion>
-
-<Accordion title="constraint — Constraints and Limitations" icon="triangle-exclamation">
-**What it represents:** Boundaries, limitations, or constraints you're operating under.
-
-**When it's created:** The Distiller identifies constraints from project plans, conversations, and decisions.
-
-**Example:** The Distiller surfaces: "Must support legacy API until Q3 due to existing client contracts."
-
-**Status values:** `active`, `expired`, `waived`, `superseded`
-
-**Key fields:** name, status, based_on (source records), governed_by, tags
-</Accordion>
-
-<Accordion title="contradiction — Contradictions and Conflicts" icon="circle-exclamation">
-**What it represents:** Conflicts or contradictions found across different records.
-
-**When it's created:** The Distiller identifies contradictions when analyzing records that contain conflicting information.
-
-**Example:** The Distiller finds: "The Q2 launch goal conflicts with the security audit requirement, which needs 6 weeks and hasn't started."
-
-**Status values:** `unresolved`, `resolved`, `accepted`
-
-**Key fields:** name, status, based_on (conflicting records), tags
-</Accordion>
-
-<Accordion title="synthesis — Insights and Connections" icon="diagram-venn">
-**What it represents:** Synthesized insights that connect patterns across multiple records.
-
-**When it's created:** The Distiller creates synthesis records when it finds meaningful patterns across your vault.
-
-**Example:** The Distiller connects dots: "Both the Q1 Launch and Platform Redesign projects identified onboarding as a user retention blocker — suggesting a shared improvement opportunity."
-
-**Status values:** `draft`, `active`, `superseded`
-
-**Key fields:** name, status, based_on (source records), supports, tags
-</Accordion>
-
-</AccordionGroup>
-
-<Note>
-  Learning types are automatically surfaced by the Distiller. While you can create them via the API, they're typically generated automatically from your existing records.
+Person records are flexible — frontmatter typically holds `name`, `aliases`, `org` (a wikilink), `role`, `email`, `phone`. Body text is the brief Alfred has built up about the person from everything Sir has shared.
 </Note>
 
-## Intuition Types
+**Example: a person record**
 
-Records created by Alfred's intuition system as it learns your preferences and routing patterns. See the [Intuition guide](/guides/intuition) for how these work together.
+```markdown
+---
+type: person
+status: active
+name: Jane Doe
+aliases: [Jane, J.D.]
+org: "[[org/brescia-cabinet-supplier]]"
+role: Project lead
+email: jane@brescia-supplier.it
+phone: "+39 030 555 1234"
+created: 2026-03-04
+tags: [vendor, kitchen]
+---
 
-<AccordionGroup>
+# Jane Doe
 
-<Accordion title="observation — Routing Observations" icon="eye">
-**What it represents:** A record of why something was routed a certain way — Alfred observed your preference.
+Project lead at the Brescia supplier. Sir met her on the site visit
+in March. Manages the cabinet rough-in schedule.
+```
 
-**When it's created:** Automatically when you route an input through conversation, or when Alfred's judgment system routes something autonomously. Also created when you add a `routing_hint` to a vault record.
+## Work
 
-**Example:** You tell Alfred to file a vendor email under the client onboarding project. Alfred creates an observation recording the input type (email), the routing decision (project/client-onboarding), and the signals that characterized the input (sender domain, keywords, attachment type).
+Records about ongoing work — the projects, matters, tasks, and recurring routines Alfred is helping Sir manage.
 
-**Status values:** `unprocessed`, `processed`, `invalid`
-
-**Key fields:** input_type, input_source, input_ref, routing_decision, reasoning, signals, confidence, routed_by
-</Accordion>
-
-<Accordion title="instinct — Learned Routing Patterns" icon="bolt">
-**What it represents:** A learned pattern distilled from multiple observations — an instinct Alfred has developed for how to handle a recurring type of input.
-
-**When it's created:** During nightly reflection, when Alfred identifies at least 3 observations of the same routing pattern. Instincts are also updated, merged, or deprecated during reflection as new evidence accumulates.
-
-**Example:** After observing you route several vendor invoices to the same process, Alfred creates an instinct: "Emails from vendor domains containing invoice keywords and PDF attachments should be routed to process/invoice-processing."
-
-**Status values:** `active`, `proposed`, `deprecated`, `merged`
-
-**Key fields:** domain, observation_count, discretion_threshold, signals, matching_weights, routing_destination, last_matched, total_matches, total_escalations, based_on
-</Accordion>
-
-<Accordion title="reflection — Nightly Reflection Reports" icon="moon">
-**What it represents:** A report from Alfred's nightly reflection process — what it reviewed, what patterns it found, and what changes it made to its instincts.
-
-**When it's created:** Every night at 2am during the reflection process. One reflection report per night (only created when there are new observations to review).
-
-**Example:** "Reviewed 8 new observations. Created 1 new instinct (Hiring Pipeline Updates). Strengthened 2 existing instincts (Vendor Invoices, Meeting Notes). No deprecations."
-
-**Status values:** _(no status constraint)_
-
-**Key fields:** observations_reviewed, instincts_created, instincts_updated, instincts_deprecated, reasoning
-</Accordion>
-
-</AccordionGroup>
-
-<Note>
-  Intuition types are managed automatically by Alfred's learning system. Observations are captured from your routing decisions, instincts are refined during nightly reflection, and reflection reports document what Alfred learned. See the [Intuition guide](/guides/intuition) for the full picture.
-</Note>
-
-## Naming conventions
-
-- Type identifiers use lowercase, singular form (e.g., `person`, not `Person` or `people`)
-- Record names use title case with spaces (e.g., "Alice Smith")
-- Three types (`conversation`, `input`, `triage`) use `subject` as their title field instead of `name`
+| Type | Folder | Status values | When created |
+|------|--------|---------------|--------------|
+| `project` | `project/` | `active`, `paused`, `completed`, `abandoned`, `proposed` | Manual or extracted from inbox |
+| `matter` | `matter/` | `active`, `resolved`, `abandoned` | Onboarding matter pack; promoted from triage |
+| `task` | `task/` | `todo`, `active`, `blocked`, `done`, `cancelled` | Curator from inbox; main agent; onboarding errand pack |
+| `chore` | `chore/` | `active`, `paused`, `completed` | Onboarding chore generation; `POST /api/v1/chores` |
+| `process` | `process/` | `active`, `proposed`, `design`, `deprecated` | Manual definition |
+| `run` | `run/` | `active`, `completed`, `blocked`, `cancelled` | Started when a process executes |
+| `triage` | `triage/` | `unprocessed`, `reviewed`, `resolved`, `dismissed` | Inbox classifier when an item cannot be confidently routed |
+| `ledger_entry` | `ledger_entry/` | `active` | TaskRunner when an autonomous task completes — an audit-trail record |
 
 <Tip>
-  Use the `GET /api/v1/vault/schema` endpoint to retrieve the complete, up-to-date schema programmatically — including all 26 types and their valid statuses.
+**Matter vs project vs task.** A *matter* is an ongoing concern with no fixed end-state ("the kitchen renovation", "Q2 fundraise"). A *project* is a defined initiative with a beginning and an end ("ship the v3 release"). A *task* is a single, discrete, completable thing ("call Erik to book the cleaning"). Alfred's onboarding pipeline writes errands as `task` records with `tags: [errand]` — they are tasks, just so you know.
 </Tip>
+
+**Example: a matter record (auto-generated during onboarding)**
+
+```markdown
+---
+type: matter
+name: Kitchen renovation
+status: active
+category: home
+description: Whole-floor refit; Carrara counters; Brescia cabinet supplier.
+created: 2026-03-04
+created_by: onboarding_pipeline
+generated: true
+key_people:
+  - Jane Doe
+  - Michael Ng
+tags: [onboarding, matter, auto-generated, home]
+---
+
+# Kitchen renovation
+
+> Whole-floor refit Sir signed off on in February.
+
+## Context
+Cabinet rough-in scheduled for week 18. Plumbing inspection requested
+by the Brescia supplier on the same site visit.
+
+## Suggested next actions
+- Confirm RSVP with the supplier for the 14 April site visit.
+- Decide on the splash-back finish before week 17.
+```
+
+**Example: a chore record**
+
+```markdown
+---
+type: chore
+name: Call Erik — car cleaning
+status: active
+template: call_erik_car_cleaning
+schedule: '0 7 27 4 *'
+schedule_id: chore-call-erik-car-cleaning
+params: '{"chore_slug":"call-erik-car-cleaning","channel":"slack"}'
+quarantine: false
+quarantine_remaining: 0
+created_by: self
+created: '2026-04-25T08:04:04.820Z'
+tags: []
+workflow_class_name: CallErikCarCleanWorkflow
+user_facing_description: 'Monday 9am Budapest — call Erik to book full car cleaning'
+---
+
+# Call Erik — car cleaning
+
+Monday 9am Budapest — call Erik to book full car cleaning.
+```
+
+The `template` and `workflow_class_name` fields point to a Python Temporal workflow generated by Opus during onboarding (or by the main agent on request) and deployed to `/alfred-data/user-chores/`. See [the Kinetic layer](/architecture/kinetic) for the full chore lifecycle.
+
+## Knowledge
+
+Records that capture what Alfred has learned, decided, assumed, or noticed — the epistemic types.
+
+| Type | Folder | Status values | When created |
+|------|--------|---------------|--------------|
+| `note` | `note/` | `draft`, `active`, `review`, `final` | Curator from inbox uploads; manual |
+| `decision` | `decision/` | `draft`, `final`, `superseded`, `reversed` | Curator; Distiller; main agent |
+| `assumption` | `assumption/` | `active`, `challenged`, `invalidated`, `confirmed` | Distiller only |
+| `constraint` | `constraint/` | `active`, `expired`, `waived`, `superseded` | Distiller only |
+| `contradiction` | `contradiction/` | `unresolved`, `resolved`, `accepted` | Distiller only |
+| `synthesis` | `synthesis/` | `draft`, `active`, `superseded` | Distiller and Surveyor |
+
+<Note>
+The five **learning types** — `assumption`, `decision`, `constraint`, `contradiction`, `synthesis` — are the only types the [Distiller](/architecture/agent) is permitted to create. They each carry a `confidence` field, `source` references, and a chain of supporting evidence (`based_on`, `supports`, `challenged_by`, `confirmed_by`, `invalidated_by`).
+</Note>
+
+**Example: an assumption surfaced by the Distiller**
+
+```markdown
+---
+type: assumption
+status: active
+confidence: medium
+source: "[[conversation/2026-04-02-1676adbd5443]]"
+source_date: 2026-04-02
+project: ["[[matter/kitchen-renovation]]"]
+based_on:
+  - "[[event/2026-04-12-a3f9c1b2e8d4]]"
+challenged_by: []
+created: 2026-04-12
+tags: [kitchen]
+---
+
+# The Brescia supplier handles export logistics in-house
+
+## Claim
+The Brescia supplier ships the cabinets directly to Sir's address in
+Budapest without involving a third-party freight forwarder.
+
+## Basis
+Mentioned by Jane Doe during the 2 April call. Not yet confirmed in
+writing — flagged for the Janitor to chase a contract clause.
+```
+
+## Stream-derived
+
+Records created automatically from data flowing in through Streams and Connected Apps. These are the bulk of the vault — every email, calendar event, payment, GitHub notification, Slack message, and Omi audio chunk becomes one of these.
+
+| Type | Folder | Status values | When created |
+|------|--------|---------------|--------------|
+| `event` | `event/` | (no constraint) | `EventProcessorWorkflow` for every stream event (zero-LLM) |
+| `conversation` | `conversation/` | `active`, `waiting`, `resolved`, `closed`, `archived` | Curator from threaded sources; Omi audio template |
+| `input` | `input/` | `unprocessed`, `processed`, `deferred` | Anything dropped into `inbox/` |
+| `session` | `session/` | `active`, `completed` | `SessionTrackerWorkflow` from Alfred-Sir interactions |
+
+The `event` type is the workhorse. It carries `source`, `source_ref`, `stream_type`, and `enrichment_status` fields, and it is created by `stream_vault.py`'s per-source templates. The hourly enrichment pass adds entities, tags, and links in a single batched LLM call.
+
+**Example: an event record from Gmail**
+
+```markdown
+---
+type: event
+created: 2026-04-12T17:03:01+00:00
+status: active
+name: "Brescia Supplier: site visit confirmation — 14 April"
+source: "993465f7-a2d0-41be-a83c-6b5d5d0e4c53"
+source_ref: "gmail:19c24755a763b506"
+stream_type: gmail
+tags: [email]
+enrichment_status: pending
+---
+
+# Brescia Supplier: site visit confirmation — 14 April
+
+**From**: Jane Doe <jane@brescia-supplier.it>
+**To**: David <david@example.com>
+
+Confirming our site visit on 14 April at 10:00 — please let us know
+the access code for the building.
+```
+
+The same `event` type covers every stream source: Gmail, Slack, GitHub, Google Calendar, Notion, Polar payments, Omi audio, voice calls, SMS. Per-source templates in `packages/learn/src/activities/stream_vault.py` shape the body and tags appropriately.
+
+## Capabilities
+
+Records about the accounts, services, and resources Alfred can act on or knows Sir owns.
+
+| Type | Folder | Status values | When created |
+|------|--------|---------------|--------------|
+| `account` | `account/` | `active`, `suspended`, `closed`, `pending` | Mostly manual; sometimes from billing emails |
+| `asset` | `asset/` | `active`, `retired`, `maintenance`, `disposed` | Manual or extracted from purchase confirmations |
+
+`account` covers financial accounts, SaaS subscriptions, and platform logins. `asset` covers software licences, hardware, domains, vehicles — anything Sir might want Alfred to remember the existence of, with a vendor and a renewal date.
+
+## Intuition
+
+Records that power Alfred's learning loop — the Intuition layer's record types.
+
+| Type | Folder | Status values | When created |
+|------|--------|---------------|--------------|
+| `observation` | `observation/` | `unprocessed`, `processed`, `invalid` | The observer hook captures every routing decision and user instruction |
+| `instinct` | `intuition/instincts/` | `active`, `proposed`, `deprecated`, `merged` | Onboarding instinct pack; `ReflectionWorkflow` |
+| `reflection` | `reflection/` | (no constraint) | Daily `ReflectionWorkflow` — reviews observations, proposes instinct changes |
+
+<Tip>
+**Observation, instinct, reflection** form a feedback loop. The observer captures what happened (an observation). The reflector reviews many observations and proposes changes (a reflection). The change either updates an existing instinct or creates a new one. Over time Alfred's autonomous behaviour comes to match how Sir actually works. See [the guide on intuition](/guides/intuition).
+</Tip>
+
+## A note on terminology
+
+Alfred uses some terms that overlap with general usage in deliberate ways. Where there is risk of confusion:
+
+- **Errand** is not a record type. Errands are written as `task` records with `tags: [errand]` (and frontmatter fields like `urgency`, `owner`, `related_matter`).
+- **Skill** is not a record type. Skills live on disk under the agent's workspace, not in the vault.
+- **Memory** is not a record type. The agent's working memory is `MEMORY.md` in the agent workspace; long-term memory is the vault itself.
+
+If a term you read in the dashboard does not appear in this list, it is almost always a tagged or specialised view of one of the types above.
