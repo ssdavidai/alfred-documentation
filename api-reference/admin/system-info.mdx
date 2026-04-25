@@ -1,26 +1,40 @@
 ---
-title: "System Info"
-description: "Get system information and resource usage for your instance"
+title: "System info"
+description: "Host-level uptime, disk, and memory snapshot for the tenant VPS."
 api: "GET /api/v1/admin/system/info"
 ---
 
-Get system information for your Alfred instance including uptime, disk usage, and memory statistics. If any metric is unavailable, the corresponding field will contain `"unknown"`.
+Returns a coarse snapshot of the tenant VPS itself — uptime, free disk on the encrypted vault mount, and free memory. Useful for capacity planning and for the dashboard's host-stats card. Each metric is captured by shelling out to a standard Unix tool; if a tool fails, that field comes back as the literal string `"unknown"`.
+
+## Underlying commands
+
+| Field | Command |
+|------|---------|
+| `uptime` | `uptime -p` |
+| `disk`   | `df -h /mnt/encrypted` |
+| `memory` | `free -m` |
+
+## Response
+
+<ResponseField name="uptime" type="string">Pretty-printed uptime, e.g. `"up 5 days, 3 hours, 42 minutes"`. `"unknown"` if `uptime` failed.</ResponseField>
+<ResponseField name="disk" type="string">Raw `df -h` output for `/mnt/encrypted` (the encrypted vault volume). Multi-line, with the standard `df` header.</ResponseField>
+<ResponseField name="memory" type="string">Raw `free -m` output. Multi-line, includes Mem and Swap rows.</ResponseField>
 
 <RequestExample>
 
-```bash curl
-curl -H "Authorization: Bearer alf_your_key_here" \
-  /api/v1/admin/system/info
+```bash cURL
+curl -X GET https://alfred.black/api/v1/admin/system/info \
+  -H "Authorization: Bearer alf_your_key_here"
 ```
 
 </RequestExample>
 
 <ResponseExample>
 
-```json
+```json 200 OK
 {
   "uptime": "up 5 days, 3 hours, 42 minutes",
-  "disk": "Filesystem      Size  Used Avail Use% Mounted on\n/dev/sda1  200G   85G  115G  43% /data",
+  "disk": "Filesystem      Size  Used Avail Use% Mounted on\n/dev/mapper/encrypted  200G   85G  115G  43% /mnt/encrypted",
   "memory": "              total        used        free      shared  buff/cache   available\nMem:           7982        4915        1228         256        1838        2810\nSwap:          2047         512        1535"
 }
 ```
@@ -28,5 +42,5 @@ curl -H "Authorization: Bearer alf_your_key_here" \
 </ResponseExample>
 
 <Note>
-  All three fields contain raw text output from system commands. If any command fails, its field will contain `"unknown"`.
+  Values are raw command output — parse the `disk` and `memory` strings on the client if you need structured numbers. Failures degrade gracefully: a missing `uptime` binary returns `"uptime": "unknown"` rather than a 500.
 </Note>

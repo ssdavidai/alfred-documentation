@@ -1,41 +1,44 @@
 ---
-title: "Start Service"
-description: "Start a specific service on your instance"
+title: "Start container"
+description: "Start a stopped container in the tenant Docker stack."
 api: "POST /api/v1/admin/containers/{service}/start"
 ---
 
-Start a stopped service on your Alfred instance. Use this to bring back services that were previously stopped or failed to start.
+Starts the named compose service via `docker compose start <service>`. Use this to bring back a service that was previously stopped via [`POST /api/v1/admin/containers/{service}/stop`](/api-reference/admin/stop-container) or that exited unexpectedly.
 
-## Path Parameters
+## Path parameters
 
 <ParamField path="service" type="string" required>
-  The service name to start (e.g., "worker", "openclaw", "temporal"). Must contain only alphanumeric characters, hyphens, or underscores.
+  Compose service id. Must match `[a-zA-Z0-9_-]+`. Common values: `alfred`, `openclaw`, `openclaw-workers`, `alfred-learn`, `temporal`, `ollama`.
 </ParamField>
+
+## Response
+
+<ResponseField name="message" type="string">Confirmation that the start was issued.</ResponseField>
+
+## Errors
+
+`400 Bad Request` — `service` contains invalid characters.
 
 <RequestExample>
 
-```bash curl
-# Start the Alfred worker
-curl -X POST -H "Authorization: Bearer alf_your_key_here" \
-  /api/v1/admin/containers/worker/start
-
-# Start OpenClaw gateway
-curl -X POST -H "Authorization: Bearer alf_your_key_here" \
-  /api/v1/admin/containers/openclaw/start
+```bash cURL
+curl -X POST https://alfred.black/api/v1/admin/containers/alfred/start \
+  -H "Authorization: Bearer alf_your_key_here"
 ```
 
 </RequestExample>
 
 <ResponseExample>
 
-```json
+```json 200 OK
 {
-  "message": "Container \"worker\" started"
+  "message": "Container \"alfred\" started"
 }
 ```
 
 </ResponseExample>
 
 <Note>
-  Starting a service that is already running has no effect and will return success. Check service status with the list services endpoint first if needed.
+  Starting an already-running container is a no-op and returns success. To verify state afterwards, call [`GET /api/v1/admin/containers`](/api-reference/admin/list-containers).
 </Note>

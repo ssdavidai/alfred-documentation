@@ -1,23 +1,27 @@
 ---
-title: "Remove Device"
-description: "Remove a paired device"
+title: "Remove a device"
+description: "Delete a paired device and all of its credentials."
 api: "DELETE /api/v1/devices/{deviceId}"
 ---
 
-Removes a paired device from your Alfred instance, revoking its access and invalidating any existing tokens.
+Permanently removes a paired device. All tokens associated with the device are invalidated and the entry is dropped from the inventory. Use this when Sir retires a phone, decommissions a workstation, or cleans up a forgotten CLI session.
 
-<Note>
-  This endpoint uses `deviceId` in the URL path (not `requestId`). This is the identifier of an already-paired device, not a pending request.
-</Note>
+## Path parameters
 
 <ParamField path="deviceId" type="string" required>
-  The unique identifier of the paired device to remove.
+  The `device_id` from `GET /api/v1/devices` (under `devices`).
 </ParamField>
+
+## Response
+
+<ResponseField name="message" type="string">
+  Confirmation string from the OpenClaw CLI (e.g. `"Device removed"`).
+</ResponseField>
 
 <RequestExample>
 
 ```bash cURL
-curl -X DELETE https://alfred.black/api/v1/devices/dev_a1b2c3d4e5 \
+curl -X DELETE https://alfred.black/api/v1/devices/phn-7f2c \
   -H "Authorization: Bearer alf_your_key_here"
 ```
 
@@ -25,7 +29,7 @@ curl -X DELETE https://alfred.black/api/v1/devices/dev_a1b2c3d4e5 \
 
 <ResponseExample>
 
-```json Response
+```json 200 OK
 {
   "message": "Device removed"
 }
@@ -33,6 +37,6 @@ curl -X DELETE https://alfred.black/api/v1/devices/dev_a1b2c3d4e5 \
 
 </ResponseExample>
 
-<ResponseField name="message" type="string">
-  A status message confirming the device was removed.
-</ResponseField>
+<Warning>
+  Removal is destructive and immediate. If the device tries to reconnect, it will need to repeat the full pairing flow.
+</Warning>

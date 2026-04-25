@@ -1,12 +1,14 @@
 ---
-title: "List Agents"
-description: "List registered agents"
+title: "List agents"
+description: "Show every agent registered in the OpenClaw config."
 api: "GET /api/v1/openclaw/agents"
 ---
 
-List all agents registered with your instance's agent gateway. Agents are the AI backends that execute skills on behalf of Alfred tools like Curator, Janitor, Distiller, and Surveyor.
+Lists the agents OpenClaw knows about — `main` (Alfred), the vault worker agents (`vault-curator`, `vault-janitor`, `vault-distiller`), the `learn-clerk` worker, and any ephemeral execution subagents that happen to be alive at the time of the call.
 
-The response is returned as structured JSON when available, or as raw text in a `raw` field.
+## How it works
+
+ctrl-API shells into OpenClaw and runs `openclaw agents`. JSON output is forwarded; non-JSON text is returned in a `raw` field.
 
 <RequestExample>
 
@@ -19,13 +21,19 @@ curl -X GET https://alfred.black/api/v1/openclaw/agents \
 
 <ResponseExample>
 
-```json Structured Response
+```json Structured
 {
-  "...": "Structure depends on gateway agents output"
+  "agents": [
+    { "id": "main", "model": "xai/grok-4", "ready": true },
+    { "id": "learn-clerk", "model": "xai/grok-4-1-fast-reasoning", "ready": true },
+    { "id": "vault-curator", "model": "xai/grok-4-1-fast-reasoning", "ready": true },
+    { "id": "vault-janitor", "model": "xai/grok-4-1-fast-reasoning", "ready": true },
+    { "id": "vault-distiller", "model": "xai/grok-4-1-fast-reasoning", "ready": true }
+  ]
 }
 ```
 
-```json Raw Response
+```json Raw fallback
 {
   "raw": "No agents configured"
 }
@@ -34,5 +42,5 @@ curl -X GET https://alfred.black/api/v1/openclaw/agents \
 </ResponseExample>
 
 <Note>
-  The response format depends on the gateway's output. If the gateway returns valid JSON, it is passed through as-is. Otherwise, the raw text is returned in a `raw` field.
+  For the higher-level Alfred-facing view (label, description, surveyor config, provider auth status), use [`GET /api/v1/admin/agents`](/api-reference/agents/list). That endpoint reads from `config.yaml` plus per-agent model status and is what the dashboard renders.
 </Note>

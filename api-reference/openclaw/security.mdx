@@ -1,12 +1,14 @@
 ---
-title: "Security Audit"
-description: "Get agent gateway security configuration"
+title: "Security audit"
+description: "Run OpenClaw's security review of its own configuration."
 api: "GET /api/v1/openclaw/security"
 ---
 
-Run a security audit on your instance's agent gateway. This reviews the current security configuration and reports any findings or recommendations.
+Runs the OpenClaw `security` audit — checks the current allowlist, MCP server registrations, secret handling, and gateway exposure for anything that looks misconfigured or risky. A useful periodic check after Sir adds a new integration or rotates credentials.
 
-The response is returned as structured JSON when available, or as raw text in a `raw` field.
+## How it works
+
+ctrl-API shells into OpenClaw and runs `openclaw security`. JSON output is forwarded; non-JSON text is returned in a `raw` field.
 
 <RequestExample>
 
@@ -19,13 +21,16 @@ curl -X GET https://alfred.black/api/v1/openclaw/security \
 
 <ResponseExample>
 
-```json Structured Response
+```json Structured
 {
-  "...": "Structure depends on gateway security output"
+  "findings": [],
+  "allowlisted_tools": 12,
+  "mcp_servers": ["alfred-ctrl"],
+  "providers_with_credentials": ["openrouter", "anthropic", "google", "xai"]
 }
 ```
 
-```json Raw Response
+```json Raw fallback
 {
   "raw": "Security audit complete: no issues found"
 }
@@ -34,5 +39,5 @@ curl -X GET https://alfred.black/api/v1/openclaw/security \
 </ResponseExample>
 
 <Note>
-  The response format depends on the gateway's output. If the gateway returns valid JSON, it is passed through as-is. Otherwise, the raw text is returned in a `raw` field.
+  This is a read-only audit. It will never modify configuration or revoke access on your behalf. To act on a finding, use the relevant credentials, devices, or admin endpoint.
 </Note>

@@ -1,41 +1,49 @@
 ---
-title: "Restart Service"
-description: "Restart a specific service on your instance"
+title: "Restart container"
+description: "Restart one container in the tenant Docker stack."
 api: "POST /api/v1/admin/containers/{service}/restart"
 ---
 
-Restart a specific service on your Alfred instance. The service will be stopped and then started again.
+Restarts the named compose service via `docker compose restart <service>`. Use this to recover a service that has wedged or to apply config changes that don't require a full recreate.
 
-## Path Parameters
+## Path parameters
 
 <ParamField path="service" type="string" required>
-  The service name to restart (e.g., "worker", "openclaw", "temporal"). Must contain only alphanumeric characters, hyphens, or underscores.
+  Compose service id. Must match `[a-zA-Z0-9_-]+`. Common values: `alfred`, `openclaw`, `openclaw-workers`, `alfred-learn`, `temporal`, `ollama`.
 </ParamField>
+
+## Response
+
+<ResponseField name="message" type="string">Confirmation that the restart was issued.</ResponseField>
+
+## Errors
+
+`400 Bad Request` — `service` contains invalid characters.
 
 <RequestExample>
 
-```bash curl
-# Restart the Alfred worker
-curl -X POST -H "Authorization: Bearer alf_your_key_here" \
-  /api/v1/admin/containers/worker/restart
+```bash cURL
+curl -X POST https://alfred.black/api/v1/admin/containers/openclaw/restart \
+  -H "Authorization: Bearer alf_your_key_here"
+```
 
-# Restart OpenClaw gateway
-curl -X POST -H "Authorization: Bearer alf_your_key_here" \
-  /api/v1/admin/containers/openclaw/restart
+```bash Restart alfred-learn
+curl -X POST https://alfred.black/api/v1/admin/containers/alfred-learn/restart \
+  -H "Authorization: Bearer alf_your_key_here"
 ```
 
 </RequestExample>
 
 <ResponseExample>
 
-```json
+```json 200 OK
 {
-  "message": "Container \"worker\" restarted"
+  "message": "Container \"openclaw\" restarted"
 }
 ```
 
 </ResponseExample>
 
 <Warning>
-  Restarting the worker service will interrupt any active agent operations. Restarting temporal may briefly disrupt workflow execution.
+  Restarting `alfred-learn` interrupts every in-flight Temporal activity that is heartbeating from inside the container. The chore-generation pipeline has a dedicated rate-limited route ([`POST /api/v1/admin/restart-learn`](/api-reference/admin/list-containers)) for this exact reason — prefer that path when reloading dynamic chore templates. Restarting `temporal` briefly halts every workflow.
 </Warning>

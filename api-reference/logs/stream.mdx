@@ -1,91 +1,83 @@
 ---
-title: "Stream Logs"
-description: "Stream real-time logs from your instance services via Server-Sent Events"
+title: "Stream logs"
+description: "Server-Sent Events stream of live container logs."
 api: "GET /api/v1/logs"
 ---
 
-Stream logs from one or more services in real-time using Server-Sent Events (SSE). This is a long-lived connection that delivers log lines as they are produced.
+Opens a long-lived Server-Sent Events (SSE) connection that emits log lines from one container, or from every container in your Alfred stack, as they happen. Used by the dashboard's live log viewer and handy for ad-hoc debugging from a terminal.
 
-## Query Parameters
+The stream backs onto `docker compose logs --tail <n> -f` on the tenant VPS.
 
-<ParamField query="service" type="string" optional>
-  Filter logs to a specific service (e.g., `alfred`, `openclaw`, `temporal`). Must be alphanumeric (letters, numbers, hyphens, and underscores only). If omitted, logs from all services are streamed.
+## Query parameters
+
+<ParamField query="service" type="string">
+  Filter to a single service (`alfred`, `openclaw`, `openclaw-workers`, `alfred-learn`, `temporal`, `ctrl-api`, `init`, `ollama`). Must match `[a-zA-Z0-9_-]+`. Omit to stream every service interleaved.
 </ParamField>
 
-<ParamField query="tail" type="string" optional default="100">
-  Number of initial log lines to send before streaming new logs. Must be a numeric string. Defaults to `"100"`.
+<ParamField query="tail" type="string" default="100">
+  Number of historical lines to emit before live tailing begins. Must be a non-negative integer. Pass `"0"` to skip backfill.
 </ParamField>
 
-## Response
+## Response stream
 
-The response uses `Content-Type: text/event-stream` and follows the Server-Sent Events protocol.
+`Content-Type: text/event-stream`, no buffering (`X-Accel-Buffering: no`).
 
-Each log line is sent as a separate SSE data event:
-
-```
-data: {"line":"2026-02-26T10:15:23Z [alfred] Starting curator daemon"}
+Each line arrives as a single SSE `data:` event with a JSON payload:
 
 ```
+data: {"line":"2026-04-25T08:14:02Z openclaw  | gateway listening on 0.0.0.0:18789"}
+```
 
-When the stream ends normally, a close event is sent:
+When the underlying `docker compose logs` process exits cleanly:
 
 ```
 event: close
 data: {}
-
 ```
 
-On error, an error data event is sent:
+If the spawn fails:
 
 ```
-data: {"error":"Stream terminated unexpectedly"}
-
+data: {"error":"<error message>"}
 ```
+
+When the client disconnects, ctrl-API sends `SIGTERM` to the underlying `docker compose logs` process to clean up immediately.
+
+## Errors
+
+`400 Bad Request` — `service` contains invalid characters or `tail` isn't numeric.
 
 <RequestExample>
 
-```bash Stream All Logs
+```bash All services
 curl -N -H "Authorization: Bearer alf_your_key_here" \
-  /api/v1/logs
+  https://alfred.black/api/v1/logs
 ```
 
-```bash Stream Specific Service
+```bash Single service
 curl -N -H "Authorization: Bearer alf_your_key_here" \
-  "/api/v1/logs?service=alfred"
+  "https://alfred.black/api/v1/logs?service=openclaw&tail=200"
 ```
 
-```bash Stream with No History
+```bash Live only, no backfill
 curl -N -H "Authorization: Bearer alf_your_key_here" \
-  "/api/v1/logs?tail=0"
+  "https://alfred.black/api/v1/logs?service=alfred-learn&tail=0"
 ```
 
-```javascript JavaScript (EventSource)
-// Note: Standard EventSource does not support custom headers.
-// Use a library like event-source-polyfill for Authorization header support,
-// or pass the token as a query parameter if your server supports it.
-const eventSource = new EventSource(
-  '/api/v1/logs?service=openclaw'
-);
-
-eventSource.onmessage = (event) => {
-  const data = JSON.parse(event.data);
-  if (data.line) {
-    console.log(data.line);
-  }
-  if (data.error) {
-    console.error('Stream error:', data.error);
-  }
-};
-
-eventSource.addEventListener('close', () => {
-  eventSource.close();
-  console.log('Stream closed');
+```javascript Browser EventSource
+// Standard EventSource cannot set Authorization headers — use a polyfill
+// (e.g. event-source-polyfill) or wrap fetch() with a ReadableStream reader.
+const es = new EventSourcePolyfill('/api/v1/logs?service=openclaw', {
+  headers: { Authorization: 'Bearer alf_your_key_here' },
 });
 
-eventSource.onerror = (error) => {
-  console.error('Connection error:', error);
-  eventSource.close();
+es.onmessage = (e) => {
+  const data = JSON.parse(e.data);
+  if (data.line)  console.log(data.line);
+  if (data.error) console.error(data.error);
 };
+
+es.addEventListener('close', () => es.close());
 ```
 
 </RequestExample>
@@ -93,13 +85,11 @@ eventSource.onerror = (error) => {
 <ResponseExample>
 
 ```
-data: {"line":"2026-02-26T10:15:20Z [alfred] INFO - Curator watching inbox/"}
+data: {"line":"2026-04-25T08:14:02Z alfred  | INFO curator watching inbox/"}
 
-data: {"line":"2026-02-26T10:15:21Z [alfred] INFO - Janitor scan complete: 0 issues"}
+data: {"line":"2026-04-25T08:14:03Z openclaw | gateway listening on 0.0.0.0:18789"}
 
-data: {"line":"2026-02-26T10:15:22Z [openclaw] Gateway listening on 0.0.0.0:8989"}
-
-data: {"line":"2026-02-26T10:15:23Z [temporal] Started WorkflowTaskPoller"}
+data: {"line":"2026-04-25T08:14:04Z temporal | started WorkflowTaskPoller"}
 
 event: close
 data: {}
@@ -108,5 +98,5 @@ data: {}
 </ResponseExample>
 
 <Note>
-  Use the `-N` flag with curl to disable buffering for streaming responses. The standard browser `EventSource` API does not support custom `Authorization` headers -- use a polyfill library or alternative approach for browser-based clients.
+  For a one-shot, non-streaming dump of a single service's recent logs, use [`GET /api/v1/admin/containers/{service}/logs`](/api-reference/admin/container-logs) — that endpoint returns plain JSON and is easier to consume from scripts that don't speak SSE.
 </Note>

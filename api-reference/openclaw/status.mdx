@@ -1,12 +1,14 @@
 ---
-title: "Gateway Status"
-description: "Get agent gateway status"
+title: "Gateway status"
+description: "Detailed gateway state — version, configured providers, allowlisted tools."
 api: "GET /api/v1/openclaw/status"
 ---
 
-Get detailed status information about your instance's agent gateway, including uptime, version, and current configuration.
+Returns a richer view of the OpenClaw gateway than `health`. Use this when you want to confirm the gateway loaded the expected configuration: which providers it sees credentials for, the count of allowlisted tools, the active default model, and similar diagnostics.
 
-The response is returned as structured JSON when available, or as raw text in a `raw` field.
+## How it works
+
+ctrl-API shells into the OpenClaw container and runs `openclaw gateway status`. JSON output is parsed and forwarded. If the CLI emits text, it's returned in a `raw` field.
 
 <RequestExample>
 
@@ -19,13 +21,17 @@ curl -X GET https://alfred.black/api/v1/openclaw/status \
 
 <ResponseExample>
 
-```json Structured Response
+```json Structured
 {
-  "...": "Structure depends on gateway status output"
+  "version": "2026.4.15",
+  "default_model": "xai/grok-4",
+  "providers": ["openrouter", "anthropic", "google", "xai"],
+  "tools_allowlisted": 12,
+  "mcp_servers": ["alfred-ctrl"]
 }
 ```
 
-```json Raw Response
+```json Raw fallback
 {
   "raw": "Gateway status: running"
 }
@@ -34,5 +40,5 @@ curl -X GET https://alfred.black/api/v1/openclaw/status \
 </ResponseExample>
 
 <Note>
-  The response format depends on the gateway's output. If the gateway returns valid JSON, it is passed through as-is. Otherwise, the raw text is returned in a `raw` field.
+  For dashboard-style probes during a known restart window, use `GET /api/v1/openclaw/ready`. For the canonical inventory of built-in and MCP tools, use `GET /api/v1/openclaw/allowed-tools`.
 </Note>
