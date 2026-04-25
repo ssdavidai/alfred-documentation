@@ -1,25 +1,56 @@
 ---
 title: "List Records by Type"
-description: "List all vault records of a specific type."
+description: "Returns every record of a single type with full frontmatter and a body preview."
 api: "GET /api/v1/vault/list/{type}"
 ---
 
-## Overview
+## When to use
 
-Returns a list of all records of a given type (e.g., `person`, `task`, `decision`). Use this to browse records by category.
+When you want a richer, type-scoped view than `GET /api/v1/vault/context` gives you. This endpoint includes the **complete frontmatter object** and a **truncated body preview** for each record, so list views can render rich cards (titles, statuses, descriptions, tags) without making a second request per row.
+
+Records are sorted alphabetically by `name` (or `subject`, for `conversation` and `input` types).
 
 ## Path Parameters
 
 <ParamField path="type" type="string" required>
-  The record type to list. Must be one of:
-  - Entity types: `person`, `org`, `project`, `task`, `event`, `note`, `location`, `process`, `account`, `asset`, `conversation`, `input`, `run`, `session`
-  - Learning types: `assumption`, `decision`, `constraint`, `contradiction`, `synthesis`
+  One of the types returned by `GET /api/v1/vault/schema` (`person`, `org`, `project`, `task`, `event`, `note`, `location`, `process`, `account`, `asset`, `conversation`, `input`, `run`, `session`, `decision`, `triage`, `assumption`, `constraint`, `contradiction`, `synthesis`, `observation`, `instinct`, `reflection`, `matter`, `ledger_entry`, `chore`). Anything else returns `400`.
+</ParamField>
+
+## Query Parameters
+
+<ParamField query="preview" type="integer" default="500">
+  Maximum length of the `body_preview` field, in characters. Bodies longer than this are truncated and an ellipsis (`…`) is appended. Capped at `2000`. Pass `0` to get an empty preview.
 </ParamField>
 
 ## Response
 
-<ResponseField name="raw" type="string">
-  List of records as text. If the output is structured JSON, it is returned directly instead.
+<ResponseField name="results" type="array" required>
+  Records of the requested type, sorted by display name.
+
+  <Expandable title="record">
+    <ResponseField name="path" type="string">
+      Vault-relative path INCLUDING the `.md` extension (e.g., `matter/alfred-product-development-launch.md`).
+    </ResponseField>
+    <ResponseField name="name" type="string">
+      The `name` frontmatter field, falling back to `subject`, then to the file stem if neither is set.
+    </ResponseField>
+    <ResponseField name="status" type="string">
+      The `status` frontmatter field, or empty string if absent.
+    </ResponseField>
+    <ResponseField name="frontmatter" type="object">
+      The full parsed YAML frontmatter. Every key the record declares, including arbitrary user-defined fields. Date and datetime values are serialized as ISO-8601 strings.
+    </ResponseField>
+    <ResponseField name="body_preview" type="string">
+      First `preview` characters of the markdown body (everything after the closing `---`). Truncated with `…` when over the limit.
+    </ResponseField>
+    <ResponseField name="created" type="string">
+      The `created` frontmatter field as a string. May be an ISO date (`2026-04-08`) or full datetime depending on how the record was authored.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="count" type="integer" required>
+  Number of records returned. Equal to `results.length`.
 </ResponseField>
 
 ## Request Example
@@ -27,22 +58,27 @@ Returns a list of all records of a given type (e.g., `person`, `task`, `decision
 <RequestExample>
 
 ```bash cURL
-curl -X GET https://alfred.black/api/v1/vault/list/person \
-  -H "Authorization: Bearer alf_your_key_here"
+# Default 500-char body previews
+curl -X GET "https://alfred.black/api/v1/vault/list/matter" \
+  -H "Authorization: Bearer $AAS_API_KEY"
+
+# Larger 2000-char previews for a richer list view
+curl -X GET "https://alfred.black/api/v1/vault/list/matter?preview=2000" \
+  -H "Authorization: Bearer $AAS_API_KEY"
+
+# No previews (faster, smaller payload)
+curl -X GET "https://alfred.black/api/v1/vault/list/task?preview=0" \
+  -H "Authorization: Bearer $AAS_API_KEY"
 ```
 
 ```javascript JavaScript
-const type = 'person';
-
-const response = await fetch(`/api/v1/vault/list/${type}`, {
-  method: 'GET',
-  headers: {
-    'Authorization': 'Bearer alf_your_key_here'
-  }
-});
-
-const data = await response.json();
-console.log(data);
+const response = await fetch(
+  'https://alfred.black/api/v1/vault/list/matter?preview=1000',
+  { headers: { 'Authorization': `Bearer ${process.env.AAS_API_KEY}` } },
+);
+const { results, count } = await response.json();
+console.log(`${count} matters`);
+results.forEach(r => console.log(`- ${r.name} [${r.status}]`));
 ```
 
 </RequestExample>
@@ -53,7 +89,25 @@ console.log(data);
 
 ```json 200 OK
 {
-  "raw": "person/Alice Chen.md\nperson/Bob Martinez.md\nperson/Carol Zhang.md"
+  "results": [
+    {
+      "path": "matter/alfred-product-development-launch.md",
+      "name": "Alfred Product Development & Launch",
+      "status": "active",
+      "frontmatter": {
+        "type": "matter",
+        "name": "Alfred Product Development & Launch",
+        "status": "active",
+        "category": "work",
+        "created": "2026-04-08",
+        "key_people": ["[[person/Sir]]"],
+        "alfred_tags": ["alfred-product-development-launch"]
+      },
+      "body_preview": "\n# Alfred Product Development & Launch\n\n> Building Alfred, the AI personal butler / agentic assistant SaaS, from solo prototype…",
+      "created": "2026-04-08"
+    }
+  ],
+  "count": 11
 }
 ```
 
@@ -61,18 +115,23 @@ console.log(data);
 {
   "error": {
     "code": "VALIDATION_ERROR",
-    "message": "Unknown vault type: unknown_type. Known types: person, org, project, task, event, note, location, process, account, asset, conversation, input, run, session, decision, assumption, constraint, contradiction, synthesis"
+    "message": "Unknown vault type: pancake. Known types: person, org, project, task, event, note, location, process, account, asset, conversation, input, run, session, decision, triage, assumption, constraint, contradiction, synthesis, observation, instinct, reflection, matter, ledger_entry, chore"
   }
 }
 ```
 
 ```json 401 Unauthorized
-{
-  "error": {
-    "code": "UNAUTHORIZED",
-    "message": "Unauthorized"
-  }
-}
+{ "error": { "code": "UNAUTHORIZED", "message": "Invalid API key" } }
 ```
 
 </ResponseExample>
+
+## Tips
+
+<Note>
+For the full body, follow up with `GET /api/v1/vault/records/{path}` using the `path` from the listing.
+</Note>
+
+<Warning>
+Like `GET /api/v1/vault/context`, this endpoint walks every `.md` file in the vault on each call (it filters by type after parsing frontmatter). For very large vaults consider caching by type and refreshing on a sensible interval.
+</Warning>

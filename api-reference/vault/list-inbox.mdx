@@ -1,17 +1,23 @@
 ---
 title: "List Inbox Files"
-description: "List all files currently waiting in your inbox."
+description: "Returns the names of every file currently sitting in the vault's inbox directory."
 api: "GET /api/v1/vault/inbox"
 ---
 
-## Overview
+## When to use
 
-Returns a list of all files currently in your inbox waiting to be processed by the Curator agent. Once the Curator processes a file, it is removed from this list.
+The inbox (`<vault>/inbox/`) is the staging area for raw inputs that the Curator daemon will turn into structured records. Use this endpoint to:
+
+- Confirm a recent upload landed.
+- Show a count of "things waiting to be processed" in a UI.
+- Audit the state of the inbox before triggering manual processing.
+
+The endpoint reads the inbox directory directly. Hidden entries (names starting with `.`) are filtered out, but everything else — files **and** subdirectories like `processed/` and `_quarantine/` — is returned as plain entries.
 
 ## Response
 
-<ResponseField name="files" type="array">
-  Array of filenames in the inbox.
+<ResponseField name="files" type="string[]" required>
+  Array of entry names (just basenames, no paths). Includes both regular files and the housekeeping subdirectories the Curator maintains (`processed`, `_quarantine`, etc.). If the inbox directory does not yet exist, an empty array is returned.
 </ResponseField>
 
 ## Request Example
@@ -20,19 +26,16 @@ Returns a list of all files currently in your inbox waiting to be processed by t
 
 ```bash cURL
 curl -X GET https://alfred.black/api/v1/vault/inbox \
-  -H "Authorization: Bearer alf_your_key_here"
+  -H "Authorization: Bearer $AAS_API_KEY"
 ```
 
 ```javascript JavaScript
 const response = await fetch('https://alfred.black/api/v1/vault/inbox', {
-  method: 'GET',
-  headers: {
-    'Authorization': 'Bearer alf_your_key_here'
-  }
+  headers: { 'Authorization': `Bearer ${process.env.AAS_API_KEY}` },
 });
-
-const inbox = await response.json();
-console.log(inbox);
+const { files } = await response.json();
+const pending = files.filter(f => !['processed', '_quarantine'].includes(f));
+console.log(`${pending.length} files awaiting processing`);
 ```
 
 </RequestExample>
@@ -44,17 +47,30 @@ console.log(inbox);
 ```json 200 OK
 {
   "files": [
-    "meeting-notes-2026-02-26.md",
-    "project-idea.md",
-    "contact-info.txt"
+    "_quarantine",
+    "processed",
+    "meeting-notes-2026-04-25.md",
+    "audio-memo.m4a"
   ]
 }
 ```
 
-```json 200 OK (Empty Inbox)
-{
-  "files": []
-}
+```json 200 OK (empty inbox)
+{ "files": [] }
+```
+
+```json 401 Unauthorized
+{ "error": { "code": "UNAUTHORIZED", "message": "Invalid API key" } }
 ```
 
 </ResponseExample>
+
+## Tips
+
+<Note>
+The Curator moves successfully processed files into `processed/` and quarantines failures in `_quarantine/`. Both will show up in this listing — filter them out client-side if you only want to count "pending" inputs.
+</Note>
+
+<Note>
+This is a flat directory listing, not a recursive walk. To inspect what's inside `processed/` or `_quarantine/`, log into the tenant VPS and read the filesystem directly.
+</Note>

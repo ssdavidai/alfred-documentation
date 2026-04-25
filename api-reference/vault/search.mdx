@@ -1,54 +1,89 @@
 ---
 title: "Search Vault"
-description: "Search vault records by keyword or file pattern."
+description: "Find records by file glob, full-text content match, or both combined."
 api: "GET /api/v1/vault/search"
 ---
 
-## Overview
+## When to use
 
-Search your vault records by keyword (grep) or file pattern (glob). Returns matching records or file paths.
+Two orthogonal search modes that can be combined:
+
+- **Glob** — restrict to files whose vault-relative path matches a glob pattern (e.g., `matter/*.md`, `**/*alice*.md`).
+- **Grep** — case-insensitive substring match on the raw file contents (frontmatter and body included).
+
+Provide one, the other, or both. With neither, the endpoint returns every non-ignored record in the vault — equivalent to a full inventory but heavier than `GET /api/v1/vault/context`.
+
+The standard housekeeping directories are excluded (`_templates`, `_bases`, `_docs`, `.obsidian`, `view`, `dashboard`).
 
 ## Query Parameters
 
-<ParamField query="glob" type="string" optional>
-  File glob pattern to match (e.g., `person/*.md`, `**/*alice*.md`).
+<ParamField query="glob" type="string">
+  Glob pattern over the vault-relative path. Supported wildcards:
+
+  - `*` — matches anything except `/`
+  - `**` — matches across directory boundaries
+  - `?` — matches a single non-`/` character
+
+  Path traversal (`..` anywhere in the pattern, or an absolute path) is rejected with `400 VALIDATION_ERROR`. Matching is case-insensitive.
 </ParamField>
 
-<ParamField query="grep" type="string" optional>
-  Text to search for in record content (case-insensitive).
+<ParamField query="grep" type="string">
+  Case-insensitive substring (NOT regex) to search for in raw file contents. Files that fail to read as UTF-8 are skipped silently.
 </ParamField>
 
 ## Response
 
-<ResponseField name="raw" type="string">
-  Search results as text. If the output is structured JSON, it is returned directly instead.
+<ResponseField name="results" type="array" required>
+  Matching records.
+
+  <Expandable title="record">
+    <ResponseField name="path" type="string">
+      Vault-relative path with `.md` (forward slashes only).
+    </ResponseField>
+    <ResponseField name="name" type="string">
+      The `name` frontmatter field, falling back to `subject`, then to the file stem.
+    </ResponseField>
+    <ResponseField name="type" type="string">
+      The `type` frontmatter field, or empty string if absent.
+    </ResponseField>
+    <ResponseField name="status" type="string">
+      The `status` frontmatter field, or empty string if absent.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="count" type="integer" required>
+  Number of records returned.
 </ResponseField>
 
 ## Request Example
 
 <RequestExample>
 
-```bash cURL
+```bash Glob only
+curl -X GET "https://alfred.black/api/v1/vault/search?glob=matter/*.md" \
+  -H "Authorization: Bearer $AAS_API_KEY"
+```
+
+```bash Grep only
+curl -X GET "https://alfred.black/api/v1/vault/search?grep=mortgage" \
+  -H "Authorization: Bearer $AAS_API_KEY"
+```
+
+```bash Glob + grep combined
 curl -X GET \
-  "/api/v1/vault/search?grep=machine%20learning&glob=project/*.md" \
-  -H "Authorization: Bearer alf_your_key_here"
+  "https://alfred.black/api/v1/vault/search?glob=task/**/*.md&grep=urgent" \
+  -H "Authorization: Bearer $AAS_API_KEY"
 ```
 
 ```javascript JavaScript
-const params = new URLSearchParams({
-  grep: 'machine learning',
-  glob: 'project/*.md'
-});
-
-const response = await fetch(`/api/v1/vault/search?${params}`, {
-  method: 'GET',
-  headers: {
-    'Authorization': 'Bearer alf_your_key_here'
-  }
-});
-
-const results = await response.json();
-console.log(results);
+const params = new URLSearchParams({ glob: 'matter/*.md' });
+const response = await fetch(
+  `https://alfred.black/api/v1/vault/search?${params}`,
+  { headers: { 'Authorization': `Bearer ${process.env.AAS_API_KEY}` } },
+);
+const { results, count } = await response.json();
+console.log(`${count} matters found`);
 ```
 
 </RequestExample>
@@ -59,26 +94,49 @@ console.log(results);
 
 ```json 200 OK
 {
-  "raw": "project/ML Pipeline Redesign.md\nproject/Customer Segmentation Model.md\nproject/NLP Research Initiative.md"
+  "results": [
+    {
+      "path": "matter/Kondorosi út Apartment Sale.md",
+      "name": "Kondorosi út Apartment Sale",
+      "type": "matter",
+      "status": "active"
+    },
+    {
+      "path": "matter/alfred-product-development-launch.md",
+      "name": "Alfred Product Development & Launch",
+      "type": "matter",
+      "status": "active"
+    }
+  ],
+  "count": 11
+}
+```
+
+```json 400 Bad Request
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Invalid glob pattern"
+  }
 }
 ```
 
 ```json 401 Unauthorized
-{
-  "error": {
-    "code": "UNAUTHORIZED",
-    "message": "Unauthorized"
-  }
-}
-```
-
-```json 500 Internal Server Error
-{
-  "error": {
-    "code": "EXEC_ERROR",
-    "message": "Command failed with exit code 1"
-  }
-}
+{ "error": { "code": "UNAUTHORIZED", "message": "Invalid API key" } }
 ```
 
 </ResponseExample>
+
+## Tips
+
+<Note>
+`grep` is a plain case-insensitive substring match — special regex characters are NOT interpreted. To find records mentioning `[[matter/alfred]]`, just pass `grep=matter/alfred`.
+</Note>
+
+<Note>
+Combining `glob` and `grep` is the cheapest way to scope a content search — the glob narrows the file set first, so grep only reads matching files.
+</Note>
+
+<Warning>
+With no `glob` or `grep`, the endpoint walks AND parses every `.md` file in the vault. Avoid in tight loops on large vaults; prefer `GET /api/v1/vault/context` for a full inventory.
+</Warning>

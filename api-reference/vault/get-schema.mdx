@@ -1,37 +1,37 @@
 ---
 title: "Get Vault Schema"
-description: "Returns the complete vault schema definition."
+description: "Returns the static vault type system — known types, allowed status values, list fields, required fields, and directory mappings."
 api: "GET /api/v1/vault/schema"
 ---
 
-## Overview
+## When to use
 
-Returns the complete vault schema including all record types, valid status values, list fields, required fields, and name field overrides. Use this to understand what record types are available and how they're structured.
+Use this when you need to validate a frontmatter object client-side before posting it, build a record-type picker, or render a status dropdown that respects the per-type allowed values. The schema is hardcoded into the ctrl-api at build time — it does not query the vault filesystem and does not change between calls within a deployed version.
 
 ## Response
 
-<ResponseField name="known_types" type="array">
-  All 19 valid record types.
+<ResponseField name="known_types" type="string[]" required>
+  All record types Alfred knows about. As of this version: `person`, `org`, `project`, `task`, `event`, `note`, `location`, `process`, `account`, `asset`, `conversation`, `input`, `run`, `session`, `decision`, `triage`, `assumption`, `constraint`, `contradiction`, `synthesis`, `observation`, `instinct`, `reflection`, `matter`, `ledger_entry`, `chore`.
 </ResponseField>
 
-<ResponseField name="status_by_type" type="object">
-  Map of record type to allowed status values. Types without status constraints (e.g., `event`) are omitted.
+<ResponseField name="status_by_type" type="object" required>
+  Map of record type to the array of allowed `status` values. For example, `task` permits `["todo", "active", "blocked", "done", "cancelled"]`. Types whose status is unconstrained are still listed, just with the canonical set.
 </ResponseField>
 
-<ResponseField name="list_fields" type="array">
-  Field names that accept multiple values as arrays.
+<ResponseField name="list_fields" type="string[]" required>
+  Frontmatter fields that are stored as YAML lists. The vault layer enforces that these be lists (or strings, in the special case of `project`). Includes `tags`, `aliases`, `related`, `relationships`, `participants`, `outputs`, `depends_on`, `blocked_by`, `based_on`, `supports`, `challenged_by`, `approved_by`, `confirmed_by`, `invalidated_by`, `cluster_sources`, `governed_by`, `references`, `project`.
 </ResponseField>
 
-<ResponseField name="required_fields" type="array">
-  Globally required fields (applies to all types).
+<ResponseField name="required_fields" type="string[]" required>
+  Frontmatter fields that MUST be present on every record. Currently `["type", "created"]`.
 </ResponseField>
 
-<ResponseField name="name_field_by_type" type="object">
-  Types that use a different title field instead of `name`. Only `conversation` and `input` (which use `subject`) are listed.
+<ResponseField name="name_field_by_type" type="object" required>
+  Types that use a non-default title field. Currently `conversation` and `input` use `subject` instead of `name`. All other types default to `name`.
 </ResponseField>
 
-<ResponseField name="type_directory" type="object">
-  Map of record type to its directory in the vault.
+<ResponseField name="type_directory" type="object" required>
+  Map of record type to the vault subdirectory it lives in. Mostly identity (`task` -> `task`), with one notable exception: `instinct` -> `intuition/instincts`.
 </ResponseField>
 
 ## Request Example
@@ -40,19 +40,16 @@ Returns the complete vault schema including all record types, valid status value
 
 ```bash cURL
 curl -X GET https://alfred.black/api/v1/vault/schema \
-  -H "Authorization: Bearer alf_your_key_here"
+  -H "Authorization: Bearer $AAS_API_KEY"
 ```
 
 ```javascript JavaScript
 const response = await fetch('https://alfred.black/api/v1/vault/schema', {
-  method: 'GET',
-  headers: {
-    'Authorization': 'Bearer alf_your_key_here'
-  }
+  headers: { 'Authorization': `Bearer ${process.env.AAS_API_KEY}` },
 });
-
 const schema = await response.json();
-console.log(schema);
+const taskStatuses = schema.status_by_type.task;
+// → ["todo", "active", "blocked", "done", "cancelled"]
 ```
 
 </RequestExample>
@@ -66,28 +63,15 @@ console.log(schema);
   "known_types": [
     "person", "org", "project", "task", "event", "note", "location",
     "process", "account", "asset", "conversation", "input", "run",
-    "session", "decision",
-    "assumption", "constraint", "contradiction", "synthesis"
+    "session", "decision", "triage", "assumption", "constraint",
+    "contradiction", "synthesis", "observation", "instinct",
+    "reflection", "matter", "ledger_entry", "chore"
   ],
   "status_by_type": {
-    "project": ["active", "paused", "completed", "abandoned", "proposed"],
     "task": ["todo", "active", "blocked", "done", "cancelled"],
-    "session": ["active", "completed"],
-    "input": ["unprocessed", "processed", "deferred"],
-    "person": ["active", "inactive"],
-    "org": ["active", "inactive"],
-    "location": ["active", "inactive"],
-    "note": ["draft", "active", "review", "final"],
-    "decision": ["draft", "final", "superseded", "reversed"],
-    "process": ["active", "proposed", "design", "deprecated"],
-    "run": ["active", "completed", "blocked", "cancelled"],
-    "account": ["active", "suspended", "closed", "pending"],
-    "asset": ["active", "retired", "maintenance", "disposed"],
-    "conversation": ["active", "waiting", "resolved", "closed", "archived"],
-    "assumption": ["active", "challenged", "invalidated", "confirmed"],
-    "constraint": ["active", "expired", "waived", "superseded"],
-    "contradiction": ["unresolved", "resolved", "accepted"],
-    "synthesis": ["draft", "active", "superseded"]
+    "matter": ["active", "resolved", "abandoned"],
+    "chore": ["active", "paused", "completed"],
+    "project": ["active", "paused", "completed", "abandoned", "proposed"]
   },
   "list_fields": [
     "tags", "aliases", "related", "relationships", "participants",
@@ -101,34 +85,25 @@ console.log(schema);
     "input": "subject"
   },
   "type_directory": {
-    "project": "project",
     "task": "task",
-    "person": "person",
-    "org": "org",
-    "location": "location",
-    "note": "note",
-    "decision": "decision",
-    "process": "process",
-    "run": "run",
-    "event": "event",
-    "account": "account",
-    "asset": "asset",
-    "conversation": "conversation",
-    "assumption": "assumption",
-    "constraint": "constraint",
-    "contradiction": "contradiction",
-    "synthesis": "synthesis"
+    "matter": "matter",
+    "instinct": "intuition/instincts"
   }
 }
 ```
 
 ```json 401 Unauthorized
-{
-  "error": {
-    "code": "UNAUTHORIZED",
-    "message": "Unauthorized"
-  }
-}
+{ "error": { "code": "UNAUTHORIZED", "message": "Invalid API key" } }
 ```
 
 </ResponseExample>
+
+## Tips
+
+<Note>
+The `status_by_type` map in the example above is truncated for brevity. The actual response includes every type from `known_types` that has a constrained status enum.
+</Note>
+
+<Note>
+`type_directory` is what determines where a new record lands when you `POST /api/v1/vault/records` without an explicit path. Most types map to a directory of the same name; `instinct` is the lone exception, living under `intuition/instincts/`.
+</Note>

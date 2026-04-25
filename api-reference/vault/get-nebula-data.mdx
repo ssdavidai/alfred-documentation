@@ -1,0 +1,161 @@
+---
+title: "Get Nebula Data"
+description: "Returns surveyor clusters, unclustered records, body wikilinks, and aggregate stats for the Vault Nebula visualisation."
+api: "GET /api/v1/vault/nebula-data"
+---
+
+## When to use
+
+Powers the Vault Nebula homepage visualisation. Three data shapes in one response:
+
+1. **Clusters** — semantic clusters maintained by the surveyor daemon, read from `/mnt/encrypted/alfred/surveyor_state.json`. Each cluster carries a label, a member list, and a colour derived from the dominant record type in the cluster.
+2. **Unclustered** — records that exist in the vault but aren't yet assigned to any surveyor cluster.
+3. **Links** — deduplicated body-wikilink edges (frontmatter relations are NOT included here; use `GET /api/v1/vault/graph` for those).
+
+The endpoint uses a slightly different ignore list than the rest of the vault read endpoints: it skips `_templates`, `_bases`, `.obsidian`, `inbox`, and `view` (note `_docs` and `dashboard` are NOT skipped here).
+
+## Response
+
+<ResponseField name="clusters" type="array" required>
+  Surveyor clusters with at least one resolvable member.
+
+  <Expandable title="cluster">
+    <ResponseField name="id" type="string">
+      Cluster id from `surveyor_state.json`.
+    </ResponseField>
+    <ResponseField name="label" type="string[]">
+      The cluster's label tokens (a list of short strings the surveyor picked to describe it).
+    </ResponseField>
+    <ResponseField name="recordCount" type="integer">
+      Number of records resolved into the cluster.
+    </ResponseField>
+    <ResponseField name="color" type="string">
+      Hex colour derived from the cluster's dominant record type. Type-to-colour: `note`/`conversation` -> `#C9A84C`, `task` -> `#FFFFFF`, `decision`/`assumption`/`constraint` -> `#1E4D5E`, `triage` -> `#FF6B6B`, `project`/`matter` -> `#D4AF37`, `observation`/`instinct`/`reflection` -> `#8B7532`. Fallback `#858C9C`.
+    </ResponseField>
+    <ResponseField name="records" type="string[]">
+      Vault-relative paths (with `.md`) of every record in the cluster.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="unclustered" type="array" required>
+  Records that exist in the vault but aren't a member of any cluster.
+
+  <Expandable title="entry">
+    <ResponseField name="path" type="string">
+      Vault-relative path with `.md`.
+    </ResponseField>
+    <ResponseField name="type" type="string">
+      The record's top-level directory name (used as a cheap proxy for type — frontmatter is NOT parsed here).
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="links" type="array" required>
+  Deduplicated body-wikilink edges. Only edges whose target resolves to an actual file in the vault are returned.
+
+  <Expandable title="link">
+    <ResponseField name="source" type="string">
+      Source record path (`.md`).
+    </ResponseField>
+    <ResponseField name="target" type="string">
+      Target record path (`.md`).
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="stats" type="object" required>
+  Aggregate counts.
+
+  <Expandable title="stats">
+    <ResponseField name="totalRecords" type="integer">
+      Records walked.
+    </ResponseField>
+    <ResponseField name="totalLinks" type="integer">
+      Body-wikilink edges after deduplication.
+    </ResponseField>
+    <ResponseField name="totalClusters" type="integer">
+      Clusters with at least one resolvable member.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="generatedAt" type="string" required>
+  ISO-8601 timestamp the response was built (server clock).
+</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X GET https://alfred.black/api/v1/vault/nebula-data \
+  -H "Authorization: Bearer $AAS_API_KEY"
+```
+
+```javascript JavaScript
+const response = await fetch('https://alfred.black/api/v1/vault/nebula-data', {
+  headers: { 'Authorization': `Bearer ${process.env.AAS_API_KEY}` },
+});
+const { clusters, unclustered, links, stats } = await response.json();
+console.log(`${stats.totalClusters} clusters, ${stats.totalLinks} links`);
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "clusters": [
+    {
+      "id": "c_42",
+      "label": ["product", "launch", "alfred"],
+      "recordCount": 8,
+      "color": "#D4AF37",
+      "records": [
+        "matter/alfred-product-development-launch.md",
+        "task/v1-launch.md",
+        "task/onboard-design-partners.md"
+      ]
+    }
+  ],
+  "unclustered": [
+    { "path": "note/Start Here.md", "type": "note" }
+  ],
+  "links": [
+    {
+      "source": "task/rebuild-docs.md",
+      "target": "matter/alfred-product-development-launch.md"
+    }
+  ],
+  "stats": {
+    "totalRecords": 9392,
+    "totalLinks": 1287,
+    "totalClusters": 42
+  },
+  "generatedAt": "2026-04-25T20:43:01.123Z"
+}
+```
+
+```json 401 Unauthorized
+{ "error": { "code": "UNAUTHORIZED", "message": "Invalid API key" } }
+```
+
+</ResponseExample>
+
+## Tips
+
+<Note>
+On a fresh tenant or right after the surveyor first runs, `surveyor_state.json` may not exist yet. The endpoint silently returns `clusters: []` and treats every record as unclustered — no error.
+</Note>
+
+<Note>
+The `type` field on `unclustered` entries is derived from the top-level directory, not parsed frontmatter. For records living in a non-standard directory (rare), this can disagree with the actual `type:` frontmatter — use `GET /api/v1/vault/records/{path}` to confirm.
+</Note>
+
+<Warning>
+This endpoint reads every body in the vault to extract wikilinks. Heavy. Cache the response client-side in any visualisation that re-renders frequently.
+</Warning>

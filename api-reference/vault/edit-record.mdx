@@ -1,88 +1,99 @@
 ---
 title: "Edit Record"
-description: "Update an existing vault record's metadata or content."
+description: "Set or append frontmatter fields, append to or replace the markdown body of an existing vault record."
 api: "PATCH /api/v1/vault/records/{path}"
 ---
 
-## Overview
+## When to use
 
-Updates an existing record's metadata fields and/or content body. You can set or replace fields, append to list fields, or update the content body.
+Modify an existing record without re-writing the whole file. Four operations can be combined in a single request:
+
+- **`set`** — overwrite frontmatter scalars or replace list values.
+- **`append`** — append values to list-typed frontmatter fields (`tags`, `participants`, `related`, etc.).
+- **`body_append`** — append a chunk of markdown to the end of the body, separated by a blank line.
+- **`body_set`** — replace the body wholesale (frontmatter is left intact).
+
+The `set`/`append`/`body_append` operations execute via `alfred vault edit` inside the alfred container. The `body_set` operation runs at the filesystem level inside the same per-path mutex, applied AFTER the CLI portion writes any frontmatter changes.
 
 ## Path Parameters
 
 <ParamField path="path" type="string" required>
-  Relative path to the record (e.g., `person/Alice Chen.md`). URL-encode spaces and special characters.
+  Vault-relative path to the record (e.g., `task/rebuild-docs.md`). Must end in `.md` (this endpoint does not auto-append the extension the way `GET` does).
 </ParamField>
 
 ## Body Parameters
 
-<ParamField body="set" type="object" optional>
-  Key-value pairs to set in the record metadata. Replaces existing values for these fields.
+<ParamField body="set" type="object">
+  Frontmatter scalars to set or overwrite. Each entry becomes a `--set key=value` flag on the alfred CLI. Values are JSON-decoded by the CLI before assignment, so arrays must be JSON-encoded strings (e.g., `"tags": "[\"foo\",\"bar\"]"`).
 </ParamField>
 
-<ParamField body="append" type="object" optional>
-  Key-value pairs to append to list fields in metadata (e.g., adding a tag or project link).
+<ParamField body="append" type="object">
+  Values to append to list-typed frontmatter fields. Each entry becomes `--append key=value`. If the field doesn't exist yet, it's created as a list when the field name is in the schema's `list_fields` set, or as a single scalar otherwise.
 </ParamField>
 
-<ParamField body="body_append" type="string" optional>
-  Text to append to the content body.
+<ParamField body="body_append" type="string">
+  Markdown to append to the end of the body. The endpoint inserts a blank line between the existing body and the new chunk.
 </ParamField>
 
-<ParamField body="body_stdin" type="string" optional>
-  Replace the content body entirely with this text.
+<ParamField body="body_set" type="string">
+  Replace the body wholesale. Frontmatter is preserved exactly as written by the CLI (including any changes from `set`/`append` in the same request). If the file has no frontmatter, the entire file is overwritten with `body_set`.
+
+  Used by housekeeping scripts to clear stub bodies (e.g., curator-generated `# <name>\n\nExtracted from [[event/...]].`) so they don't overshadow a freshly-written `description` scalar in downstream renders.
 </ParamField>
 
 ## Response
 
-<ResponseField name="raw" type="string">
-  Confirmation message. If the output is structured JSON, it is returned directly instead.
+<ResponseField name="path" type="string">
+  Vault-relative path of the edited record.
 </ResponseField>
+
+<ResponseField name="fields_changed" type="string[]">
+  Names of frontmatter fields that changed, plus the literal string `"body"` if `body_append` was applied. (`body_set` runs at the filesystem level after this list is computed and is NOT reflected here.)
+</ResponseField>
+
+If the alfred CLI produces non-JSON output, the response is wrapped as `{ "raw": "<stdout>" }`.
 
 ## Request Example
 
 <RequestExample>
 
-```bash cURL
+```bash Set + append
 curl -X PATCH \
-  "/api/v1/vault/records/person/Alice%20Chen.md" \
-  -H "Authorization: Bearer alf_your_key_here" \
+  "https://alfred.black/api/v1/vault/records/task/rebuild-docs.md" \
+  -H "Authorization: Bearer $AAS_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "set": {
-      "status": "inactive",
-      "updated": "2026-02-26T10:00:00Z"
-    },
-    "append": {
-      "project": "[[project/Infrastructure Audit]]"
-    },
-    "body_append": "\n## Status Note\n\nMarked inactive as of Feb 26."
+    "set": { "status": "active", "priority": "high" },
+    "append": { "tags": "q2-planning" },
+    "body_append": "## Update 2026-04-25\n\nKicked off."
+  }'
+```
+
+```bash Replace body
+curl -X PATCH \
+  "https://alfred.black/api/v1/vault/records/note/meeting-notes-2026-04-25.md" \
+  -H "Authorization: Bearer $AAS_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "body_set": "# Meeting Notes — 2026-04-25\n\nCleared earlier stub.\n"
   }'
 ```
 
 ```javascript JavaScript
-const recordPath = 'person/Alice Chen.md';
-const encodedPath = encodeURIComponent(recordPath);
-
-const response = await fetch(`/api/v1/vault/records/${encodedPath}`, {
-  method: 'PATCH',
-  headers: {
-    'Authorization': 'Bearer alf_your_key_here',
-    'Content-Type': 'application/json'
+await fetch(
+  'https://alfred.black/api/v1/vault/records/matter/alfred-product-development-launch.md',
+  {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${process.env.AAS_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      set: { status: 'resolved' },
+      append: { related: '[[task/v1-launch.md]]' },
+    }),
   },
-  body: JSON.stringify({
-    set: {
-      status: 'inactive',
-      updated: '2026-02-26T10:00:00Z'
-    },
-    append: {
-      project: '[[project/Infrastructure Audit]]'
-    },
-    body_append: '\n## Status Note\n\nMarked inactive as of Feb 26.'
-  })
-});
-
-const result = await response.json();
-console.log(result);
+);
 ```
 
 </RequestExample>
@@ -93,7 +104,8 @@ console.log(result);
 
 ```json 200 OK
 {
-  "raw": "Edited person/Alice Chen.md"
+  "path": "task/rebuild-docs.md",
+  "fields_changed": ["status", "priority", "tags", "body"]
 }
 ```
 
@@ -106,13 +118,27 @@ console.log(result);
 }
 ```
 
-```json 500 Internal Server Error
+```json 500 Internal Server Error (record missing)
 {
   "error": {
     "code": "EXEC_ERROR",
-    "message": "Command failed with exit code 1"
+    "message": "alfred failed (1): {\"error\": \"File not found: task/missing.md\"}"
   }
 }
 ```
 
 </ResponseExample>
+
+## Tips
+
+<Note>
+Concurrent PATCHes to the **same path** are serialized at the ctrl-api boundary (per-path mutex) so two writers can't fork-storm the alfred CLI's in-container file lock. Different paths run in parallel as before.
+</Note>
+
+<Note>
+For `matter/*` and `task/*` paths, every successful edit fires a Plane forward-sync nudge so external Plane issues update within seconds.
+</Note>
+
+<Warning>
+The alfred CLI also accepts a `--body-stdin` flag for streaming larger body content; this is not exposed by the HTTP API. Use `body_append` (chunked) or `body_set` (replace) instead.
+</Warning>

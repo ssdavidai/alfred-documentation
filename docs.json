@@ -102,6 +102,7 @@
             "group": "Vault",
             "pages": [
               "api-reference/vault/get-context",
+              "api-reference/vault/get-schema",
               "api-reference/vault/search",
               "api-reference/vault/list-by-type",
               "api-reference/vault/read-record",
@@ -109,7 +110,9 @@
               "api-reference/vault/edit-record",
               "api-reference/vault/move-record",
               "api-reference/vault/delete-record",
-              "api-reference/vault/get-schema",
+              "api-reference/vault/promote-triage",
+              "api-reference/vault/get-graph",
+              "api-reference/vault/get-nebula-data",
               "api-reference/vault/upload-inbox",
               "api-reference/vault/upload-inbox-bulk",
               "api-reference/vault/list-inbox"
