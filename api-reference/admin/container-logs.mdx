@@ -1,47 +1,57 @@
 ---
-title: "Service Logs"
-description: "Get logs from a specific service"
+title: "Container logs"
+description: "One-shot fetch of recent log lines from a single container."
 api: "GET /api/v1/admin/containers/{service}/logs"
 ---
 
-Retrieve recent logs from a specific service. This endpoint returns a snapshot of log history and does not stream updates.
+Returns a snapshot of the most recent log lines from one container. Backs onto `docker compose logs --tail <n> <service>`. This is the synchronous counterpart to [`GET /api/v1/logs`](/api-reference/logs/stream) — use it from scripts that don't speak Server-Sent Events, or when you just want a quick peek.
 
-## Path Parameters
+## Path parameters
 
 <ParamField path="service" type="string" required>
-  The service name to get logs from (e.g., "worker", "openclaw", "temporal"). Must contain only alphanumeric characters, hyphens, or underscores.
+  Compose service id. Must match `[a-zA-Z0-9_-]+`.
 </ParamField>
 
-## Query Parameters
+## Query parameters
 
-<ParamField query="tail" type="string" optional default="100">
-  Number of log lines to retrieve from the end of the log. Must be a numeric string.
+<ParamField query="tail" type="string" default="100">
+  Number of lines to return from the tail. Must be a non-negative integer.
 </ParamField>
+
+## Response
+
+<ResponseField name="logs" type="string">
+  Concatenated log output, lines separated by `\n`. Includes the leading `<service> | ` prefix that `docker compose logs` adds.
+</ResponseField>
+
+## Errors
+
+`400 Bad Request` — `service` contains invalid characters or `tail` isn't numeric.
 
 <RequestExample>
 
-```bash curl
-# Get last 100 lines from worker logs (default)
-curl -H "Authorization: Bearer alf_your_key_here" \
-  /api/v1/admin/containers/worker/logs
+```bash Default tail (100)
+curl -X GET https://alfred.black/api/v1/admin/containers/alfred/logs \
+  -H "Authorization: Bearer alf_your_key_here"
+```
 
-# Get last 500 lines from OpenClaw logs
-curl -H "Authorization: Bearer alf_your_key_here" \
-  "/api/v1/admin/containers/openclaw/logs?tail=500"
+```bash Custom tail
+curl -X GET "https://alfred.black/api/v1/admin/containers/openclaw/logs?tail=500" \
+  -H "Authorization: Bearer alf_your_key_here"
 ```
 
 </RequestExample>
 
 <ResponseExample>
 
-```json
+```json 200 OK
 {
-  "logs": "2026-02-26T10:15:20Z INFO - Alfred orchestrator starting\n2026-02-26T10:15:21Z INFO - Starting curator daemon\n2026-02-26T10:15:22Z INFO - Starting janitor daemon\n2026-02-26T10:15:23Z INFO - Starting distiller daemon\n2026-02-26T10:15:24Z INFO - All daemons running\n"
+  "logs": "alfred  | 2026-04-25T08:14:02Z INFO curator watching inbox/\nalfred  | 2026-04-25T08:14:03Z INFO janitor scan complete\n"
 }
 ```
 
 </ResponseExample>
 
 <Note>
-  For real-time log streaming, use the `/api/v1/logs` SSE endpoint instead. This endpoint is designed for quick log inspection and debugging.
+  For long-running tailing or live monitoring, use [`GET /api/v1/logs?service=...`](/api-reference/logs/stream). That SSE stream is what the dashboard's live log viewer uses.
 </Note>

@@ -1,44 +1,50 @@
 ---
-title: "Approve Device"
-description: "Approve a pending device pairing request"
+title: "Approve a device"
+description: "Admit a pending pairing request and issue the device its token."
 api: "POST /api/v1/devices/{requestId}/approve"
 ---
 
-Approves a pending device pairing request, allowing the device to connect to your Alfred instance.
+Approves a pending pairing request. After approval, the device receives its credentials and can begin talking to your Alfred. Use this only for requests you actually initiated — every approval grants access to the same vault Sir relies on.
 
-<Warning>
-  This endpoint uses `requestId` in the URL path, not `deviceId`. The request ID is the identifier of the pending pairing request, which is different from the device ID assigned after pairing.
-</Warning>
+## Path parameters
 
 <ParamField path="requestId" type="string" required>
-  The unique identifier of the pending pairing request to approve.
+  The `request_id` from `GET /api/v1/devices` (under `pending`).
 </ParamField>
 
-<ParamField body="latest" type="boolean" optional default={false}>
-  If true, approves only the most recent request from this device. Prevents approval of stale requests.
+## Body parameters
+
+<ParamField body="latest" type="boolean" default="false">
+  When `true`, approves the most recent pending request for the device's identity rather than the specific request ID. Useful when the user re-initiated pairing after a stale request and the request ID drifted.
 </ParamField>
+
+## Response
+
+<ResponseField name="message" type="string">
+  Confirmation string from the OpenClaw CLI (e.g. `"Device approved"`).
+</ResponseField>
 
 <RequestExample>
 
 ```bash cURL
-curl -X POST https://alfred.black/api/v1/devices/req_7k9m3p2q1/approve \
+curl -X POST https://alfred.black/api/v1/devices/req-91a3/approve \
   -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
-  -d '{
-    "latest": true
-  }'
+  -d '{}'
 ```
 
-```bash Without Options
-curl -X POST https://alfred.black/api/v1/devices/req_7k9m3p2q1/approve \
-  -H "Authorization: Bearer alf_your_key_here"
+```bash With --latest
+curl -X POST https://alfred.black/api/v1/devices/req-91a3/approve \
+  -H "Authorization: Bearer alf_your_key_here" \
+  -H "Content-Type: application/json" \
+  -d '{"latest": true}'
 ```
 
 </RequestExample>
 
 <ResponseExample>
 
-```json Response
+```json 200 OK
 {
   "message": "Device approved"
 }
@@ -46,6 +52,6 @@ curl -X POST https://alfred.black/api/v1/devices/req_7k9m3p2q1/approve \
 
 </ResponseExample>
 
-<ResponseField name="message" type="string">
-  A status message confirming the device was approved.
-</ResponseField>
+<Warning>
+  Approval is irrevocable in the sense that the device receives a real token. If you later change your mind, use [`POST /api/v1/devices/{deviceId}/revoke`](/api-reference/devices/revoke) to invalidate the role.
+</Warning>

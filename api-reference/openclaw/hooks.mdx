@@ -1,12 +1,14 @@
 ---
-title: "List Hooks"
-description: "List configured hooks"
+title: "List hooks"
+description: "Show event hooks registered with the OpenClaw gateway."
 api: "GET /api/v1/openclaw/hooks"
 ---
 
-List all event hooks configured on your instance's agent gateway. Hooks let you trigger custom actions in response to agent events, such as sending notifications when a vault operation completes.
+Lists OpenClaw event hooks. Hooks fire on gateway events (a session starts, a tool call completes, an agent emits a particular signal) and run small handler scripts in response. Alfred uses one such hook — `alfred-learn-observer` — to capture user instructions, corrections, and confirmations into the learning pipeline.
 
-The response is returned as structured JSON when available, or as raw text in a `raw` field.
+## How it works
+
+ctrl-API shells into OpenClaw and runs `openclaw hooks`. JSON output is forwarded; non-JSON text is returned in a `raw` field.
 
 <RequestExample>
 
@@ -19,13 +21,15 @@ curl -X GET https://alfred.black/api/v1/openclaw/hooks \
 
 <ResponseExample>
 
-```json Structured Response
+```json Structured
 {
-  "...": "Structure depends on gateway hooks output"
+  "hooks": [
+    { "name": "alfred-learn-observer", "events": ["message.user", "message.assistant"] }
+  ]
 }
 ```
 
-```json Raw Response
+```json Raw fallback
 {
   "raw": "No hooks registered"
 }
@@ -34,5 +38,5 @@ curl -X GET https://alfred.black/api/v1/openclaw/hooks \
 </ResponseExample>
 
 <Note>
-  The response format depends on the gateway's output. If the gateway returns valid JSON, it is passed through as-is. Otherwise, the raw text is returned in a `raw` field.
+  Hook handlers must be written as ESM modules (`export default handler`). CJS handlers fail silently.
 </Note>

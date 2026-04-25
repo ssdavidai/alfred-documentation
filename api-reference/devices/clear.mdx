@@ -1,37 +1,44 @@
 ---
-title: "Clear Devices"
-description: "Bulk clear pending or all devices"
+title: "Clear devices"
+description: "Bulk-clear pending pairing requests, or every device entry."
 api: "POST /api/v1/devices/clear"
 ---
 
-Clears multiple devices at once. You can clear only pending pairing requests or remove all devices (both pending and paired).
+Bulk operation for tidying up the device list. By default it clears **everything** — paired devices and pending requests alike. Use the `pending_only` flag to keep paired devices and only sweep the pending queue.
 
-<ParamField body="pending_only" type="boolean" optional>
-  If true, only clears pending device requests. If omitted or false, clears all devices.
+## Body parameters
+
+<ParamField body="pending_only" type="boolean" default="false">
+  When `true`, only pending pairing requests are removed. Paired devices remain intact. Strongly recommended unless you intend a full reset.
 </ParamField>
+
+## Response
+
+<ResponseField name="message" type="string">
+  Confirmation string from the OpenClaw CLI (e.g. `"Devices cleared"`).
+</ResponseField>
 
 <RequestExample>
 
-```bash Clear Pending Only
+```bash Clear pending only
 curl -X POST https://alfred.black/api/v1/devices/clear \
   -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
-  -d '{
-    "pending_only": true
-  }'
+  -d '{"pending_only": true}'
 ```
 
-```bash Clear All
+```bash Clear everything (destructive)
 curl -X POST https://alfred.black/api/v1/devices/clear \
   -H "Authorization: Bearer alf_your_key_here" \
-  -H "Content-Type: application/json"
+  -H "Content-Type: application/json" \
+  -d '{}'
 ```
 
 </RequestExample>
 
 <ResponseExample>
 
-```json Response
+```json 200 OK
 {
   "message": "Devices cleared"
 }
@@ -39,6 +46,6 @@ curl -X POST https://alfred.black/api/v1/devices/clear \
 
 </ResponseExample>
 
-<ResponseField name="message" type="string">
-  A status message confirming the devices were cleared.
-</ResponseField>
+<Warning>
+  Calling this without `pending_only` removes every paired device. Sir's phone, dashboard sessions, and any agent-side credentials will all need to be re-paired. Reach for this only during a deliberate reset.
+</Warning>

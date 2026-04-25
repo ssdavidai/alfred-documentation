@@ -1,12 +1,20 @@
 ---
-title: "Restart Gateway"
-description: "Restart the agent gateway"
+title: "Restart gateway"
+description: "Restart the OpenClaw container."
 api: "POST /api/v1/openclaw/restart"
 ---
 
-Restart your instance's agent gateway. This is useful when you need to pick up configuration changes or recover from an error state.
+Restarts the OpenClaw container in your Alfred instance. Use this after editing `openclaw.json` directly, after rotating provider credentials, or as a last-resort recovery if Alfred has stopped responding. All in-flight sessions are interrupted.
 
-All active agent connections will be terminated during the restart. Running sessions will need to reconnect once the gateway is back online.
+## How it works
+
+ctrl-API runs `docker compose restart openclaw` against your tenant's compose file. The container comes back in roughly 30–60 seconds on a cx53 Hetzner VPS.
+
+## Response
+
+<ResponseField name="message" type="string">
+  Confirmation that the restart command was issued. Restart itself happens asynchronously inside Docker.
+</ResponseField>
 
 <RequestExample>
 
@@ -19,10 +27,18 @@ curl -X POST https://alfred.black/api/v1/openclaw/restart \
 
 <ResponseExample>
 
-```json Response
+```json 200 OK
 {
   "message": "OpenClaw container restarted"
 }
 ```
 
 </ResponseExample>
+
+<Warning>
+  Any active conversation Sir is having with Alfred will be cut. Background workflows that depend on the gateway will fail and retry until the gateway is back up. Avoid restarting during active onboarding or chore generation runs.
+</Warning>
+
+<Note>
+  After issuing the restart, poll `GET /api/v1/openclaw/health` (or `/ready`) until the gateway returns success.
+</Note>

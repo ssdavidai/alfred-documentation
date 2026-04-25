@@ -1,41 +1,44 @@
 ---
-title: "Stop Service"
-description: "Stop a specific service on your instance"
+title: "Stop container"
+description: "Stop a running container in the tenant Docker stack."
 api: "POST /api/v1/admin/containers/{service}/stop"
 ---
 
-Stop a running service on your Alfred instance. The service will remain stopped until you start it again.
+Stops the named compose service via `docker compose stop <service>`. The container stays stopped until you call the start endpoint — Docker Compose's restart policy is suppressed for stopped containers.
 
-## Path Parameters
+## Path parameters
 
 <ParamField path="service" type="string" required>
-  The service name to stop (e.g., "worker", "openclaw", "temporal"). Must contain only alphanumeric characters, hyphens, or underscores.
+  Compose service id. Must match `[a-zA-Z0-9_-]+`. Common values: `alfred`, `openclaw`, `openclaw-workers`, `alfred-learn`, `temporal`, `ollama`.
 </ParamField>
+
+## Response
+
+<ResponseField name="message" type="string">Confirmation that the stop was issued.</ResponseField>
+
+## Errors
+
+`400 Bad Request` — `service` contains invalid characters.
 
 <RequestExample>
 
-```bash curl
-# Stop the Alfred worker
-curl -X POST -H "Authorization: Bearer alf_your_key_here" \
-  /api/v1/admin/containers/worker/stop
-
-# Stop Temporal UI
-curl -X POST -H "Authorization: Bearer alf_your_key_here" \
-  /api/v1/admin/containers/temporal-ui/stop
+```bash cURL
+curl -X POST https://alfred.black/api/v1/admin/containers/openclaw-workers/stop \
+  -H "Authorization: Bearer alf_your_key_here"
 ```
 
 </RequestExample>
 
 <ResponseExample>
 
-```json
+```json 200 OK
 {
-  "message": "Container \"worker\" stopped"
+  "message": "Container \"openclaw-workers\" stopped"
 }
 ```
 
 </ResponseExample>
 
 <Warning>
-  Stopping the worker service will halt all Alfred daemons (curator, janitor, distiller). Stopping temporal will prevent workflow execution.
+  Stopping `alfred` halts every vault worker daemon (curator, janitor, distiller, surveyor). Stopping `openclaw` takes Alfred himself offline. Stopping `temporal` halts every scheduled workflow including chores. Reach for stop only when you know you'll start the container again shortly — for everything else, `restart` is safer.
 </Warning>

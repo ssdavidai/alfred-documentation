@@ -1,52 +1,46 @@
 ---
-title: "List Agents"
-description: "Get the model configuration and status for all agents."
+title: "List agents"
+description: "Show every agent on this instance with its label and description."
 api: "GET /api/v1/admin/agents"
 ---
 
-Returns a summary of every agent on your instance. This includes the four OpenClaw agents (Alfred, Curator, Janitor, Distiller) and the Surveyor pipeline configuration.
+Returns a lightweight summary of every agent on your Alfred instance, plus the surveyor pipeline configuration. This is the cheap, no-`docker exec` endpoint that the dashboard polls to render the Agents page.
 
-Use [Get Agent](/api-reference/agents/get-agent) to retrieve the full model status for a single agent.
+For per-agent model resolution, fallbacks, and provider auth status, drill into a specific agent with [`GET /api/v1/admin/agents/{agentId}`](/api-reference/agents/get-agent).
 
 ## Response
 
 <ResponseField name="agents" type="array">
-  List of agent summary objects, one per OpenClaw agent.
+  Every OpenClaw agent on the instance.
 
-  <Expandable title="Agent object properties">
+  <Expandable title="Agent fields">
     <ResponseField name="id" type="string">
-      Agent identifier. One of `main`, `vault-curator`, `vault-janitor`, `vault-distiller`.
+      Stable identifier — one of `main`, `learn-clerk`, `vault-curator`, `vault-janitor`, `vault-distiller`.
     </ResponseField>
-
     <ResponseField name="label" type="string">
-      Human-readable agent name (e.g., "Alfred", "Curator").
+      Human-readable name (e.g. `"Alfred"`, `"Curator"`).
     </ResponseField>
-
     <ResponseField name="description" type="string">
-      Brief description of what the agent does.
+      One-line description of the agent's role.
     </ResponseField>
   </Expandable>
 </ResponseField>
 
 <ResponseField name="surveyor" type="object">
-  Surveyor pipeline model configuration (configured via `config.yaml`, not OpenClaw).
+  Surveyor pipeline configuration, read from `config.yaml`.
 
-  <Expandable title="Surveyor object properties">
+  <Expandable title="Surveyor fields">
     <ResponseField name="labeler_model" type="string">
-      Model used for cluster labeling. Defaults to `x-ai/grok-4.1-fast`.
+      Model used for cluster labelling. Defaults to `x-ai/grok-4.1-fast`.
     </ResponseField>
-
     <ResponseField name="embedder_model" type="string">
-      Model used for embedding vault records. Defaults to `nomic-embed-text`.
+      Embedding model. Defaults to `nomic-embed-text`.
     </ResponseField>
-
     <ResponseField name="embedder_source" type="string">
-      Where embeddings are generated. Either `ollama` (local) or `openrouter` (remote).
+      Where embeddings come from — `ollama` (local) or `openrouter` (remote).
     </ResponseField>
   </Expandable>
 </ResponseField>
-
-## Request Example
 
 <RequestExample>
 
@@ -55,47 +49,18 @@ curl -X GET https://alfred.black/api/v1/admin/agents \
   -H "Authorization: Bearer alf_your_key_here"
 ```
 
-```javascript JavaScript
-const response = await fetch('https://alfred.black/api/v1/admin/agents', {
-  method: 'GET',
-  headers: {
-    'Authorization': 'Bearer alf_your_key_here'
-  }
-});
-
-const data = await response.json();
-console.log(data.agents);
-```
-
 </RequestExample>
-
-## Response Example
 
 <ResponseExample>
 
 ```json 200 OK
 {
   "agents": [
-    {
-      "id": "main",
-      "label": "Alfred",
-      "description": "Default agent for device interactions"
-    },
-    {
-      "id": "vault-curator",
-      "label": "Curator",
-      "description": "Processes inbox into structured vault records"
-    },
-    {
-      "id": "vault-janitor",
-      "label": "Janitor",
-      "description": "Scans vault for structural issues and fixes them"
-    },
-    {
-      "id": "vault-distiller",
-      "label": "Distiller",
-      "description": "Extracts latent knowledge from operational records"
-    }
+    { "id": "main",            "label": "Alfred",    "description": "Default agent for device interactions" },
+    { "id": "learn-clerk",     "label": "Clerk",     "description": "Stateless LLM worker for learning workflows" },
+    { "id": "vault-curator",   "label": "Curator",   "description": "Processes inbox into structured vault records" },
+    { "id": "vault-janitor",   "label": "Janitor",   "description": "Fixes structural vault issues" },
+    { "id": "vault-distiller", "label": "Distiller", "description": "Extracts latent knowledge from records" }
   ],
   "surveyor": {
     "labeler_model": "x-ai/grok-4.1-fast",
@@ -105,13 +70,8 @@ console.log(data.agents);
 }
 ```
 
-```json 401 Unauthorized
-{
-  "error": {
-    "code": "UNAUTHORIZED",
-    "message": "Unauthorized"
-  }
-}
-```
-
 </ResponseExample>
+
+<Note>
+  This endpoint is intentionally lightweight — no `docker exec` involved. To check whether an agent's configured model has working credentials, call the per-agent endpoint.
+</Note>

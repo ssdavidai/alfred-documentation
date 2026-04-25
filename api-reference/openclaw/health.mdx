@@ -1,12 +1,18 @@
 ---
-title: "Gateway Health"
-description: "Check agent gateway health"
+title: "Gateway health"
+description: "Quick liveness probe for the OpenClaw gateway."
 api: "GET /api/v1/openclaw/health"
 ---
 
-Check whether your instance's agent gateway is running and responsive. Use this endpoint for uptime monitoring or automated health checks.
+Reports liveness for the OpenClaw gateway running inside your Alfred instance. OpenClaw is the AI gateway every agent talks through — Alfred himself, the vault workers, and any background subagents. If this endpoint isn't healthy, nothing else that needs an LLM will be either.
 
-The response is returned as structured JSON when available, or as raw text in a `raw` field.
+## How it works
+
+ctrl-API shells into the OpenClaw container and runs `openclaw gateway health`. The output is parsed as JSON and returned. If the CLI emits non-JSON, the raw text is wrapped in a `raw` field.
+
+## Response
+
+The exact shape comes from the OpenClaw CLI. Expect a small object describing process status, configured providers, and basic checks. When the CLI is mid-restart and produces text, the response degrades to `{ "raw": "..." }`.
 
 <RequestExample>
 
@@ -19,13 +25,15 @@ curl -X GET https://alfred.black/api/v1/openclaw/health \
 
 <ResponseExample>
 
-```json Structured Response
+```json Structured
 {
-  "...": "Structure depends on gateway health output"
+  "ok": true,
+  "uptime_seconds": 3284,
+  "providers_loaded": ["openrouter", "anthropic", "google", "xai"]
 }
 ```
 
-```json Raw Response
+```json Raw fallback
 {
   "raw": "Gateway is healthy"
 }
@@ -34,5 +42,5 @@ curl -X GET https://alfred.black/api/v1/openclaw/health \
 </ResponseExample>
 
 <Note>
-  The response format depends on the gateway's output. If the gateway returns valid JSON, it is passed through as-is. Otherwise, the raw text is returned in a `raw` field.
+  For a fast, dashboard-style readiness check that is aware of in-flight gateway restarts (e.g. after Sir connects a new Composio app), prefer `GET /api/v1/openclaw/ready` — it returns within ~1.5s and tells you when to expect the gateway back.
 </Note>

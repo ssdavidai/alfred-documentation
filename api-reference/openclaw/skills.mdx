@@ -1,12 +1,14 @@
 ---
-title: "List Skills"
-description: "List available agent skills"
+title: "List skills"
+description: "Show every skill loaded into the OpenClaw workspace."
 api: "GET /api/v1/openclaw/skills"
 ---
 
-List all agent skills available on your instance. Skills define what your AI agents can do -- for example, `vault-curator`, `vault-janitor`, and `vault-distiller` are the built-in Alfred skills.
+Lists the skills available to Alfred and the vault workers. Skills are the prompt-and-procedure bundles that tell each agent how to do its job — for example, `alfred-vault-operations` for the main agent, `vault-curator` for the curator worker, or any per-app Composio skill that's been generated when Sir connected an integration.
 
-The response is returned as structured JSON when available, or as raw text in a `raw` field.
+## How it works
+
+ctrl-API shells into OpenClaw and runs `openclaw skills`. JSON output is forwarded; non-JSON text is returned in a `raw` field.
 
 <RequestExample>
 
@@ -19,13 +21,20 @@ curl -X GET https://alfred.black/api/v1/openclaw/skills \
 
 <ResponseExample>
 
-```json Structured Response
+```json Structured
 {
-  "...": "Structure depends on gateway skills output"
+  "skills": [
+    { "name": "alfred-vault-operations", "agent": "main" },
+    { "name": "alfred-chore-management", "agent": "main" },
+    { "name": "alfred-email-channel", "agent": "main" },
+    { "name": "vault-curator", "agent": "vault-curator" },
+    { "name": "vault-janitor", "agent": "vault-janitor" },
+    { "name": "vault-distiller", "agent": "vault-distiller" }
+  ]
 }
 ```
 
-```json Raw Response
+```json Raw fallback
 {
   "raw": "vault-curator, vault-janitor, vault-distiller"
 }
@@ -34,5 +43,5 @@ curl -X GET https://alfred.black/api/v1/openclaw/skills \
 </ResponseExample>
 
 <Note>
-  The response format depends on the gateway's output. If the gateway returns valid JSON, it is passed through as-is. Otherwise, the raw text is returned in a `raw` field.
+  Two sources populate this list. Vault-worker skills (`vault-curator`, `vault-janitor`, `vault-distiller`) come from the Alfred Python package. Main-agent skills (`alfred-*`) and per-app Composio skills come from the platform workspace template, copied in by the init container on every boot.
 </Note>

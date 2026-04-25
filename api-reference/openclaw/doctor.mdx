@@ -1,12 +1,14 @@
 ---
-title: "Run Diagnostics"
-description: "Run diagnostics on the agent gateway"
+title: "Run doctor"
+description: "Run OpenClaw's self-diagnostic and auto-repair routine."
 api: "POST /api/v1/openclaw/doctor"
 ---
 
-Run a comprehensive diagnostic check on your instance's agent gateway. This performs health checks across all gateway components and attempts to auto-fix common issues it finds.
+Runs the OpenClaw `doctor` command — a self-check that audits the gateway's configuration, verifies provider credentials, checks tool wiring, and attempts safe auto-fixes for common drift. Use it after a manual config edit, after upgrading the OpenClaw image, or when something feels off but `health` still reports green.
 
-The response is returned as structured JSON when available, or as raw text in a `raw` field.
+## How it works
+
+ctrl-API shells into OpenClaw and runs `openclaw doctor`. JSON output is forwarded; non-JSON text is returned in a `raw` field.
 
 <RequestExample>
 
@@ -19,13 +21,19 @@ curl -X POST https://alfred.black/api/v1/openclaw/doctor \
 
 <ResponseExample>
 
-```json Structured Response
+```json Structured
 {
-  "...": "Structure depends on gateway doctor output"
+  "checks": [
+    { "name": "config.parses",      "status": "pass" },
+    { "name": "providers.reachable", "status": "pass" },
+    { "name": "tools.allowlist",     "status": "pass" }
+  ],
+  "fixed": [],
+  "warnings": []
 }
 ```
 
-```json Raw Response
+```json Raw fallback
 {
   "raw": "All checks passed"
 }
@@ -34,5 +42,5 @@ curl -X POST https://alfred.black/api/v1/openclaw/doctor \
 </ResponseExample>
 
 <Note>
-  The response format depends on the gateway's output. If the gateway returns valid JSON, it is passed through as-is. Otherwise, the raw text is returned in a `raw` field.
+  Doctor is read-mostly. Auto-fixes are limited to safe, reversible changes such as repairing a malformed tool entry or re-syncing the gateway token. It will never delete user data or rotate credentials.
 </Note>
