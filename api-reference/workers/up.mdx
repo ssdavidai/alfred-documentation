@@ -1,39 +1,43 @@
 ---
 title: "Start Workers"
-description: "Start all AI agents"
+description: "Bring up the worker daemons inside the alfred container."
 api: "POST /api/v1/workers/up"
 ---
 
-Starts your AI agents. You can optionally start only specific agents by providing a comma-separated list.
+Starts the worker daemons (`alfred up --foreground`). All configured daemons start by default; pass `only` to start a subset.
+
+The container itself is already running — this command boots the daemon supervisor process inside it. If the daemon is already up, the call returns the existing supervisor's status text.
+
+## Authentication
+
+Bearer token in the `Authorization` header. See [Authentication](/api-reference/authentication).
+
+## Request body
 
 <ParamField body="only" type="string" optional>
-  Comma-separated list of agents to start. Valid values: `curator`, `janitor`, `distiller`. If omitted, all configured agents will start.
-
-  Example: `"curator,janitor"`
+  Comma-separated list of daemon names to start. Valid names today: `curator`, `janitor`, `distiller`, `surveyor`. Omit to start every configured daemon.
 </ParamField>
 
 <RequestExample>
 
-```bash Start All Agents
+```bash Start everything
 curl -X POST https://alfred.black/api/v1/workers/up \
   -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json"
 ```
 
-```bash Start Specific Agents
+```bash Start only Curator and Janitor
 curl -X POST https://alfred.black/api/v1/workers/up \
   -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
-  -d '{
-    "only": "curator,janitor"
-  }'
+  -d '{"only": "curator,janitor"}'
 ```
 
 </RequestExample>
 
 <ResponseExample>
 
-```json Response
+```json 200
 {
   "message": "Workers started"
 }
@@ -42,5 +46,15 @@ curl -X POST https://alfred.black/api/v1/workers/up \
 </ResponseExample>
 
 <ResponseField name="message" type="string">
-  Confirmation that agents have been started.
+  Trimmed stdout of `alfred up`, or the literal string `"Workers started"` if the CLI returned no output.
 </ResponseField>
+
+## When to use
+
+- After applying a config change that the daemon supervisor must re-read.
+- After [`POST /api/v1/workers/down`](/api-reference/workers/down) was used to stop the daemons for maintenance.
+- During first-boot bring-up if the supervisor failed to auto-start.
+
+<Note>
+  This does not restart the `alfred` Docker container itself. For that, use [`POST /api/v1/workers/restart`](/api-reference/workers/restart).
+</Note>

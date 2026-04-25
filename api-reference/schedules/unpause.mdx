@@ -1,35 +1,60 @@
 ---
 title: "Unpause Schedule"
-description: "Resume a paused workflow schedule"
+description: "Resume a paused Temporal schedule."
 api: "POST /api/v1/schedules/{schId}/unpause"
 ---
 
-Resume a paused workflow schedule. Once unpaused, the schedule will begin executing again according to its configured cron expression.
+Resumes a paused schedule. Wraps `temporal schedule update --schedule-id <id> --unpause`. The schedule begins firing on its next cron tick.
+
+## Authentication
+
+Bearer token in the `Authorization` header.
+
+## Path parameters
 
 <ParamField path="schId" type="string" required>
-  The schedule ID to unpause
+  Schedule ID to unpause.
 </ParamField>
 
+## Request body
+
 <ParamField body="reason" type="string" optional>
-  Human-readable reason for unpausing. Recorded on the schedule for reference.
+  Free-text rationale recorded on the schedule's notes field via Temporal's `--reason` flag.
 </ParamField>
 
 <RequestExample>
-```bash cURL
-curl -X POST \
+
+```bash With reason
+curl -X POST https://alfred.black/api/v1/schedules/al-judgment/unpause \
   -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
-  -d '{
-    "reason": "Vault migration complete"
-  }' \
-  /api/v1/schedules/curator-hourly/unpause
+  -d '{"reason": "Maintenance window complete"}'
 ```
+
+```bash No reason
+curl -X POST https://alfred.black/api/v1/schedules/al-judgment/unpause \
+  -H "Authorization: Bearer alf_your_key_here" \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
+
 </RequestExample>
 
 <ResponseExample>
+
 ```json 200
 {
   "message": "Schedule unpaused"
 }
 ```
+
 </ResponseExample>
+
+## When to use
+
+- Resuming a schedule after a paused maintenance window.
+- Re-enabling a chore once its underlying activity is fixed.
+
+<Note>
+  Unpausing does not retroactively run missed fires. If those need to be made up, call [`trigger`](/api-reference/schedules/trigger) once per missed run.
+</Note>

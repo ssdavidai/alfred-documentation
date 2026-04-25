@@ -1,33 +1,63 @@
 ---
 title: "Cancel Workflow"
-description: "Request graceful cancellation of a workflow"
+description: "Request graceful cancellation of a Temporal workflow."
 api: "POST /api/v1/workflows/{wfId}/cancel"
 ---
 
-Request graceful cancellation of a running workflow. Unlike [terminate](/api-reference/workflows/terminate), cancellation allows the workflow to execute cleanup logic before stopping.
+Sends a cancellation request to a running workflow. Wraps `temporal workflow cancel --workflow-id <id>`. The workflow observes the cancel signal at its next `await` point and is expected to release resources, write a final record, and return.
+
+This is the gentle counterpart to [`terminate`](/api-reference/workflows/terminate): cancel allows cleanup, terminate kills outright.
+
+## Authentication
+
+Bearer token in the `Authorization` header.
+
+## Path parameters
 
 <ParamField path="wfId" type="string" required>
-  The workflow ID to cancel
+  Workflow ID to cancel.
 </ParamField>
 
+## Request body
+
 <ParamField body="run_id" type="string" optional>
-  Specific run ID to cancel. If omitted, cancels the most recent run.
+  Pin to a specific run. Omit to cancel the latest run.
 </ParamField>
 
 <RequestExample>
-```bash cURL
-curl -X POST \
+
+```bash Default run
+curl -X POST https://alfred.black/api/v1/workflows/al-task-runner-run/cancel \
   -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
-  -d '{}' \
-  /api/v1/workflows/curator-sweep-20260226-143022/cancel
+  -d '{}'
 ```
+
+```bash Specific run
+curl -X POST https://alfred.black/api/v1/workflows/al-task-runner-run/cancel \
+  -H "Authorization: Bearer alf_your_key_here" \
+  -H "Content-Type: application/json" \
+  -d '{"run_id": "9b8e7f6a-5d4c-3b2a-1f0e-9d8c7b6a5f4e"}'
+```
+
 </RequestExample>
 
 <ResponseExample>
+
 ```json 200
 {
   "message": "Workflow cancelled"
 }
 ```
+
 </ResponseExample>
+
+## When to use
+
+- Stopping a long-running workflow that needs to write a final state record.
+- Aborting a workflow whose downstream resource (e.g. open file handle) must be released.
+- Routine "stop this run" cases where cleanup matters.
+
+<Note>
+  Cancel only delivers the request — the workflow may take time to observe it. If the workflow ignores cancellation, it will not actually stop. Use [`terminate`](/api-reference/workflows/terminate) for hard kills.
+</Note>

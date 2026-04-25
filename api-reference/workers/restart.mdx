@@ -1,14 +1,16 @@
 ---
 title: "Restart Workers"
-description: "Restart all AI agents"
+description: "Restart the alfred Docker container."
 api: "POST /api/v1/workers/restart"
 ---
 
-Performs a full restart of all AI agents. Use this to apply configuration changes or recover from errors.
+Issues `docker compose restart alfred` against the tenant's compose stack. The container is recreated, every daemon is started fresh, and any new code or config baked into the image takes effect.
 
-<Info>
-  This operation will cause brief downtime (typically 10-30 seconds) while the agents restart.
-</Info>
+This is heavier than [`down`](/api-reference/workers/down) + [`up`](/api-reference/workers/up): expect roughly 10–30 seconds of downtime while the container restarts.
+
+## Authentication
+
+Bearer token in the `Authorization` header.
 
 <RequestExample>
 
@@ -22,7 +24,7 @@ curl -X POST https://alfred.black/api/v1/workers/restart \
 
 <ResponseExample>
 
-```json Response
+```json 200
 {
   "message": "Alfred container restarted"
 }
@@ -31,5 +33,15 @@ curl -X POST https://alfred.black/api/v1/workers/restart \
 </ResponseExample>
 
 <ResponseField name="message" type="string">
-  Confirmation that the restart completed successfully.
+  Always `"Alfred container restarted"` on success. The endpoint waits for the compose command to exit before returning.
 </ResponseField>
+
+## When to use
+
+- After pulling a new `alfred-worker` image.
+- After editing files mounted from `/mnt/encrypted/openclaw` that the worker reads at boot only.
+- To recover from a daemon that won't respond to `down` cleanly.
+
+<Warning>
+  Workflows that restart the `alfred` container from inside an activity (for example chore-template reloads) frequently appear to fail with a Temporal heartbeat timeout because the activity kills its own runtime. The restart still succeeds — verify with [`GET /api/v1/workers/status`](/api-reference/workers/status) and ignore the heartbeat error.
+</Warning>

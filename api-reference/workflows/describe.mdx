@@ -1,52 +1,71 @@
 ---
 title: "Describe Workflow"
-description: "Get detailed information about a specific workflow execution"
+description: "Fetch full details for a specific Temporal workflow execution."
 api: "GET /api/v1/workflows/{wfId}"
 ---
 
-Retrieve detailed information about a specific workflow execution, including its configuration, current status, and timing. If no `run_id` is specified, the most recent run is returned.
+Returns Temporal's `workflow describe` payload for a given workflow ID. Includes execution config, current status, parent workflow info (if any), pending activities, and timing. Wraps `temporal workflow describe --workflow-id <id> --output json`.
+
+If the workflow ID has multiple runs, the most recent is returned by default. Pass `run_id` to pin to a specific run.
+
+## Authentication
+
+Bearer token in the `Authorization` header.
+
+## Path parameters
 
 <ParamField path="wfId" type="string" required>
-  The workflow ID to describe
+  Temporal workflow ID. URL-encoded if it contains slashes or other reserved characters.
 </ParamField>
 
+## Query parameters
+
 <ParamField query="run_id" type="string" optional>
-  Specific run ID to describe. If omitted, describes the most recent run of this workflow ID.
+  Specific run ID to describe. Omit to describe the latest run for this workflow ID.
 </ParamField>
 
 <RequestExample>
-```bash cURL
-# Describe latest run
-curl -X GET \
-  -H "Authorization: Bearer alf_your_key_here" \
-  /api/v1/workflows/curator-sweep-20260226-143022
 
-# Describe specific run
-curl -X GET \
-  -H "Authorization: Bearer alf_your_key_here" \
-  "/api/v1/workflows/curator-sweep-20260226-143022?run_id=f47ac10b-58cc-4372-a567-0e02b2c3d479"
+```bash Latest run
+curl -X GET https://alfred.black/api/v1/workflows/al-judgment-run \
+  -H "Authorization: Bearer alf_your_key_here"
 ```
+
+```bash Specific run
+curl -X GET "https://alfred.black/api/v1/workflows/al-judgment-run?run_id=f47ac10b-58cc-4372-a567-0e02b2c3d479" \
+  -H "Authorization: Bearer alf_your_key_here"
+```
+
 </RequestExample>
 
 <ResponseExample>
+
 ```json 200
 {
   "executionConfig": {
-    "taskQueue": {
-      "name": "alfred-curator"
-    }
+    "taskQueue": {"name": "alfred-learn"}
   },
   "workflowExecutionInfo": {
     "execution": {
-      "workflowId": "curator-sweep-20260226-143022",
+      "workflowId": "al-judgment-run",
       "runId": "f47ac10b-58cc-4372-a567-0e02b2c3d479"
     },
-    "type": {
-      "name": "CuratorWorkflow"
-    },
-    "startTime": "2026-02-26T14:30:22.154Z",
+    "type": {"name": "JudgmentWorkflow"},
+    "startTime": "2026-04-25T09:14:00Z",
     "status": "WORKFLOW_EXECUTION_STATUS_RUNNING"
-  }
+  },
+  "pendingActivities": []
 }
 ```
+
 </ResponseExample>
+
+## When to use
+
+- Diagnosing why a workflow is stuck in `RUNNING`.
+- Inspecting input arguments captured at start time.
+- Confirming a workflow ran on the expected task queue.
+
+<Note>
+  Output is whatever Temporal emits. The endpoint first attempts to parse it as a single JSON document, falling back to JSONL parsing on failure.
+</Note>

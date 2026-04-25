@@ -1,24 +1,30 @@
 ---
-title: "Get Extraction History"
-description: "View Distiller extraction history"
+title: "Distiller Run History"
+description: "List the most recent Distiller extraction runs."
 api: "GET /api/v1/workers/distiller/history"
 ---
 
-Returns a chronological history of Distiller extraction runs, including how many candidates were found and learnings were extracted in each run.
+Returns the most recent Distiller runs in reverse chronological order, with per-type record counts for each. Wraps `alfred distiller history --limit <N>`.
 
-<ParamField query="limit" type="number" default={10}>
-  Maximum number of run records to return.
+## Authentication
+
+Bearer token in the `Authorization` header.
+
+## Query parameters
+
+<ParamField query="limit" type="string" optional default="10">
+  Maximum number of runs to return. Passed through to the CLI as a string.
 </ParamField>
 
 <RequestExample>
 
-```bash Default Limit
+```bash Default (10 runs)
 curl -X GET https://alfred.black/api/v1/workers/distiller/history \
   -H "Authorization: Bearer alf_your_key_here"
 ```
 
-```bash Custom Limit
-curl -X GET "/api/v1/workers/distiller/history?limit=25" \
+```bash Last 25 runs
+curl -X GET "https://alfred.black/api/v1/workers/distiller/history?limit=25" \
   -H "Authorization: Bearer alf_your_key_here"
 ```
 
@@ -26,30 +32,41 @@ curl -X GET "/api/v1/workers/distiller/history?limit=25" \
 
 <ResponseExample>
 
-```json Structured Response
+```json 200 Structured
 {
-  "history": [
+  "runs": [
     {
-      "timestamp": "2026-02-26T09:00:00Z",
-      "candidates": 8,
-      "learnings_extracted": 18
+      "run_id": "run-0043",
+      "timestamp": "2026-04-25T09:14:02Z",
+      "candidates_found": 8,
+      "candidates_processed": 8,
+      "records_created": {"assumption": 4, "decision": 6, "constraint": 3}
+    },
+    {
+      "run_id": "run-0042",
+      "timestamp": "2026-04-24T21:00:00Z",
+      "candidates_found": 6,
+      "candidates_processed": 6,
+      "records_created": {"assumption": 2, "decision": 5, "synthesis": 1}
     }
   ]
 }
 ```
 
-```json Raw Response
+```json 200 Raw fallback
 {
-  "raw": "Extraction history (last 10):\n..."
+  "raw": "run_id     timestamp                    found  proc.  records\nrun-0043   2026-04-25T09:14:02Z         8      8      assumption:4 decision:6 constraint:3\nrun-0042   2026-04-24T21:00:00Z         6      6      assumption:2 decision:5 synthesis:1"
 }
 ```
 
 </ResponseExample>
 
-<Note>
-  If the response contains structured JSON, it is returned directly. Otherwise, the output is returned in a `raw` field.
-</Note>
-
 <ResponseField name="raw" type="string">
-  Human-readable output when structured JSON is not available.
+  Trimmed stdout when the CLI did not return JSON. Present only in the fallback case.
 </ResponseField>
+
+## When to use
+
+- Reviewing whether the Distiller daemon's scheduled runs are producing useful learnings.
+- Tracking trends in extraction volume to spot a stalled daemon.
+- Auditing which run produced a specific learning record (cross-reference by timestamp).

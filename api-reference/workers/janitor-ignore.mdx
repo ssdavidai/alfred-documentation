@@ -1,56 +1,75 @@
 ---
-title: "Ignore File"
-description: "Tell Janitor to ignore a file"
+title: "Add Janitor Ignore"
+description: "Mark a vault file as off-limits for Janitor."
 api: "POST /api/v1/workers/janitor/ignore"
 ---
 
-Adds a file to the Janitor's ignore list, preventing it from being flagged in future scans. Useful for archived files, intentionally broken links, or legacy records you do not want the Janitor to touch.
+Adds a vault-relative path to Janitor's ignore list. Future scans skip the file entirely; it will not appear in issue counts and will never be auto-fixed. Useful for archived material, scratch notes, or files where Janitor's heuristics produce false positives.
+
+## Authentication
+
+Bearer token in the `Authorization` header.
+
+## Request body
 
 <ParamField body="file" type="string" required>
-  Vault-relative path to the file to ignore. Must be an existing vault file.
-
-  Example: `"projects/archive/legacy-project.md"`
+  Vault-relative path of the file to ignore (for example `archive/legacy-project.md`). Returns `400` if missing.
 </ParamField>
 
 <ParamField body="reason" type="string" optional>
-  Human-readable reason for ignoring this file.
-
-  Example: `"Archived project with intentional broken links"`
+  Free-text rationale recorded alongside the ignore entry. Surfaces in `janitor status` audit output.
 </ParamField>
 
 <RequestExample>
 
-```bash With Reason
+```bash With reason
 curl -X POST https://alfred.black/api/v1/workers/janitor/ignore \
   -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
   -d '{
-    "file": "projects/archive/legacy-integration.md",
-    "reason": "Archived project, broken links are intentional"
+    "file": "archive/2024-acme-project.md",
+    "reason": "Archived; intentional broken links to retired entities"
   }'
 ```
 
-```bash Without Reason
+```bash Without reason
 curl -X POST https://alfred.black/api/v1/workers/janitor/ignore \
   -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
-  -d '{
-    "file": "notes/scratch-pad.md"
-  }'
+  -d '{"file": "notes/scratch.md"}'
 ```
 
 </RequestExample>
 
 <ResponseExample>
 
-```json Response
+```json 200
 {
   "message": "File ignored"
+}
+```
+
+```json 400 Missing file
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "file is required"
+  }
 }
 ```
 
 </ResponseExample>
 
 <ResponseField name="message" type="string">
-  Confirmation that the file has been added to the ignore list.
+  Trimmed stdout of the CLI, or the literal string `"File ignored"` if the CLI returned no output.
 </ResponseField>
+
+## When to use
+
+- Whitelisting a one-off file that Janitor keeps trying to "fix" incorrectly.
+- Quarantining historical material that should not be modified post-import.
+- Preventing Janitor from touching files Sir maintains by hand.
+
+<Note>
+  This endpoint adds files to the ignore list — there is no symmetric "unignore" endpoint. To remove an ignore today, edit the worker state file directly inside the `alfred` container.
+</Note>

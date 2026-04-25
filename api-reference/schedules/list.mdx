@@ -1,46 +1,75 @@
 ---
 title: "List Schedules"
-description: "Retrieve all workflow schedules"
+description: "List every Temporal schedule registered on the tenant."
 api: "GET /api/v1/schedules"
 ---
 
-List all configured workflow schedules for your instance. Returns an array of schedule summaries including their cron expressions, associated workflow types, and paused state.
+Returns every schedule registered against the tenant's Temporal cluster. Wraps `temporal schedule list --output json`.
+
+A typical Alfred tenant boots with these schedules registered by `register_schedules.py` against the `alfred-learn` task queue:
+
+| Schedule ID | Workflow | Cadence |
+|---|---|---|
+| `al-event-processor` | `EventProcessorWorkflow` | every 15 min |
+| `al-session-tracker` | `SessionTrackerWorkflow` | every 15 min |
+| `al-learning` | `LearningWorkflow` | every 15 min |
+| `al-judgment` | `JudgmentWorkflow` | every 15 min |
+| `al-task-runner` | `TaskRunnerWorkflow` | every 15 min |
+| `al-hourly-enrichment` | `HourlyEnrichmentWorkflow` | hourly |
+| `al-omi-processor` | `OmiAudioProcessorWorkflow` | every 10 min |
+| `al-daily-digest` | `DailyDigestWorkflow` | daily 18:00 (tenant TZ) |
+| `al-reflection` | `ReflectionWorkflow` | daily 02:00 (tenant TZ) |
+| `al-nightly-maintenance` | `NightlyMaintenanceWorkflow` | daily 03:00 (tenant TZ) |
+| `al-chore-promotion` | `ChorePromotionReflectionWorkflow` | weekly Sunday 03:00 (tenant TZ) |
+
+Generated chores from the onboarding pipeline and the chore generator add additional schedules with bespoke cron expressions.
+
+## Authentication
+
+Bearer token in the `Authorization` header.
 
 <RequestExample>
+
 ```bash cURL
-curl -X GET \
-  -H "Authorization: Bearer alf_your_key_here" \
-  /api/v1/schedules
+curl -X GET https://alfred.black/api/v1/schedules \
+  -H "Authorization: Bearer alf_your_key_here"
 ```
+
 </RequestExample>
 
 <ResponseExample>
+
 ```json 200
 [
   {
-    "scheduleId": "curator-hourly",
+    "scheduleId": "al-hourly-enrichment",
     "info": {
-      "spec": {
-        "cronExpressions": ["0 * * * *"]
-      },
-      "workflowType": {
-        "name": "CuratorWorkflow"
-      },
-      "paused": false
+      "workflowType": {"name": "HourlyEnrichmentWorkflow"},
+      "paused": false,
+      "recentActions": [
+        {"actualTime": "2026-04-25T09:00:00Z", "scheduleTime": "2026-04-25T09:00:00Z"}
+      ]
     }
   },
   {
-    "scheduleId": "janitor-daily",
+    "scheduleId": "al-daily-digest",
     "info": {
-      "spec": {
-        "cronExpressions": ["0 2 * * *"]
-      },
-      "workflowType": {
-        "name": "JanitorWorkflow"
-      },
-      "paused": false
+      "workflowType": {"name": "DailyDigestWorkflow"},
+      "paused": false,
+      "recentActions": []
     }
   }
 ]
 ```
+
 </ResponseExample>
+
+## When to use
+
+- Powering the dashboard's Schedules tab.
+- Sanity-checking that all expected `al-*` schedules registered on first boot.
+- Auditing chore-generated schedules per tenant.
+
+<Note>
+  The exact JSON shape comes from Temporal's CLI output. The endpoint uses `parseJsonLines`, which tolerates either a JSON array or a JSONL stream.
+</Note>

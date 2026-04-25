@@ -1,10 +1,16 @@
 ---
-title: "Get Janitor Status"
-description: "Get Janitor agent status"
+title: "Janitor Status"
+description: "Sweep counters and ignore-list size for the Janitor daemon."
 api: "GET /api/v1/workers/janitor/status"
 ---
 
-Returns the current status of the Janitor agent, including whether it is running and details about its most recent vault health scan.
+Returns Janitor's bookkeeping: lifetime sweep counts, the size of its ignore list, and the most recent sweep summary. Wraps `alfred janitor status`.
+
+Janitor is the structural-health worker. It scans every vault file looking for broken links, malformed frontmatter, orphaned records, and other problems, then either reports them (`scan`) or repairs what it can (`fix`).
+
+## Authentication
+
+Bearer token in the `Authorization` header.
 
 <RequestExample>
 
@@ -17,26 +23,37 @@ curl -X GET https://alfred.black/api/v1/workers/janitor/status \
 
 <ResponseExample>
 
-```json Structured Response
+```json 200 Structured
 {
-  "status": "running",
-  "last_sweep": "2026-02-26T10:15:00Z",
-  "issues_found": 12
+  "total_sweeps": 142,
+  "total_files_scanned": 60866,
+  "ignored_files": 5,
+  "fix_log_entries": 38,
+  "files_with_janitor_note": 12,
+  "last_sweep": {
+    "timestamp": "2026-04-25T03:00:12Z",
+    "files_scanned": 423,
+    "issues_found": 7,
+    "files_fixed": 0,
+    "files_deleted": 0
+  }
 }
 ```
 
-```json Raw Response
+```json 200 Raw fallback
 {
-  "raw": "Janitor: running\nLast sweep: 2026-02-26 10:15 (12 issues found)"
+  "raw": "Total sweeps: 142\nIgnored files: 5\nFix log entries: 38\n\nLast sweep: 2026-04-25T03:00:12Z\n  Files scanned: 423\n  Issues found: 7"
 }
 ```
 
 </ResponseExample>
 
-<Note>
-  If the response contains structured JSON, it is returned directly. Otherwise, the output is returned in a `raw` field.
-</Note>
-
 <ResponseField name="raw" type="string">
-  Human-readable output when structured JSON is not available.
+  Trimmed stdout when the CLI did not return JSON. Present only in the fallback case.
 </ResponseField>
+
+## When to use
+
+- Before triggering a manual `janitor/fix` to confirm Janitor is alive and idle.
+- For a dashboard tile showing vault-health drift over time.
+- To pull the ignore-list size when reviewing what Janitor is intentionally not touching.

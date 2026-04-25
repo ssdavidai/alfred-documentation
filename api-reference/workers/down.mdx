@@ -1,10 +1,16 @@
 ---
 title: "Stop Workers"
-description: "Stop all AI agents"
+description: "Gracefully stop the worker daemons."
 api: "POST /api/v1/workers/down"
 ---
 
-Gracefully stops all running AI agents. Any in-progress work will be completed before the agents shut down.
+Stops the worker daemon supervisor inside the `alfred` container (`alfred down`). In-flight work is allowed to settle before exit.
+
+The container itself stays up — only the daemon processes inside it are stopped. Use [`POST /api/v1/workers/up`](/api-reference/workers/up) to bring them back, or [`POST /api/v1/workers/restart`](/api-reference/workers/restart) for a hard container restart.
+
+## Authentication
+
+Bearer token in the `Authorization` header.
 
 <RequestExample>
 
@@ -18,7 +24,7 @@ curl -X POST https://alfred.black/api/v1/workers/down \
 
 <ResponseExample>
 
-```json Response
+```json 200
 {
   "message": "Workers stopped"
 }
@@ -27,5 +33,11 @@ curl -X POST https://alfred.black/api/v1/workers/down \
 </ResponseExample>
 
 <ResponseField name="message" type="string">
-  Confirmation that all agents have been stopped.
+  Trimmed stdout of `alfred down`, or the literal string `"Workers stopped"` if the CLI returned no output.
 </ResponseField>
+
+## When to use
+
+- Before a vault migration that should not race against Curator or Janitor writes.
+- Before swapping `config.yaml` and bringing workers back up cleanly.
+- For temporary quiescing without restarting the container.

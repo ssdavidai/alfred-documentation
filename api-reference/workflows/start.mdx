@@ -1,49 +1,93 @@
 ---
 title: "Start Workflow"
-description: "Start a new workflow execution"
+description: "Start a new Temporal workflow execution."
 api: "POST /api/v1/workflows"
 ---
 
-Start a new workflow execution. Provide the workflow type, task queue, and optional input data. Returns the assigned workflow ID and run ID on success.
+Starts a Temporal workflow. Wraps `temporal workflow start`. The caller specifies the workflow type and task queue; the cluster assigns a run ID and (if no `workflow_id` is supplied) generates a workflow ID.
+
+For new tenants, the typical task queue is `alfred-learn`. Workflow types registered there include `EventProcessorWorkflow`, `SessionTrackerWorkflow`, `LearningWorkflow`, `JudgmentWorkflow`, `ReflectionWorkflow`, `DailyDigestWorkflow`, `HourlyEnrichmentWorkflow`, `TaskRunnerWorkflow`, `OnboardingPipelineWorkflow`, `MediaIngestionWorkflow`, `OmiAudioProcessorWorkflow`, `StreamPullerWorkflow`, `NightlyMaintenanceWorkflow`, `ChorePromotionReflectionWorkflow`, plus per-tenant generated chores (e.g. `WeeklyMatterDigestWorkflow`, `SubscriptionWatcherWorkflow`).
+
+## Authentication
+
+Bearer token in the `Authorization` header.
+
+## Request body
 
 <ParamField body="workflow_type" type="string" required>
-  The workflow type to execute. Must match a registered workflow name.
+  Registered workflow type name. Must match a `@workflow.defn(name="...")` value on the worker.
 </ParamField>
 
 <ParamField body="task_queue" type="string" required>
-  The task queue where this workflow should be executed.
+  Task queue the workflow should be scheduled on. For learn workflows: `alfred-learn`.
 </ParamField>
 
 <ParamField body="workflow_id" type="string" optional>
-  Custom workflow ID. If omitted, a unique ID will be generated.
+  Custom workflow ID. If omitted, Temporal generates a UUID.
 </ParamField>
 
 <ParamField body="input" type="any" optional>
-  Input data for the workflow. Will be JSON-serialized and passed to the workflow.
+  Single workflow input value. Will be JSON-serialized and passed via `--input`.
 </ParamField>
 
 <RequestExample>
-```bash cURL
-curl -X POST \
+
+```bash Manual JudgmentWorkflow run
+curl -X POST https://alfred.black/api/v1/workflows \
   -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
   -d '{
-    "workflow_type": "MyWorkflow",
-    "task_queue": "my-task-queue",
-    "workflow_id": "manual-run-001",
-    "input": {
-      "key": "value"
-    }
-  }' \
-  /api/v1/workflows
+    "workflow_type": "JudgmentWorkflow",
+    "task_queue": "alfred-learn",
+    "workflow_id": "manual-judgment-2026-04-25"
+  }'
 ```
+
+```bash Run with input payload
+curl -X POST https://alfred.black/api/v1/workflows \
+  -H "Authorization: Bearer alf_your_key_here" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "workflow_type": "MediaIngestionWorkflow",
+    "task_queue": "alfred-learn",
+    "input": {"file_path": "/vault/.streams/system-media-ingestion/2026-04-25.mp4"}
+  }'
+```
+
 </RequestExample>
 
 <ResponseExample>
-```json 201
+
+```json 201 Structured
 {
-  "workflowId": "manual-run-001",
+  "workflowId": "manual-judgment-2026-04-25",
   "runId": "9b8e7f6a-5d4c-3b2a-1f0e-9d8c7b6a5f4e"
 }
 ```
+
+```json 201 Raw fallback
+{
+  "raw": "Started workflow manual-judgment-2026-04-25 (run 9b8e7f6a-5d4c-3b2a-1f0e-9d8c7b6a5f4e)"
+}
+```
+
+```json 400 Missing required fields
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "workflow_type and task_queue are required"
+  }
+}
+```
+
 </ResponseExample>
+
+## When to use
+
+- Manually triggering a workflow that normally runs on a schedule (e.g. force a fresh `JudgmentWorkflow`).
+- One-off media or media-ingestion runs with a specific input.
+- Internal tools and scripts that need to enqueue work onto Temporal.
+
+<Note>
+  For the onboarding pipeline specifically, prefer `POST /api/v1/workflows/onboarding/start` (in the onboarding routes) rather than starting `OnboardingPipelineWorkflow` by hand — that endpoint constructs a deterministic workflow ID and the right input shape.
+</Note>

@@ -1,48 +1,82 @@
 ---
-title: "Get Workflow History"
-description: "Retrieve the complete event history for a workflow execution"
+title: "Workflow History"
+description: "Full event history for a Temporal workflow execution."
 api: "GET /api/v1/workflows/{wfId}/history"
 ---
 
-Retrieve the complete event history for a workflow execution. Returns an ordered array of events showing every state transition, scheduled task, and completion. Useful for debugging workflow behavior and understanding execution flow.
+Returns the complete Temporal event history for a workflow execution. Each event records a state transition (workflow started, activity scheduled, activity completed, signal received, workflow completed, etc.). Wraps `temporal workflow show --workflow-id <id> --output json`.
+
+This is the canonical record of what happened during a run — invaluable for debugging activity failures, retry behaviour, and signal handling.
+
+## Authentication
+
+Bearer token in the `Authorization` header.
+
+## Path parameters
 
 <ParamField path="wfId" type="string" required>
-  The workflow ID to retrieve history for
+  Temporal workflow ID.
 </ParamField>
 
+## Query parameters
+
 <ParamField query="run_id" type="string" optional>
-  Specific run ID to retrieve history for. If omitted, returns history for the most recent run.
+  Specific run ID. Omit to get history for the latest run.
 </ParamField>
 
 <RequestExample>
-```bash cURL
-curl -X GET \
-  -H "Authorization: Bearer alf_your_key_here" \
-  /api/v1/workflows/curator-sweep-20260226-143022/history
+
+```bash Latest run
+curl -X GET https://alfred.black/api/v1/workflows/al-judgment-run/history \
+  -H "Authorization: Bearer alf_your_key_here"
 ```
+
+```bash Specific run
+curl -X GET "https://alfred.black/api/v1/workflows/al-judgment-run/history?run_id=f47ac10b-58cc-4372-a567-0e02b2c3d479" \
+  -H "Authorization: Bearer alf_your_key_here"
+```
+
 </RequestExample>
 
 <ResponseExample>
+
 ```json 200
 [
   {
     "eventId": "1",
     "eventType": "EVENT_TYPE_WORKFLOW_EXECUTION_STARTED",
-    "eventTime": "2026-02-26T14:30:22.154Z",
+    "eventTime": "2026-04-25T09:14:00Z",
     "workflowExecutionStartedEventAttributes": {
-      "workflowType": {
-        "name": "CuratorWorkflow"
-      },
-      "taskQueue": {
-        "name": "alfred-curator"
-      }
+      "workflowType": {"name": "JudgmentWorkflow"},
+      "taskQueue": {"name": "alfred-learn"}
     }
   },
   {
-    "eventId": "2",
-    "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
-    "eventTime": "2026-02-26T14:30:22.160Z"
+    "eventId": "5",
+    "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
+    "eventTime": "2026-04-25T09:14:00.420Z",
+    "activityTaskScheduledEventAttributes": {
+      "activityType": {"name": "score_inputs_against_instincts"}
+    }
+  },
+  {
+    "eventId": "7",
+    "eventType": "EVENT_TYPE_ACTIVITY_TASK_FAILED",
+    "activityTaskFailedEventAttributes": {
+      "failure": {"message": "Heartbeat timeout"}
+    }
   }
 ]
 ```
+
 </ResponseExample>
+
+## When to use
+
+- Forensics on a specific failed run.
+- Verifying signal handlers fired in the expected order.
+- Confirming activity retry policies behaved as configured.
+
+<Note>
+  Histories can be very large for long-running workflows. Output is parsed via `parseJsonLines`, which tolerates either a single JSON document or a JSONL stream.
+</Note>

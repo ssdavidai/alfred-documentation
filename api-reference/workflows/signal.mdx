@@ -1,47 +1,83 @@
 ---
 title: "Signal Workflow"
-description: "Send a signal to a running workflow"
+description: "Send a Temporal signal to a running workflow."
 api: "POST /api/v1/workflows/{wfId}/signal"
 ---
 
-Send a signal to a running workflow. Signals allow you to communicate with a workflow while it is executing, triggering actions or passing updated data to it.
+Delivers a Temporal signal to a running workflow. Wraps `temporal workflow signal --workflow-id <id> --name <name>`. The named signal handler must already be registered on the workflow.
+
+Signals are the standard way to push data into a long-running workflow without restarting it — for example to update config, queue a new task, or release a wait.
+
+## Authentication
+
+Bearer token in the `Authorization` header.
+
+## Path parameters
 
 <ParamField path="wfId" type="string" required>
-  The workflow ID to signal
+  Workflow ID to signal.
 </ParamField>
 
+## Request body
+
 <ParamField body="signal_name" type="string" required>
-  The name of the signal to send. Must match a signal handler defined in the workflow.
+  Name of the signal handler defined inside the workflow. Returns `400` if missing.
 </ParamField>
 
 <ParamField body="input" type="any" optional>
-  Data to pass with the signal. Will be JSON-serialized.
+  Single value to pass to the signal handler. JSON-serialized.
 </ParamField>
 
 <ParamField body="run_id" type="string" optional>
-  Specific run ID to signal. If omitted, signals the most recent run.
+  Pin to a specific run. Omit to signal the latest run.
 </ParamField>
 
 <RequestExample>
-```bash cURL
-curl -X POST \
+
+```bash No payload
+curl -X POST https://alfred.black/api/v1/workflows/al-task-runner-run/signal \
+  -H "Authorization: Bearer alf_your_key_here" \
+  -H "Content-Type: application/json" \
+  -d '{"signal_name": "refresh_inputs"}'
+```
+
+```bash With payload
+curl -X POST https://alfred.black/api/v1/workflows/al-task-runner-run/signal \
   -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
   -d '{
-    "signal_name": "update_config",
-    "input": {
-      "sweep_interval": 600,
-      "batch_size": 10
-    }
-  }' \
-  /api/v1/workflows/curator-sweep-20260226-143022/signal
+    "signal_name": "enqueue_task",
+    "input": {"task_id": "task-2026-04-25-001"}
+  }'
 ```
+
 </RequestExample>
 
 <ResponseExample>
+
 ```json 200
 {
   "message": "Signal sent"
 }
 ```
+
+```json 400 Missing signal name
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "signal_name is required"
+  }
+}
+```
+
 </ResponseExample>
+
+## When to use
+
+- Pushing fresh input into a long-running workflow (e.g. `TaskRunnerWorkflow`).
+- Triggering a workflow's wait condition to unblock.
+- Coordinating multiple workflows that exchange signals.
+
+<Warning>
+  Signals are silently dropped by Temporal if no handler matches the given name. The endpoint returns `200` regardless — verify the handler exists in the workflow source.
+</Warning>

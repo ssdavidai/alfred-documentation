@@ -1,58 +1,77 @@
 ---
-title: "Extract Learnings"
-description: "Run Distiller knowledge extraction"
+title: "Distiller Run"
+description: "Scan plus extract: write learning records for every candidate."
 api: "POST /api/v1/workers/distiller/run"
 ---
 
-Scans your vault for extraction candidates and then runs the Distiller agent to extract knowledge. The Distiller analyzes candidate records and creates new learning records -- assumptions, decisions, constraints, contradictions, and synthesis -- for each piece of latent knowledge discovered.
+Runs `alfred distiller run`: scans for candidates, then invokes the Distiller agent to extract latent knowledge from each one. New records are written for every assumption, decision, constraint, contradiction, and synthesis that the agent surfaces.
+
+This is an LLM-bound operation — every candidate requires an OpenClaw gateway call. Use [`distiller/scan`](/api-reference/workers/distiller-scan) first if Sir wants to see how many candidates are on the table before paying for a run.
+
+## Authentication
+
+Bearer token in the `Authorization` header.
+
+## Request body
 
 <ParamField body="project" type="string" optional>
-  Filter extraction to a specific project. If omitted, extracts from all candidates.
-
-  Example: `"acme-redesign"`
+  Restrict extraction to a single project slug. Omit to run across the entire vault.
 </ParamField>
 
 <RequestExample>
 
-```bash Extract All Candidates
-curl -X POST https://alfred.black/api/v1/workers/distiller/run \
-  -H "Authorization: Bearer alf_your_key_here" \
-  -H "Content-Type: application/json"
-```
-
-```bash Extract from Specific Project
+```bash Whole vault
 curl -X POST https://alfred.black/api/v1/workers/distiller/run \
   -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
-  -d '{
-    "project": "acme-redesign"
-  }'
+  -d '{}'
+```
+
+```bash Single project
+curl -X POST https://alfred.black/api/v1/workers/distiller/run \
+  -H "Authorization: Bearer alf_your_key_here" \
+  -H "Content-Type: application/json" \
+  -d '{"project": "acme-redesign"}'
 ```
 
 </RequestExample>
 
 <ResponseExample>
 
-```json Structured Response
+```json 200 Structured
 {
-  "records_scanned": 423,
+  "run_id": "run-0043",
+  "timestamp": "2026-04-25T09:14:02Z",
   "candidates_found": 8,
-  "learnings_extracted": 18
+  "candidates_processed": 8,
+  "records_created": {
+    "assumption": 4,
+    "decision": 6,
+    "constraint": 3,
+    "contradiction": 1,
+    "synthesis": 4
+  }
 }
 ```
 
-```json Raw Response
+```json 200 Raw fallback
 {
-  "raw": "Scanned 423 records, found 8 candidates, extracted 18 learnings"
+  "raw": "Extraction Run run-0043 — 2026-04-25T09:14:02Z\nCandidates: 8 found / 8 processed\nRecords created: assumption:4 decision:6 constraint:3 contradiction:1 synthesis:4"
 }
 ```
 
 </ResponseExample>
 
-<Note>
-  If the response contains structured JSON, it is returned directly. Otherwise, the output is returned in a `raw` field.
-</Note>
-
 <ResponseField name="raw" type="string">
-  Human-readable output when structured JSON is not available.
+  Trimmed stdout when the CLI did not return JSON. Present only in the fallback case.
 </ResponseField>
+
+## When to use
+
+- Manual triggers after a major vault edit Sir wants distilled immediately.
+- Project-scoped knowledge passes (for example after closing out an engagement).
+- Recovering missed extractions after a Distiller daemon outage.
+
+<Warning>
+  Distiller writes new vault records under their respective entity directories. The runs are tracked in [`distiller/history`](/api-reference/workers/distiller-history) but the writes themselves are not transactional — an aborted run may leave a partial set of new records.
+</Warning>

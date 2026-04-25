@@ -1,46 +1,55 @@
 ---
-title: "Scan for Learnings"
-description: "Scan for extractable knowledge"
+title: "Distiller Scan"
+description: "Identify extraction candidates without running the agent."
 api: "POST /api/v1/workers/distiller/scan"
 ---
 
-Scans your vault records to identify candidates for knowledge extraction. The Distiller looks for latent assumptions, decisions, constraints, contradictions, and synthesis opportunities. This is a read-only operation that reports candidates without extracting anything.
+Triggers `alfred distiller scan`: walks the vault, identifies records that look like extraction candidates (sources of latent assumptions, decisions, constraints, contradictions, or syntheses), and reports them. No LLM agent is invoked, no records are written.
+
+For the full extraction pass, use [`distiller/run`](/api-reference/workers/distiller-run).
+
+## Authentication
+
+Bearer token in the `Authorization` header.
+
+## Request body
 
 <ParamField body="project" type="string" optional>
-  Filter candidates to a specific project. If omitted, scans all vault records.
-
-  Example: `"acme-redesign"`
+  Filter candidates to a single project slug. Omit to scan the entire vault.
 </ParamField>
 
 <RequestExample>
 
-```bash Scan All Records
-curl -X POST https://alfred.black/api/v1/workers/distiller/scan \
-  -H "Authorization: Bearer alf_your_key_here" \
-  -H "Content-Type: application/json"
-```
-
-```bash Scan Specific Project
+```bash Whole vault
 curl -X POST https://alfred.black/api/v1/workers/distiller/scan \
   -H "Authorization: Bearer alf_your_key_here" \
   -H "Content-Type: application/json" \
-  -d '{
-    "project": "acme-redesign"
-  }'
+  -d '{}'
+```
+
+```bash Single project
+curl -X POST https://alfred.black/api/v1/workers/distiller/scan \
+  -H "Authorization: Bearer alf_your_key_here" \
+  -H "Content-Type: application/json" \
+  -d '{"project": "acme-redesign"}'
 ```
 
 </RequestExample>
 
 <ResponseExample>
 
-```json Structured Response
+```json 200 Structured
 {
   "records_scanned": 423,
-  "candidates_found": 8
+  "candidates_found": 8,
+  "candidates": [
+    {"path": "matters/acme-redesign.md", "reason": "decision-language detected"},
+    {"path": "tasks/migrate-db.md", "reason": "constraint-language detected"}
+  ]
 }
 ```
 
-```json Raw Response
+```json 200 Raw fallback
 {
   "raw": "Scanned 423 records, found 8 candidates"
 }
@@ -48,10 +57,16 @@ curl -X POST https://alfred.black/api/v1/workers/distiller/scan \
 
 </ResponseExample>
 
-<Note>
-  If the response contains structured JSON, it is returned directly. Otherwise, the output is returned in a `raw` field.
-</Note>
-
 <ResponseField name="raw" type="string">
-  Human-readable output when structured JSON is not available.
+  Trimmed stdout when the CLI did not return JSON. Present only in the fallback case.
 </ResponseField>
+
+## When to use
+
+- Estimating Distiller workload before a `run`.
+- Verifying that recent vault writes produced new candidate material.
+- Project-scoped audits ahead of a focused extraction pass.
+
+<Note>
+  Scans are LLM-free and cheap. Use them freely.
+</Note>
