@@ -1,0 +1,36 @@
+---
+title: "List Authorised Numbers"
+description: "Numbers whose inbound SMS gets a live agent reply instead of stream ingest."
+api: "GET /api/v1/phone/authorized-numbers"
+---
+
+## Overview
+
+Reads `/mnt/encrypted/alfred/.authorized-phone-numbers.json`. Returns the current list of phone numbers that bypass the zero-LLM stream path and get a synchronous openclaw chat-completion reply.
+
+## Response
+
+<ResponseField name="numbers" type="array">
+  E.164 phone numbers (normalised by stripping spaces, dashes, parens).
+</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -H "Authorization: Bearer $AAS_API_KEY" \
+  https://alfred.black/api/v1/phone/authorized-numbers
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{ "numbers": ["+15559876543", "+447700900123"] }
+```
+
+</ResponseExample>

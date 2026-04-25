@@ -1,0 +1,71 @@
+---
+title: "Connect (API Key)"
+description: "Connect a non-OAuth Composio toolkit by supplying an API key or bearer token."
+api: "POST /api/v1/integrations/connect-api-key"
+---
+
+## Overview
+
+Direct connect flow for toolkits whose `auth_scheme` is `API_KEY` or `BEARER_TOKEN` — Clockify, Tavily, PostHog, etc. The user provides their own credential and the connection lands in `ACTIVE` state immediately. No popup, no redirect.
+
+## Body Parameters
+
+<ParamField body="toolkit_slug" type="string" required>
+  Composio toolkit slug.
+</ParamField>
+
+<ParamField body="credential" type="string" required>
+  The user's API key or bearer token.
+</ParamField>
+
+<ParamField body="auth_scheme" type="string" optional default="API_KEY">
+  One of `API_KEY` or `BEARER_TOKEN`. The handler maps `BEARER_TOKEN` to a `token` field and `API_KEY` to an `api_key` field on the Composio connection state.
+</ParamField>
+
+## Response
+
+Mirrors `/api/v1/integrations/connect` so the SaaS side can reuse the same upsert path.
+
+<ResponseField name="connect_url" type="string">
+  Always empty — there is nothing for the user to approve in a browser.
+</ResponseField>
+
+<ResponseField name="connection_id" type="string">
+  Composio connection id.
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Typically `ACTIVE` immediately.
+</ResponseField>
+
+<ResponseField name="auth_scheme" type="string">
+  Echoed back from the request.
+</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X POST -H "Authorization: Bearer $AAS_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"toolkit_slug": "clockify", "credential": "ZGN...", "auth_scheme": "API_KEY"}' \
+  https://alfred.black/api/v1/integrations/connect-api-key
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "connect_url": "",
+  "connection_id": "ca_01HXYZABCDEFGH",
+  "status": "ACTIVE",
+  "auth_scheme": "API_KEY"
+}
+```
+
+</ResponseExample>

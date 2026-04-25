@@ -1,0 +1,44 @@
+---
+title: "Dismiss Quarantined File"
+description: "Permanently delete a quarantined file."
+api: "POST /api/v1/learning/quarantine/:id/dismiss"
+---
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  Filename of the quarantined entry. Sanitised.
+</ParamField>
+
+## Response
+
+<ResponseField name="message" type="string">Confirmation string.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X POST -H "Authorization: Bearer $AAS_API_KEY" \
+  https://alfred.black/api/v1/learning/quarantine/broken-pdf-attachment.pdf/dismiss
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{ "message": "Dismissed quarantined file: broken-pdf-attachment.pdf" }
+```
+
+```json 404 Not Found
+{ "error": "Quarantined file not found: broken-pdf-attachment.pdf" }
+```
+
+</ResponseExample>
+
+<Warning>
+Permanent — there is no soft-delete. Confirm before calling.
+</Warning>

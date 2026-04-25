@@ -1,0 +1,61 @@
+---
+title: "Prune Old Events"
+description: "Reclaim disk by deleting processed events older than the retention window."
+api: "POST /api/v1/streams/prune"
+---
+
+## Overview
+
+Rewrites every `<stream_id>.jsonl` file under `streams/`, dropping events that are both:
+
+1. Marked `processed` in `processed-events.json`, AND
+2. Whose `processed_at` is older than `retention_days` ago.
+
+Unprocessed and recently-processed events are kept. The matching entries in `processed-events.json` are also pruned.
+
+## Body Parameters
+
+<ParamField body="retention_days" type="number" optional default="7">
+  How many days of processed history to keep. Minimum 1.
+</ParamField>
+
+## Response
+
+<ResponseField name="pruned" type="number">Events removed from JSONL files.</ResponseField>
+<ResponseField name="kept" type="number">Events kept across all streams.</ResponseField>
+<ResponseField name="stale_tracking_removed" type="number">Entries removed from `processed-events.json`.</ResponseField>
+<ResponseField name="bytes_reclaimed" type="number">Disk reclaimed across all stream files.</ResponseField>
+<ResponseField name="retention_days" type="number">Effective retention applied.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X POST -H "Authorization: Bearer $AAS_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"retention_days": 14}' \
+  https://alfred.black/api/v1/streams/prune
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "pruned": 1843,
+  "kept": 412,
+  "stale_tracking_removed": 1843,
+  "bytes_reclaimed": 5832104,
+  "retention_days": 14
+}
+```
+
+</ResponseExample>
+
+<Warning>
+Unparseable JSONL lines are kept as-is — pruning will not delete malformed history. Manually clean up `<stream_id>.jsonl` if needed.
+</Warning>

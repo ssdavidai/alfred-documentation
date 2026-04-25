@@ -1,0 +1,50 @@
+---
+title: "Report Openclaw Session Stats"
+description: "Internal endpoint that the openclaw session-harvester posts stats to."
+api: "POST /api/v1/streams/system/openclaw-sessions/report"
+---
+
+## Overview
+
+Updates the `system-openclaw-sessions` stream's metadata in-place: `last_event_at`, cumulative `event_count`, and `status`. Does not write to the JSONL events file — the harvester does that directly.
+
+## Body Parameters
+
+<ParamField body="messages_harvested" type="number" optional>
+  Number of session messages harvested in this run. Added to `event_count`.
+</ParamField>
+
+<ParamField body="status" type="string" optional>
+  Replaces the stream's `status` field (e.g. `idle`, `harvesting`, `error`).
+</ParamField>
+
+## Response
+
+<ResponseField name="status" type="string">`ok`.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X POST -H "Authorization: Bearer $AAS_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"messages_harvested": 14, "status": "idle"}' \
+  https://alfred.black/api/v1/streams/system/openclaw-sessions/report
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{ "status": "ok" }
+```
+
+</ResponseExample>
+
+<Note>
+Internal-only — called by the openclaw session harvester job. Not intended for ad-hoc use.
+</Note>

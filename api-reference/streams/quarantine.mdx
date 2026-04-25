@@ -1,0 +1,49 @@
+---
+title: "Quarantine Event"
+description: "Mark a stream event as quarantined with a reason — keeps it visible without re-processing."
+api: "POST /api/v1/streams/events/:id/quarantine"
+---
+
+## Overview
+
+Records the event as quarantined in `processed-events.json`. The Activity tab surfaces these so a human can decide whether to retry or dismiss.
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  StreamEvent id.
+</ParamField>
+
+## Body Parameters
+
+<ParamField body="reason" type="string" optional default="Unknown reason">
+  Why the event was quarantined (parser failed, unknown sender, malformed payload, etc.).
+</ParamField>
+
+## Response
+
+<ResponseField name="status" type="string">`quarantined`.</ResponseField>
+<ResponseField name="event_id" type="string">Echo.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X POST -H "Authorization: Bearer $AAS_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"reason": "parser_failed: invalid JSON in raw.body"}' \
+  https://alfred.black/api/v1/streams/events/550e8400-e29b-41d4/quarantine
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{ "status": "quarantined", "event_id": "550e8400-e29b-41d4" }
+```
+
+</ResponseExample>

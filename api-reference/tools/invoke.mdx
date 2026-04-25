@@ -1,0 +1,75 @@
+---
+title: "Invoke Tool"
+description: "Dispatch a tool by name to its underlying ctrl-api endpoint."
+api: "POST /api/v1/tools/invoke"
+---
+
+## Overview
+
+Legacy tool-by-name dispatcher. Resolves `tool` against the registry, validates required + enum params, then synthesises a request to the underlying ctrl-api endpoint and returns its response.
+
+For `composio_execute` the dispatch routes specially to `POST /api/v1/integrations/execute` with `{action, arguments}`.
+
+For `vault_create`, the tool's `path` arg is rewritten into `{type, name}` to match the underlying `POST /api/v1/vault/records` body shape; `frontmatter` is dropped (current vault create endpoint takes content + name only).
+
+For `stream_ingest`, `stream_type` is forced to `"tool-ingest"`.
+
+## Body Parameters
+
+<ParamField body="tool" type="string" required>
+  Tool name from `GET /api/v1/tools`.
+</ParamField>
+
+<ParamField body="args" type="object" optional default="{}">
+  Arguments matching the tool's parameter schema. Required parameters that are missing produce a `400 Bad Request`.
+</ParamField>
+
+## Response
+
+The underlying endpoint's response, as-is.
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X POST -H "Authorization: Bearer $AAS_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tool": "vault_search",
+    "args": {"query": "Hetzner migration"}
+  }' \
+  https://alfred.black/api/v1/tools/invoke
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK (vault_search)
+{
+  "results": [
+    {"path": "matter/hetzner-migration.md", "score": 0.92}
+  ]
+}
+```
+
+```json 400 Bad Request
+{
+  "error": "Missing required parameter \"path\" for tool \"vault_read\""
+}
+```
+
+```json 404 Not Found
+{
+  "error": "Unknown tool: \"foo_bar\". Available: vault_read, vault_create, ..."
+}
+```
+
+</ResponseExample>
+
+<Note>
+Modern agents use the MCP `self({endpoint: "..."})` tool which talks straight to ctrl-api — no registry lookup needed. This endpoint is preserved for the gateway's legacy tool-name dispatch path and for callers that prefer the schema-validated invocation form.
+</Note>

@@ -1,0 +1,83 @@
+---
+title: "Migrate Stream"
+description: "Replace a stale Composio action slug with a new one and rebuild its Temporal schedule."
+api: "POST /api/v1/integrations/:id/migrate-stream"
+---
+
+## Overview
+
+When Composio renames or removes an action, the on-disk stream config still references the old slug and every pull 404s. This endpoint rewrites the stream config to point at a new slug (and a new derived stream id), deletes the stale Temporal schedule, and creates a fresh one on the same interval.
+
+If `new_action_slug` is omitted, falls back to `RECOMMENDED_STREAMS[toolkit].action`.
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  Composio connection id (ownership-checked against the calling tenant).
+</ParamField>
+
+## Body Parameters
+
+<ParamField body="old_action_slug" type="string" required>
+  The current (stale) action slug, e.g. `NOTION_LIST_PAGES`.
+</ParamField>
+
+<ParamField body="new_action_slug" type="string" optional>
+  New action slug. Defaults to the toolkit's recommended stream action.
+</ParamField>
+
+<ParamField body="new_args" type="object" optional>
+  New Composio args. Defaults to `RECOMMENDED_STREAMS[toolkit].args`.
+</ParamField>
+
+## Response
+
+<ResponseField name="status" type="string">`migrated`.</ResponseField>
+<ResponseField name="old_action" type="string">Echo of `old_action_slug`.</ResponseField>
+<ResponseField name="new_action" type="string">Resolved new slug.</ResponseField>
+<ResponseField name="old_stream_id" type="string">Pre-migrate stream id.</ResponseField>
+<ResponseField name="new_stream_id" type="string">Post-migrate stream id.</ResponseField>
+<ResponseField name="schedule_interval_seconds" type="number">Preserved from the old config.</ResponseField>
+<ResponseField name="config" type="object">Full new config including `composio_args`, `pull_mode`, `parser`.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X POST -H "Authorization: Bearer $AAS_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"old_action_slug": "NOTION_LIST_PAGES"}' \
+  https://alfred.black/api/v1/integrations/ca_01HXYZ/migrate-stream
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "status": "migrated",
+  "old_action": "NOTION_LIST_PAGES",
+  "new_action": "NOTION_FETCH_DATA",
+  "old_stream_id": "composio-notion-notion-list-pages",
+  "new_stream_id": "composio-notion-notion-fetch-data",
+  "schedule_interval_seconds": 300,
+  "config": {
+    "id": "composio-notion-notion-fetch-data",
+    "type": "composio",
+    "composio_action": "NOTION_FETCH_DATA",
+    "composio_args": {"query": ""},
+    "pull_mode": "snapshot",
+    "schedule_interval_seconds": 300
+  }
+}
+```
+
+</ResponseExample>
+
+<Note>
+Schedule recreation is a best-effort step. If the Temporal CLI errors out the new config is still written and you can retry via the schedules endpoint. The migrate endpoint always recreates the schedule even when the schedule id is unchanged — the old behaviour of skipping when ids matched left some streams scheduled-less.
+</Note>

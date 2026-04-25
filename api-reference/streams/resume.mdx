@@ -1,0 +1,50 @@
+---
+title: "Resume Stream"
+description: "Re-enable a paused stream."
+api: "POST /api/v1/streams/:id/resume"
+---
+
+## Overview
+
+Sets `enabled: true` and `status: "idle"`. The next scheduled `StreamPullerWorkflow` run will pull again.
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  Stream id.
+</ParamField>
+
+## Response
+
+<ResponseField name="stream" type="object">The updated stream entry.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X POST -H "Authorization: Bearer $AAS_API_KEY" \
+  https://alfred.black/api/v1/streams/composio-gmail-gmail-fetch-emails/resume
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "stream": {
+    "id": "composio-gmail-gmail-fetch-emails",
+    "enabled": true,
+    "status": "idle"
+  }
+}
+```
+
+```json 400 Bad Request
+{ "error": "Cannot resume a system stream — it is always enabled" }
+```
+
+</ResponseExample>

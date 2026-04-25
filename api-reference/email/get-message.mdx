@@ -1,0 +1,54 @@
+---
+title: "Get Message"
+description: "Fetch the full body of one AgentMail message by id."
+api: "GET /api/v1/email/message/:message_id"
+---
+
+## Overview
+
+Direct passthrough to AgentMail. The channel handler uses this when the inbound webhook payload exceeded 1MB and AgentMail stripped `text` / `html` from the webhook body.
+
+## Path Parameters
+
+<ParamField path="message_id" type="string" required>
+  AgentMail message id (URL-encoded if it contains slashes).
+</ParamField>
+
+## Response
+
+AgentMail's raw message object: `{message_id, thread_id, from_, to, cc, bcc, subject, text, html, attachments, received_at, ...}`.
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -H "Authorization: Bearer $AAS_API_KEY" \
+  https://alfred.black/api/v1/email/message/msg_01HXYZABCDEF
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "message_id": "msg_01HXYZABCDEF",
+  "thread_id": "thr_01HXYZGHIJKL",
+  "from_": ["\"Alice\" <alice@example.com>"],
+  "to": ["alfred.david@mail.alfred.black"],
+  "subject": "Following up",
+  "text": "Hi David...",
+  "html": "<p>Hi David...</p>",
+  "received_at": "2026-04-25T11:00:00Z",
+  "attachments": []
+}
+```
+
+```json 404 Not Found
+{ "error": "message msg_01HXYZ not found" }
+```
+
+</ResponseExample>

@@ -1,0 +1,40 @@
+---
+title: "Retry Quarantined File"
+description: "Move a quarantined file back to the inbox so the curator can try again."
+api: "POST /api/v1/learning/quarantine/:id/retry"
+---
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  Filename of the quarantined entry. Sanitised — no path traversal.
+</ParamField>
+
+## Response
+
+<ResponseField name="message" type="string">Confirmation string.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X POST -H "Authorization: Bearer $AAS_API_KEY" \
+  https://alfred.black/api/v1/learning/quarantine/broken-pdf-attachment.pdf/retry
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{ "message": "Moved broken-pdf-attachment.pdf back to inbox" }
+```
+
+```json 404 Not Found
+{ "error": "Quarantined file not found: broken-pdf-attachment.pdf" }
+```
+
+</ResponseExample>

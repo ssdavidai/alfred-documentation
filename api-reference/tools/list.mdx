@@ -1,0 +1,59 @@
+---
+title: "List Tools"
+description: "List the unprefixed tool registry — every tool the gateway can dispatch to."
+api: "GET /api/v1/tools"
+---
+
+## Overview
+
+Returns the canonical tool catalogue. Each tool entry maps a name + parameter schema to an underlying ctrl-api endpoint. The list includes vault, learning, streams, workflows, schedules, workers, admin tools, plus `composio_execute` when `COMPOSIO_API_KEY` is configured.
+
+The MCP `self` tool is the agent-facing wrapper that bypasses this registry by hitting endpoints directly. The `/tools/invoke` endpoint below remains for legacy callers that still dispatch by tool name.
+
+## Response
+
+<ResponseField name="tools" type="array">
+  Each entry: `{name, description, parameters: {<param>: {type, required, enum?}}, endpoint}`.
+
+  - `endpoint` is the underlying route in `METHOD /api/v1/...` form (with `{param}` placeholders).
+  - `composio_execute` uses the special endpoint string `__composio__` — dispatched specially.
+</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -H "Authorization: Bearer $AAS_API_KEY" \
+  https://alfred.black/api/v1/tools
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "tools": [
+    {
+      "name": "vault_read",
+      "description": "Read a vault record by path",
+      "parameters": {"path": {"type": "string", "required": true}},
+      "endpoint": "GET /api/v1/vault/records/{path}"
+    },
+    {
+      "name": "composio_execute",
+      "description": "Execute a Composio action on a connected third-party app...",
+      "parameters": {
+        "action": {"type": "string", "required": true},
+        "arguments": {"type": "object", "required": false}
+      },
+      "endpoint": "__composio__"
+    }
+  ]
+}
+```
+
+</ResponseExample>

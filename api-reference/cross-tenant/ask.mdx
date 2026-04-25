@@ -1,0 +1,78 @@
+---
+title: "Ask (peer-side)"
+description: "Receive a question from another tenant's Alfred and reason an answer."
+api: "POST /api/v1/cross-tenant/ask"
+---
+
+## Overview
+
+Receiving endpoint for the `ask_alfred({tenant, prompt})` MCP tool that David's Alfred Prime exposes. The peer (e.g. Miguel) accepts the question, spawns an openclaw `sessions_spawn` against its own gateway with workspace context (`USER.md` + `SOUL.md` + `MEMORY.md`) inlined, polls for completion, and returns the reasoned reply.
+
+Subagent completion is signalled by a `<final>...</final>` tag in the assistant message, or by the session reaching `completed` / `done` status.
+
+## Body Parameters
+
+<ParamField body="prompt" type="string" required>
+  The question to ask. Capped at 8000 chars.
+</ParamField>
+
+<ParamField body="callerId" type="string" optional default="unknown">
+  Identifier for the calling tenant — purely informational, logged.
+</ParamField>
+
+<ParamField body="timeoutSeconds" type="number" optional default="300">
+  Max wait for the subagent. Capped at 480.
+</ParamField>
+
+## Response
+
+<ResponseField name="answer" type="string">
+  The reasoned reply. May start with `[error: ...]` or `[timeout — ...]` for failure modes (LLM billing error, session error, partial answer on timeout).
+</ResponseField>
+
+<ResponseField name="sessionKey" type="string">openclaw child session key.</ResponseField>
+
+<ResponseField name="durationMs" type="number">Wall-clock time taken on the peer side.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X POST -H "Authorization: Bearer $PEER_AAS_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "What did we agree about the Q3 launch in our last call?",
+    "callerId": "alfred-prime-david",
+    "timeoutSeconds": 240
+  }' \
+  http://100.72.147.32:3100/api/v1/cross-tenant/ask
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "answer": "We agreed to push the launch to October 15 to give the design team another sprint.",
+  "sessionKey": "session-abc123",
+  "durationMs": 18432
+}
+```
+
+```json 200 OK (peer LLM out of credits)
+{
+  "answer": "[error: The target tenant's LLM provider returned a billing error — their API key has run out of credits or has an insufficient balance. The remote Alfred cannot respond until credits are topped up.]",
+  "sessionKey": "session-xyz789",
+  "durationMs": 5102
+}
+```
+
+</ResponseExample>
+
+<Warning>
+Errors in the spawn-and-poll loop never throw — they are returned in `answer` as `[error: ...]` strings so the caller's UX stays consistent. Check for the bracketed prefix to detect failures.
+</Warning>

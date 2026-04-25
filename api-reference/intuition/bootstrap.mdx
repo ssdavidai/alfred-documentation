@@ -1,0 +1,40 @@
+---
+title: "Bootstrap Alfred Learn"
+description: "Add the alfred-learn service to the tenant compose file and start it."
+api: "POST /api/v1/learning/bootstrap"
+---
+
+## Overview
+
+Idempotent — safe to call on any tenant. Patches `/opt/alfred/compose/docker-compose.yaml` to add the `alfred-learn` service block (if missing), pulls the latest image, starts the container, and sets `ALFRED_LEARN_ENABLED=true` in `.env`.
+
+Used by `/api/v1/admin/dashboard` to bring missing intelligence layers online without re-running the provisioner.
+
+## Response
+
+<ResponseField name="message" type="string">`Alfred Learn bootstrapped and started`.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X POST -H "Authorization: Bearer $AAS_API_KEY" \
+  https://alfred.black/api/v1/learning/bootstrap
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{ "message": "Alfred Learn bootstrapped and started" }
+```
+
+</ResponseExample>
+
+<Warning>
+The compose file is patched in place via string append. If a malformed YAML edit precedes this call, the result may not parse. Check `docker compose config` after bootstrap to confirm.
+</Warning>

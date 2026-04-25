@@ -1,0 +1,66 @@
+---
+title: "Connect (OAuth)"
+description: "Start the OAuth Connect-Link flow for a Composio toolkit."
+api: "POST /api/v1/integrations/connect"
+---
+
+## Overview
+
+Creates (or reuses) a Composio `auth_config` for the requested toolkit, then mints a `connected_account` scoped to this tenant's `COMPOSIO_USER_ID`, and returns a redirect URL the dashboard pops open in a new window.
+
+When the user completes OAuth in the popup, Composio redirects to the configured `redirect_url` and the SaaS dashboard fires `POST /api/v1/integrations/:id/auto-config` to wire up the recommended stream + tool + skill.
+
+## Body Parameters
+
+<ParamField body="toolkit_slug" type="string" required>
+  Composio toolkit slug (e.g. `gmail`, `googlecalendar`, `notion`, `github`).
+</ParamField>
+
+<ParamField body="redirect_url" type="string" optional>
+  Where Composio sends the browser after OAuth completes. Defaults to Composio's hosted callback if omitted.
+</ParamField>
+
+## Response
+
+<ResponseField name="connect_url" type="string">
+  URL to open in the user's browser to complete OAuth. Empty when the toolkit uses a non-OAuth scheme (use `/connect-api-key` instead).
+</ResponseField>
+
+<ResponseField name="connection_id" type="string">
+  Composio connection id — pass to `/auto-config`, `/capabilities`, etc. once OAuth completes.
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Composio connection state — typically `INITIATED` until the user completes the OAuth flow.
+</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X POST -H "Authorization: Bearer $AAS_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"toolkit_slug": "gmail", "redirect_url": "https://alfred.black/dashboard/apps/callback"}' \
+  https://alfred.black/api/v1/integrations/connect
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "connect_url": "https://accounts.google.com/o/oauth2/v2/auth?...",
+  "connection_id": "ca_01HXYZABCDEFGH",
+  "status": "INITIATED"
+}
+```
+
+</ResponseExample>
+
+<Warning>
+Connecting the first Composio app on a tenant adds `composio_execute` to `gateway.tools.allow`, which restarts the openclaw gateway (~40s window of Cloudflare 502s). The dashboard masks this behind a "Configuring..." banner via `GET /api/v1/openclaw/ready`.
+</Warning>

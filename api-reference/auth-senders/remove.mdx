@@ -1,0 +1,40 @@
+---
+title: "Remove Authorised Sender"
+description: "De-authorise a sender — their inbound mail returns to the stream pipeline."
+api: "DELETE /api/v1/auth/senders/:email"
+---
+
+## Path Parameters
+
+<ParamField path="email" type="string" required>
+  Email to remove (URL-encoded). Match is exact after lowercasing.
+</ParamField>
+
+## Response
+
+<ResponseField name="senders" type="array">The persisted list after removal.</ResponseField>
+<ResponseField name="updated_at" type="string">ISO timestamp.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X DELETE -H "Authorization: Bearer $AAS_API_KEY" \
+  "https://alfred.black/api/v1/auth/senders/miguel%40upstring.com"
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "senders": ["david@szabostuban.com"],
+  "updated_at": "2026-04-25T11:36:00Z"
+}
+```
+
+</ResponseExample>

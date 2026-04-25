@@ -1,0 +1,59 @@
+---
+title: "List Events for a Stream"
+description: "List the most recent events for one stream."
+api: "GET /api/v1/streams/:id/events"
+---
+
+## Overview
+
+Reads only the tail of the stream's JSONL file (proportional to `limit`) to avoid loading large histories. Returns events newest-first.
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  Stream id.
+</ParamField>
+
+## Query Parameters
+
+<ParamField query="limit" type="number" optional default="50">
+  Max events to return. Capped at 200.
+</ParamField>
+
+## Response
+
+<ResponseField name="events" type="array">Stream events, newest first.</ResponseField>
+<ResponseField name="count" type="number">Count returned.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -H "Authorization: Bearer $AAS_API_KEY" \
+  "https://alfred.black/api/v1/streams/voice-call/events?limit=10"
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "events": [
+    {
+      "id": "660e8400-...",
+      "stream_id": "voice-call",
+      "stream_type": "voice-call",
+      "received_at": "2026-04-25T10:55:00Z",
+      "raw": {"from": "+15551234567", "duration_seconds": 142},
+      "summary": "Call from +15551234567"
+    }
+  ],
+  "count": 1
+}
+```
+
+</ResponseExample>

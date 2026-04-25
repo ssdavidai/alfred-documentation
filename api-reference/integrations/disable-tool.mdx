@@ -1,0 +1,48 @@
+---
+title: "Disable Tool"
+description: "Remove a tool slug from the openclaw gateway allowlist."
+api: "POST /api/v1/integrations/disable-tool"
+---
+
+## Overview
+
+Removes a single tool name from `gateway.tools.allow` in `openclaw.json`. No-op if the slug is not present. Triggers a debounced gateway restart.
+
+## Body Parameters
+
+<ParamField body="action_slug" type="string" required>
+  Tool name to remove from the allowlist.
+</ParamField>
+
+## Response
+
+<ResponseField name="status" type="string">`disabled`.</ResponseField>
+<ResponseField name="action_slug" type="string">Echo.</ResponseField>
+<ResponseField name="tools_count" type="number">Total `gateway.tools.allow` length after removal.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X POST -H "Authorization: Bearer $AAS_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"action_slug": "GMAIL_SEND_EMAIL"}' \
+  https://alfred.black/api/v1/integrations/disable-tool
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "status": "disabled",
+  "action_slug": "GMAIL_SEND_EMAIL",
+  "tools_count": 13
+}
+```
+
+</ResponseExample>

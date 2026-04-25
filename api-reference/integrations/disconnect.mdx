@@ -1,0 +1,68 @@
+---
+title: "Disconnect"
+description: "Disconnect a Composio integration and tear down its streams, schedules, and skill files."
+api: "DELETE /api/v1/integrations/:id"
+---
+
+## Overview
+
+Validates ownership (the connection must belong to this tenant's `COMPOSIO_USER_ID`), then deletes the Composio connected-account, the matching stream config + Temporal schedule, and the auto-generated `alfred-composio-<toolkit>` skill files in the openclaw and openclaw-workers workspaces.
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  Composio connection id (returned by `/connect` or `/integrations`).
+</ParamField>
+
+## Response
+
+<ResponseField name="status" type="string">
+  `disconnected` on success.
+</ResponseField>
+
+<ResponseField name="toolkit" type="string">
+  Toolkit slug that was disconnected.
+</ResponseField>
+
+<ResponseField name="cleanup" type="object">
+  Summary of side effects: `stream_deleted`, `schedule_deleted`, `skill_deleted`, etc. Each may be a string id or a boolean.
+</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X DELETE -H "Authorization: Bearer $AAS_API_KEY" \
+  https://alfred.black/api/v1/integrations/ca_01HXYZABCDEFGH
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "status": "disconnected",
+  "toolkit": "notion",
+  "cleanup": {
+    "stream_deleted": "composio-notion-notion-fetch-data",
+    "schedule_deleted": true,
+    "skill_deleted": "alfred-composio-notion"
+  }
+}
+```
+
+```json 403 Forbidden
+{
+  "error": "Connection ca_... does not belong to this tenant"
+}
+```
+
+</ResponseExample>
+
+<Note>
+Disconnecting the last Composio app removes `composio_execute` from `gateway.tools.allow`, triggering an openclaw gateway restart — same 40s window as the first connect.
+</Note>

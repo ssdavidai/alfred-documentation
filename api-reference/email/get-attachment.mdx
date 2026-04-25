@@ -1,0 +1,53 @@
+---
+title: "Download Attachment"
+description: "Download a single attachment by message + attachment id."
+api: "GET /api/v1/email/attachment/:message_id/:attachment_id"
+---
+
+## Overview
+
+Direct passthrough to AgentMail's `/messages/{id}/attachments/{aid}` endpoint. Returns the attachment payload as AgentMail returns it (typically base64 inside JSON, depending on the AgentMail content type).
+
+## Path Parameters
+
+<ParamField path="message_id" type="string" required>
+  AgentMail message id.
+</ParamField>
+
+<ParamField path="attachment_id" type="string" required>
+  AgentMail attachment id (from the message's `attachments[].id`).
+</ParamField>
+
+## Response
+
+AgentMail's raw response — typically `{filename, content_type, content_base64, size}`.
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -H "Authorization: Bearer $AAS_API_KEY" \
+  https://alfred.black/api/v1/email/attachment/msg_01HXYZABCDEF/att_01HXYZ001
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "filename": "Q3-report.pdf",
+  "content_type": "application/pdf",
+  "content_base64": "JVBERi0xLjQK...",
+  "size": 142567
+}
+```
+
+```json 404 Not Found
+{ "error": "attachment not found" }
+```
+
+</ResponseExample>

@@ -1,0 +1,80 @@
+---
+title: "Intuition Status"
+description: "Overall stats for the intuition subsystem — observations, instincts, reflections, queue, recent activity."
+api: "GET /api/v1/learning/status"
+---
+
+## Overview
+
+Single dashboard endpoint that aggregates everything about the learning subsystem (observations, instincts, reflections), the routing queue, the activity log, and the most recent daily digest. Reads `ALFRED_LEARN_ENABLED` from `/opt/alfred/compose/.env`.
+
+Reads instincts from BOTH the legacy `intuition/instincts/` path AND the newer `instinct/` path so old + new records both count.
+
+## Response
+
+<ResponseField name="enabled" type="boolean">Whether the alfred-learn worker is enabled in `.env`.</ResponseField>
+
+<ResponseField name="observations" type="object">
+  `{total, unprocessed, processed, invalid}`.
+</ResponseField>
+
+<ResponseField name="instincts" type="object">
+  `{total, active, proposed, deprecated, merged}`.
+</ResponseField>
+
+<ResponseField name="reflections" type="object">`{total}`.</ResponseField>
+
+<ResponseField name="streams" type="object">`{processed}` — count of processed openclaw-session events.</ResponseField>
+
+<ResponseField name="processedToday" type="number">Stream events folded into the vault today (UTC).</ResponseField>
+
+<ResponseField name="autoRouteRate" type="number">Percentage of observations marked `routed_by: alfred`.</ResponseField>
+
+<ResponseField name="queueSize" type="number">Vault records with `status: unrouted`.</ResponseField>
+
+<ResponseField name="recentActivity" type="array">Last 20 lines from `learn-activity.jsonl`, newest-first.</ResponseField>
+
+<ResponseField name="instinctCount" type="number">Total instincts (alias for `instincts.total`).</ResponseField>
+
+<ResponseField name="lastDigest" type="object">
+  `{timestamp, path, summary}` — most recent event tagged `digest`. Null if none.
+</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -H "Authorization: Bearer $AAS_API_KEY" \
+  https://alfred.black/api/v1/learning/status
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "enabled": true,
+  "observations": {"total": 412, "unprocessed": 8, "processed": 404, "invalid": 0},
+  "instincts": {"total": 28, "active": 24, "proposed": 3, "deprecated": 1, "merged": 0},
+  "reflections": {"total": 9},
+  "streams": {"processed": 1842},
+  "processedToday": 67,
+  "autoRouteRate": 92,
+  "queueSize": 3,
+  "recentActivity": [
+    {"at": "2026-04-25T11:00:00Z", "kind": "judgment", "instinct": "instinct/clean-old-receipts.md"}
+  ],
+  "instinctCount": 28,
+  "lastDigest": {
+    "timestamp": "2026-04-24T18:00:00Z",
+    "path": "event/2026-04-24-daily-digest.md",
+    "summary": "Yesterday: 3 meetings, 2 chores ran clean..."
+  }
+}
+```
+
+</ResponseExample>

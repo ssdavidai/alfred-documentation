@@ -1,0 +1,36 @@
+---
+title: "Remove Authorised Number"
+description: "Drop one number from the authorised-phone-numbers list."
+api: "DELETE /api/v1/phone/authorized-numbers/:number"
+---
+
+## Path Parameters
+
+<ParamField path="number" type="string" required>
+  Phone number to remove (URL-encoded). Match is exact after normalisation.
+</ParamField>
+
+## Response
+
+<ResponseField name="numbers" type="array">The persisted list after the removal.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X DELETE -H "Authorization: Bearer $AAS_API_KEY" \
+  "https://alfred.black/api/v1/phone/authorized-numbers/%2B15559876543"
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{ "numbers": [] }
+```
+
+</ResponseExample>

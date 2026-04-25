@@ -1,0 +1,58 @@
+---
+title: "Approve Task"
+description: "Approve a pending execution task — TaskRunner will pick it up on its next pass."
+api: "POST /api/v1/approvals/:path/approve"
+---
+
+## Overview
+
+Patches the vault record's frontmatter directly (bypasses the `alfred vault edit` CLI which rejects non-standard fields like `approved`):
+
+- `approved: true`
+- `requires_approval: false`
+- `status: queued`
+
+`TaskRunnerWorkflow` then sees `task.approved == true` and dispatches the action.
+
+## Path Parameters
+
+<ParamField path="path" type="string" required>
+  Vault-relative path, e.g. `task/2026-04-25-archive-old-receipts.md`. Use forward slashes; slashes inside the path are URL-encoded.
+</ParamField>
+
+## Response
+
+<ResponseField name="approved" type="boolean">Always true on success.</ResponseField>
+<ResponseField name="path" type="string">Echo of the path.</ResponseField>
+<ResponseField name="record" type="object">The updated frontmatter.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X POST -H "Authorization: Bearer $AAS_API_KEY" \
+  "https://alfred.black/api/v1/approvals/task%2F2026-04-25-archive-old-receipts.md/approve"
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "approved": true,
+  "path": "task/2026-04-25-archive-old-receipts.md",
+  "record": {
+    "type": "task",
+    "name": "Archive old receipts",
+    "approved": "true",
+    "requires_approval": "false",
+    "status": "queued"
+  }
+}
+```
+
+</ResponseExample>
