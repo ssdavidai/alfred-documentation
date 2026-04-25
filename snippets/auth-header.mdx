@@ -1,3 +1,3 @@
 <ParamField header="Authorization" type="string" required>
-  Bearer token for API authentication. Format: `Bearer alf_your_key_here`. Create API keys in your [dashboard](https://alfred.black) under **Settings → API Keys**.
+  Bearer token. Format: `Bearer ${AAS_API_KEY}`. Sir gets the key from the dashboard under **Settings → API Keys**, or by calling `GET /api/v1/admin/credentials` once authenticated. Each key authorises one tenant only — Sir's tenant.
 </ParamField>

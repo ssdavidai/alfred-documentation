@@ -1,5 +1,4 @@
 
 <Note>
-  The base URL for all API endpoints is `https://alfred.black/api/v1`. Your API key authenticates all requests.
-  Create one in your [Alfred Black dashboard](https://alfred.black) under **Settings → API Keys**.
+  All API calls go to `https://alfred.black/api/v1/...`. The SaaS layer authenticates the request, decrypts Sir's tenant key, and proxies the call over Tailscale to Sir's dedicated `ctrl-api` on port `:3100`. Sir never touches the tenant directly. The same `Authorization: Bearer ${AAS_API_KEY}` header is required on every request.
 </Note>

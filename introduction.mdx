@@ -1,110 +1,115 @@
 ---
 title: "What is Alfred Black?"
-description: "Alfred Black is a private butler service for your entire life — a team of specialists that turns the chaos of your world into a structured, connected vault of everything that matters."
+description: "A private butler service for Sir's entire life — a small staff of specialists turning the noise of Sir's world into a clean, connected vault of everything that matters."
 ---
 
-## Your life, attended to.
+## Sir's life, attended to.
 
-Alfred Black is a private butler service. Not software. Not another app you'll learn and eventually abandon. A fully managed service — built, configured, and maintained for you.
+Alfred Black is a private butler service. Not an app Sir installs. Not a dashboard Sir is expected to maintain. A managed service — provisioned, configured, and tended to on Sir's behalf.
 
-You share the raw reality of your world with Alfred — meeting notes, conversations, research, ideas, commitments — and Alfred's specialists turn it into a clean, structured, and interconnected vault of everything that matters. Every person, project, task, decision, and insight, connected in ways your brain was never designed to track alone.
+Sir shares the raw substance of life — emails, meetings, calls, notes, documents, ambient recordings — and Alfred's specialists turn it into a structured, interconnected vault. Every person, project, decision, commitment, and pattern, recorded once and linked everywhere it belongs.
 
-And with [Streams](/architecture/data), you don't even have to share manually. Alfred connects to your email, calendar, payment providers, and ambient recording devices — capturing events as they happen and processing them automatically.
+Alfred attends to Sir on every channel Sir already uses — the dashboard, email, SMS, voice calls, Slack, Telegram. Sir does not learn Alfred's interface. Alfred meets Sir wherever Sir already is.
 
 You don't use Alfred. Alfred serves you.
 
-## Zero-config onboarding
+---
 
-Sign up with Google and everything auto-provisions. Your instance spins up, your vault initializes, and your first integrations connect — all before you finish reading the welcome screen. No configuration wizards, no setup checklists.
+## A small staff of specialists
 
-## 1,000+ app integrations
+| Specialist | Role |
+|------------|------|
+| **The Curator** | Receives anything Sir hands in — meeting notes, documents, screenshots — and files it as connected vault records |
+| **The Janitor** | Walks the vault on a schedule, mending broken links and tidying inconsistencies before Sir notices |
+| **The Distiller** | Reads between the lines of existing records and surfaces the assumptions, decisions, constraints, and contradictions hiding there |
+| **The Surveyor** | Embeds records, clusters them by meaning, and quietly maps how Sir's world fits together |
+| **The Clerk** | A stateless analyst dispatched on demand for classification, extraction, and short-form reasoning |
+| **Alfred himself** | The agent Sir actually speaks to — orchestrates the staff, answers questions, executes errands |
 
-Alfred connects to over 1,000 apps via [Connected Apps](/guides/connected-apps), powered by Composio:
+Behind them all, Alfred's **intuition** observes how Sir routes things. Over time, observations harden into **instincts** — learned patterns that let Alfred handle routine matters on Sir's behalf, asking only when judgment is genuinely required.
 
-- **Gmail** — 100-day backfill on connect, then incremental sync (only new emails)
-- **Google Calendar** — events with true delta sync (syncToken — only changes)
-- **Notion** — pages and databases with incremental polling
-- **GitHub** — notifications, PRs, and issues
-- **Slack, Linear, Stripe, Todoist, Asana** — and hundreds more
-- **Omi** — ambient recordings and transcriptions via wearable
-- **Custom webhooks** — bring any source via the webhook API
+---
 
-Every connected app gives Alfred both **data in** (automatic streams) and **actions out** (the agent can create events, send messages, update issues on your behalf).
+## The vault as Sir's life-OS
+
+Every meeting, every promise, every preference is recorded as a Markdown file in Sir's vault and connected via wikilinks to everything else it touches. The vault is fully Obsidian-compatible — Sir can pair a device and browse it directly. There are 26 record types across four families: standing entities (people, organisations, projects), activity records (events, tasks, conversations), learning records (assumptions, decisions, contradictions), and intuition records (observations, instincts).
+
+Hand Alfred a single standup note and it produces records for each participant, the organisation they represent, the decisions made, the action items with owners, the project being discussed — all linked to the conversation itself. Drop another note in tomorrow and the same people get richer, the same projects accumulate history.
+
+The dashboard's homepage is the **Vault Nebula** — a living visualisation of those clusters as drifting clouds, giving Sir an at-a-glance map of everything Alfred is tracking.
+
+---
+
+## Connected Apps — 1,000+ integrations
+
+Alfred connects to over a thousand applications via Composio. Each connection gives Alfred two things: **data in** (Sir's emails, calendar events, Notion pages, GitHub notifications stream into the vault automatically) and **actions out** (Alfred can send the email, create the calendar event, update the issue, post to Slack — on Sir's behalf, with Sir's credentials, never leaving Sir's namespace).
+
+Common integrations:
+
+- **Gmail** — 100-day backfill on connect, then incremental sync of only new mail
+- **Google Calendar** — true delta sync via syncToken; only changes are fetched
+- **Notion, GitHub, Slack, Linear, Stripe, Todoist, Asana** — and hundreds more
+- **Omi** — ambient recordings transcribed via Groq Whisper
+- **Custom webhooks** — any HTTPS source can push into a stream
+
+Sir authorises once. Composio holds the credentials in its vault; nothing sensitive sits on Sir's tenant. Alfred picks up new mail every few minutes and folds it into the vault using zero-LLM Python templates — fast, predictable, free. An hourly enrichment pass batches recent records into a single LLM call to add entities and tags.
+
+---
+
+## Channels — wherever Sir already is
+
+Alfred is reachable on every channel Sir uses for the rest of life:
+
+- **Dashboard chat** at [alfred.black](https://alfred.black)
+- **Email** at `alfred.<sir>@mail.alfred.black` — Sir writes; Alfred replies; PDFs and attachments work both ways
+- **SMS** at Sir's dedicated phone number — full conversational replies, threaded context
+- **Voice calls** at the same number — Alfred answers, primed with Sir's open matters and last week's summaries; transcript captured back into the vault on hangup
+- **Slack** as a bot in Sir's workspace — DMs and mentions
+- **Telegram** as a bot in Sir's chat
+
+Sir can move freely between them. Something said over voice this morning informs the email response this afternoon — every channel writes to the same vault, every channel is primed from the same memory.
+
+---
 
 ## Progressive autonomy
 
-Alfred acts on what it learns. The [Kinetic layer](/architecture/kinetic) powers a growing set of capabilities:
+Alfred is not a chat window pretending to be useful. The Kinetic layer powers an active, growing surface:
 
-- **Matters** — ongoing concerns that group related work (the kitchen renovation, the Q2 launch)
-- **Errands** — discrete tasks executed by Alfred or flagged for you
-- **Chores** — recurring scheduled workflows generated by Opus, personalised per tenant (weekly digest, health check-in, expense tracker)
-- **Instincts** — learned patterns from your instructions that Alfred executes autonomously via ephemeral agents on connected apps
-- **Triage** — items Alfred couldn't confidently classify, surfaced for your review
+- **Matters** — ongoing concerns that group related work (the kitchen renovation, the Q2 launch, the dispute with the landlord)
+- **Errands** — discrete tasks Alfred either executes itself or surfaces for Sir
+- **Chores** — recurring scheduled workflows generated by Opus and personalised to Sir (the weekly cashflow forecast, the morning brief, the quarterly contact warm-up). Each chore is a real Python workflow, validated and smoke-tested before going live
+- **Instincts** — learned routing patterns from Sir's instructions ("from now on, treat receipts from Bolt as expense items"). Instincts execute via short-lived, scope-limited agents
+- **Triage** — items Alfred could not confidently classify, surfaced for Sir's review
 
-## Vault Nebula
+Trust grows in stages. New instincts require Sir's approval on every run. After ten observations of the same pattern with Sir's consent, the threshold relaxes. After fifty, Alfred acts autonomously and reports after the fact.
 
-Your homepage is the **Vault Nebula** — a data-driven cloud visualization where each cloud represents a cluster of related vault records. It gives you a living, at-a-glance map of everything Alfred is tracking.
+---
 
-## How it works
+## Three planes, one tenant
 
-<Steps>
-  <Step title="Data flows in automatically">
-    Connected apps stream data continuously — emails, calendar events, messages, notifications. Alfred also accepts manual uploads (meeting notes, documents, PDFs) via the dashboard or API.
-  </Step>
-  <Step title="Vault records are created instantly">
-    Stream events become structured vault records immediately using zero-LLM Python templates — no waiting for AI processing. Manual uploads go through the Curator for deeper analysis. An hourly enrichment pass adds entities, tags, and context to all recent records in a single batched LLM call.
-  </Step>
-  <Step title="The Janitor keeps everything in order">
-    The Janitor continuously scans for broken links, inconsistencies, and structural issues — fixing them before you ever notice.
-  </Step>
-  <Step title="The Distiller surfaces what's hidden">
-    The Distiller reads between the lines of your records and surfaces the knowledge hiding there: assumptions being made, decisions taken, constraints in play, contradictions across your world.
-  </Step>
-  <Step title="The Surveyor maps your world">
-    The Surveyor embeds your records, clusters them by meaning, labels the clusters, and discovers relationships — giving you a bird's-eye view of your connected world.
-  </Step>
-  <Step title="Alfred develops intuition">
-    Over time, Alfred observes how you route and organize inputs. Those observations become instincts — learned patterns that let Alfred handle routine decisions on your behalf, asking only when something truly requires your judgment.
-  </Step>
-</Steps>
+Underneath the service voice, Alfred is a three-plane system:
 
-## Five specialists, one vault — and growing intuition
+- **SaaS plane** — `alfred.black` handles authentication, billing, the dashboard, and proxies API calls to Sir's tenant
+- **Control plane** — `ctrl-api` runs on Sir's tenant at port `:3100`, exposing every operation Alfred performs as an HTTP endpoint
+- **Data plane** — Sir's dedicated Hetzner VPS runs the full Docker stack: vault workers, OpenClaw gateway, Temporal workflow engine, the intelligence layer
 
-| Specialist | What they do | When they work |
-|-------|-------------|-------------|
-| **Curator** | Processes manual inbox uploads into structured vault records | When files are dropped into the inbox |
-| **Janitor** | Scans for and repairs structural issues in your vault | Periodic sweeps and on-demand |
-| **Distiller** | Surfaces assumptions, decisions, constraints, and insights | On-demand or scheduled |
-| **Surveyor** | Embeds records, clusters by meaning, discovers relationships | On-demand or scheduled |
-| **Clerk** | Stateless LLM worker dispatched for analytical tasks — classification, extraction, summarization | On-demand by other specialists |
+Every subscriber gets their own server. Data is encrypted at rest with LUKS2. Services bind to localhost only — external access exclusively through Sir's private Tailscale mesh. No data ever shares a machine with another subscriber's data.
 
-Beyond the specialists, Alfred's **intuition** quietly learns from how you work — observing your routing decisions, developing instincts, and gradually handling routine decisions on your behalf.
-
-## What Alfred prepares from a single meeting note
-
-Hand Alfred a quick standup summary and it produces:
-
-- **People** — records for each participant, linked to their organization
-- **Tasks** — action items with owners and project links
-- **Decisions** — choices that were made, with rationale
-- **Projects** — initiatives mentioned, with team connections
-- **Conversations** — the meeting itself, linking to everything above
-
-Every record is connected to every other relevant record, building a vault that grows richer with everything you share.
+---
 
 ## Where to begin
 
-<Columns cols={2}>
+<CardGroup cols={2}>
   <Card title="Quickstart" icon="rocket" href="/quickstart">
-    Your first moment with Alfred — share something and watch it come alive
+    The five minutes from Sir, the three hours from Alfred — what to expect on day one
+  </Card>
+  <Card title="How It Works" icon="layer-group" href="/how-it-works">
+    The six-layer architecture, from dedicated server up to the channels Sir uses
   </Card>
   <Card title="Your Vault" icon="vault" href="/vault/understanding-your-vault">
-    Understand how your records, connections, and world fit together
-  </Card>
-  <Card title="The Six Layers" icon="layer-group" href="/how-it-works">
-    Understand how Alfred is organized, from infrastructure to interface
+    The 26 record types, how they connect, and how Sir's knowledge graph forms
   </Card>
   <Card title="API Reference" icon="code" href="/api-reference/introduction">
-    Build integrations with 86 API endpoints
+    The full HTTP surface — vault, workers, workflows, channels, integrations
   </Card>
-</Columns>
+</CardGroup>

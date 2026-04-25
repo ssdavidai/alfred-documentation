@@ -1,20 +1,22 @@
 ---
 title: "How It Works"
-description: "Alfred is organized in six layers, from bare metal to the interfaces you touch every day."
+description: "Alfred is organised in seven layers, from the dedicated server up to the channels Sir actually speaks through."
 icon: "layer-group"
 ---
 
-Alfred Black is a full-stack private intelligence service. Every subscriber gets a dedicated machine — no shared infrastructure, no multi-tenant databases, no commingled data. The entire system is organized in six layers, each with a clear responsibility.
+Alfred Black is a full-stack private intelligence service. Every subscriber gets their own dedicated machine — no shared databases, no commingled vaults, no multi-tenant tables. The system is organised in seven layers, each with a single responsibility.
 
 ```mermaid
 graph TB
-    L6["<b>Interface</b><br/>Dashboard · Terminal · Vault Nebula · Channels · Talk · Ambient"]
-    L5["<b>Kinetic</b><br/>Temporal · Matters · Errands · Triage · Chores · Rules"]
+    L7["<b>Channels</b><br/>Email · SMS · Voice · Slack · Telegram"]
+    L6["<b>Interface</b><br/>Dashboard · Vault Nebula · Terminal · API"]
+    L5["<b>Kinetic</b><br/>Temporal · Matters · Errands · Chores · Triage · Instincts"]
     L4["<b>Semantic</b><br/>Vault · 26 Record Types · Intuition"]
-    L3["<b>Data</b><br/>Connected Apps · Streams · Zero-LLM Ingest"]
-    L2["<b>Agentic</b><br/>OpenClaw · Specialists · Scope"]
-    L1["<b>Infrastructure</b><br/>Dedicated Server · Encryption · Tailscale"]
+    L3["<b>Data</b><br/>Connected Apps · Streams · Zero-LLM Ingest · Hourly Enrichment"]
+    L2["<b>Agentic</b><br/>OpenClaw · Specialists · Ephemeral Subagents · Scope"]
+    L1["<b>Infrastructure</b><br/>Dedicated Server · LUKS2 · Tailscale · Cloudflare Tunnel"]
 
+    L7 --> L6
     L6 --> L5
     L5 --> L4
     L4 --> L3
@@ -27,108 +29,113 @@ graph TB
     style L4 fill:#f7c06a,color:#000
     style L5 fill:#fad28e,color:#000
     style L6 fill:#fde4b5,color:#000
+    style L7 fill:#fff0d6,color:#000
 ```
 
 ---
 
 ## Infrastructure Layer
 
-**Your dedicated machine.**
+**Sir's dedicated machine.**
 
-Every subscriber gets their own Hetzner Cloud server. Data encrypted at rest with LUKS2. All services bind to localhost — zero public ports. External access exclusively through your private Tailscale mesh. No shared infrastructure between subscribers. Your data never touches another subscriber's machine.
+Every subscriber is given their own Hetzner Cloud server. Disk encrypted at rest with LUKS2. All services bind to localhost — there are no public ports. External access exists only via Sir's private Tailscale mesh, with a Cloudflare Tunnel relaying the SaaS proxy. Sir's data never sits on shared infrastructure.
 
 <Card title="Infrastructure Layer" icon="server" href="/architecture/infrastructure">
-  Dedicated servers, encryption, network isolation, container hardening, and data lifecycle.
+  Dedicated servers, encryption, network isolation, container hardening.
 </Card>
 
 ## Agentic Layer
 
-**Your team of specialists.**
+**Sir's staff of specialists.**
 
-OpenClaw hosts five specialist workers — Curator, Janitor, Distiller, Surveyor, and Clerk — each with strictly enforced scope permissions. They interact with your vault only through a controlled CLI gate; they never touch the filesystem directly.
-
-| Specialist | What they do | When they work |
-|-----------|-------------|------|
-| **Curator** | Processes manual inbox uploads into structured vault records | When files are dropped into the inbox |
-| **Janitor** | Scans for and repairs structural issues in your vault | Periodic sweeps |
-| **Distiller** | Surfaces assumptions, decisions, constraints, and insights | On-demand or scheduled |
-| **Surveyor** | Embeds records, clusters by meaning, discovers relationships | On-demand or scheduled |
-| **Clerk** | Stateless LLM worker dispatched for analytical tasks — classification, extraction, summarization | On-demand by other specialists |
+The OpenClaw gateway hosts the specialist workers — Curator, Janitor, Distiller, Surveyor, and the Clerk — each with strictly enforced scope permissions. They reach the vault only through the controlled `ctrl-api` endpoint; they never touch the filesystem directly. The Kinetic layer can also spin up **ephemeral subagents** with per-task tool scoping for one-off execution.
 
 <Card title="Agentic Layer" icon="robot" href="/architecture/agent">
-  OpenClaw runtime, specialist roles, scope enforcement, and prompt injection defense.
+  OpenClaw runtime, specialist roles, ephemeral subagents, scope enforcement.
 </Card>
 
 ## Data Layer
 
-**Your world, flowing in.**
+**Sir's world, flowing in.**
 
-Connect over 1,000 apps via Composio — Gmail, Google Calendar, Notion, GitHub, Slack, and more. Each connection creates a persistent OAuth link that never expires. Alfred polls for new data on a schedule, creates structured vault records using zero-LLM Python templates, and enriches them in hourly batches. Incremental sync means only new or changed items are fetched — not the entire dataset every time.
+Over 1,000 apps connect via Composio — Gmail, Calendar, Notion, GitHub, Slack, Stripe, and the rest. Each connection is a persistent OAuth link that does not expire. Streams pull on a schedule using incremental sync — only new or changed items, never the whole dataset. Stream events become structured vault records immediately via zero-LLM Python templates. An hourly enrichment workflow batches recent records into a single LLM call to add entities, tags, and context.
 
 <Card title="Data Layer" icon="wave-pulse" href="/architecture/data">
-  Connected Apps, Composio integration, zero-LLM ingest, incremental sync, and stream management.
+  Connected Apps, Composio, zero-LLM ingest, incremental sync, hourly enrichment.
 </Card>
 
 ## Semantic Layer
 
-**Your structured knowledge.**
+**Sir's structured knowledge.**
 
-The vault is an Obsidian-compatible collection of Markdown files. Alfred manages 26 record types across four layers: standing entities, activity records, learning types, and intuition types. Records connect through wikilinks, forming a growing knowledge graph. Over time, Alfred develops **intuition** — learned patterns that let it handle routine decisions on your behalf.
+The vault is an Obsidian-compatible collection of Markdown files. Alfred manages 26 record types across four families: standing entities (people, organisations, projects), activity records (events, tasks, conversations), learning records (assumptions, decisions, contradictions), and intuition records (observations, instincts). Records connect through wikilinks, forming a knowledge graph that grows richer with everything Sir shares. Over time, Alfred's **intuition** distils repeated routing decisions into instincts.
 
 <Card title="Semantic Layer" icon="brain" href="/architecture/semantic">
-  Vault structure, record types, relationships, and the learning cycle.
+  Vault structure, record types, relationships, intuition.
 </Card>
 
 ## Kinetic Layer
 
-**Your actions in motion.**
+**Sir's actions in motion.**
 
-Temporal is the workflow engine. It orchestrates every specialist, intuition process, and action Alfred takes. The Kinetic layer is built around four core concepts: **Matters** (standing concerns that group related work), **Errands** (actionable tasks with a status lifecycle), **Chores** (recurring scheduled workflows generated by Opus, personalised per tenant), and **Triage** (items flagged for your review). Together with the progressive autonomy pipeline — where Alfred learns instincts from your instructions and executes them via ephemeral agents on connected apps — they turn vault knowledge into proactive service.
+Temporal orchestrates every workflow Alfred runs. The Kinetic layer is built around five concepts: **Matters** (standing concerns that group related work), **Errands** (one-shot tasks with a status lifecycle), **Chores** (recurring scheduled workflows generated by Opus and personalised to Sir), **Triage** (items flagged for Sir's review), and **Instincts** (learned routing patterns executed via ephemeral subagents). Trust grows in stages — new instincts require Sir's approval; mature ones run autonomously.
 
 <Card title="Kinetic Layer" icon="gears" href="/architecture/kinetic">
-  Temporal engine, Matters, Errands, Chores, Triage, progressive autonomy, and background processes.
+  Temporal engine, Matters, Errands, Chores, Triage, progressive autonomy.
 </Card>
 
 ## Interface Layer
 
-**Your points of contact.**
+**Sir's points of contact.**
 
-Every way you interact with Alfred — the dashboard, **Vault Nebula** (a 3D visualization of your knowledge graph), a **Terminal proxy** with full PTY support for direct CLI access to OpenClaw, messaging channels (WhatsApp, iMessage, Telegram, Discord), voice calls via Talk Mode, continuous listening via Ambient Mode, and the REST API. Every interface feeds into the same pipeline.
+The dashboard at [alfred.black](https://alfred.black) is the primary surface — the **Vault Nebula** as the homepage, plus Intelligence (Inbox, Matters, Errands, Chores), the Apps catalog, Settings, and the Terminal proxy with full PTY access into OpenClaw. Every interface feeds the same vault and the same intuition.
 
 <Card title="Interface Layer" icon="display" href="/architecture/interface">
-  Dashboard, terminal, channels, Talk Mode, Ambient Mode, device pairing, and the API.
+  Dashboard, Vault Nebula, Terminal proxy, device pairing, REST API.
+</Card>
+
+## Channels Layer
+
+**Sir's voice in Alfred's ear.**
+
+Alfred is reachable on every channel Sir already uses. **Email** at `alfred.<sir>@mail.alfred.black` for written correspondence, with PDFs and attachments in both directions. **SMS** at Sir's dedicated phone number, with full conversational replies and threaded context. **Voice** at the same number, primed at call start with Sir's open matters and recent summaries; transcripts are written back to the vault on hangup. **Slack** and **Telegram** as bots in Sir's workspaces. Every channel writes to the same vault — what Sir said over voice this morning informs the email reply this afternoon.
+
+<Card title="Channels" icon="messages" href="/architecture/interface">
+  Email, SMS, voice, Slack, Telegram, and cross-channel memory.
 </Card>
 
 ---
 
 ## Always working
 
-Alfred doesn't wait for you to ask. Your specialists and intuition processes run continuously in the background:
+Alfred does not wait for Sir to ask. Workflows run continuously in the background:
 
-- **Curator** attends to new inbox items within seconds of arrival — whether shared manually or delivered by a Stream
-- **Janitor** runs periodic health scans automatically
-- **Distiller** and **Surveyor** can be triggered on-demand or scheduled
-- **Intuition** observes, learns, and routes on automated schedules — no intervention needed
+- **Curator** attends to new inbox items within seconds of arrival
+- **Janitor** runs periodic health scans
+- **Hourly enrichment** batches recent records into a single LLM call
+- **Daily digest** at 6pm local
+- **Nightly reflection** at 2am refines instincts from the day's observations
+- **Streams** pull on each app's own schedule via incremental sync
 
-You can check on your specialists, trigger a run, and view their history from your dashboard or via the API.
+Sir can check on any of these — view history, trigger a manual run, or inspect the workflow state — from the dashboard or via the API.
 
-<Columns cols={3}>
+<CardGroup cols={3}>
   <Card title="Infrastructure" icon="server" href="/architecture/infrastructure">
-    Dedicated servers, encryption, network isolation
+    Dedicated server, encryption, network
   </Card>
   <Card title="Agentic" icon="robot" href="/architecture/agent">
-    OpenClaw, specialists, scope enforcement
+    OpenClaw, specialists, scope
   </Card>
   <Card title="Data" icon="wave-pulse" href="/architecture/data">
-    Streams, events, session logs
+    Streams, zero-LLM ingest
   </Card>
   <Card title="Semantic" icon="brain" href="/architecture/semantic">
     Vault, record types, intuition
   </Card>
   <Card title="Kinetic" icon="gears" href="/architecture/kinetic">
-    Temporal, Matters, Errands, Triage, Chores, Rules
+    Temporal, Matters, Errands, Chores
   </Card>
   <Card title="Interface" icon="display" href="/architecture/interface">
-    Dashboard, Vault Nebula, Terminal, Channels, Talk, Ambient
+    Dashboard, Nebula, Terminal, channels
   </Card>
-</Columns>
+</CardGroup>
