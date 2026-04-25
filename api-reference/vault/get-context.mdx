@@ -1,17 +1,41 @@
 ---
 title: "Get Vault Context"
-description: "Get an overview of your vault — record counts, recent activity, and statistics."
+description: "Returns every record in your vault grouped by type, plus a total count."
 api: "GET /api/v1/vault/context"
 ---
 
-## Overview
+## When to use
 
-Returns a summary of your vault including record counts by type, recent activity, and overall statistics. Use this to get a quick snapshot of your vault's current state.
+This is the cheapest way to see the full shape of your vault in one round trip. It walks the vault filesystem directly (no `docker exec` overhead) and returns a compact index of every record grouped by type — perfect for populating navigation panes, building dashboards, or letting an agent decide where to look next without N+1 reads.
+
+The endpoint excludes the standard housekeeping directories (`_templates`, `_bases`, `_docs`, `.obsidian`, `view`, `dashboard`) and the `inbox/` directory. Inbox contents are listed separately via `GET /api/v1/vault/inbox`.
+
+<Note>
+Bodies and frontmatter are NOT included — only `path`, `name`, and `status`. To read a single record's full content, use `GET /api/v1/vault/records/{path}`. To get the full frontmatter and a body preview for one type at a time, use `GET /api/v1/vault/list/{type}`.
+</Note>
 
 ## Response
 
-<ResponseField name="raw" type="string">
-  Summary of your vault as human-readable text. If the response is structured JSON, it is returned directly instead.
+<ResponseField name="records_by_type" type="object" required>
+  Map of record type to an array of record summaries. Keys are the type names from the schema (`person`, `task`, `matter`, etc.). Types with zero records are omitted.
+
+  Each entry has:
+
+  <Expandable title="record summary">
+    <ResponseField name="path" type="string">
+      Vault-relative path WITHOUT the `.md` extension (e.g., `matter/alfred-product-development-launch`). Forward slashes, even on Windows hosts.
+    </ResponseField>
+    <ResponseField name="name" type="string">
+      The file stem — i.e., the filename without `.md`. Note this is the on-disk stem, NOT the `name` frontmatter field. Use `GET /api/v1/vault/list/{type}` if you need the human-readable `name`/`subject` field instead.
+    </ResponseField>
+    <ResponseField name="status" type="string">
+      The `status` frontmatter field, or empty string if absent.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="total" type="integer" required>
+  Sum of records across every type. Useful as a sanity check (your dashboard's vault badge, etc.).
 </ResponseField>
 
 ## Request Example
@@ -20,19 +44,25 @@ Returns a summary of your vault including record counts by type, recent activity
 
 ```bash cURL
 curl -X GET https://alfred.black/api/v1/vault/context \
-  -H "Authorization: Bearer alf_your_key_here"
+  -H "Authorization: Bearer $AAS_API_KEY"
 ```
 
 ```javascript JavaScript
 const response = await fetch('https://alfred.black/api/v1/vault/context', {
-  method: 'GET',
-  headers: {
-    'Authorization': 'Bearer alf_your_key_here'
-  }
+  headers: { 'Authorization': `Bearer ${process.env.AAS_API_KEY}` },
 });
+const { records_by_type, total } = await response.json();
+console.log(`${total} records across ${Object.keys(records_by_type).length} types`);
+```
 
-const context = await response.json();
-console.log(context);
+```python Python
+import os, httpx
+r = httpx.get(
+    "https://alfred.black/api/v1/vault/context",
+    headers={"Authorization": f"Bearer {os.environ['AAS_API_KEY']}"},
+)
+data = r.json()
+print(f"{data['total']} records across {len(data['records_by_type'])} types")
 ```
 
 </RequestExample>
@@ -43,26 +73,41 @@ console.log(context);
 
 ```json 200 OK
 {
-  "raw": "127 records across 18 types.\n\nMost recent activity: 3 tasks updated today, 2 people added this week."
+  "records_by_type": {
+    "note": [
+      { "path": "Start Here", "name": "Start Here", "status": "active" }
+    ],
+    "matter": [
+      {
+        "path": "matter/alfred-product-development-launch",
+        "name": "alfred-product-development-launch",
+        "status": "active"
+      }
+    ],
+    "chore": [
+      {
+        "path": "chore/call-erik-car-cleaning",
+        "name": "call-erik-car-cleaning",
+        "status": "active"
+      }
+    ]
+  },
+  "total": 9392
 }
 ```
 
 ```json 401 Unauthorized
-{
-  "error": {
-    "code": "UNAUTHORIZED",
-    "message": "Unauthorized"
-  }
-}
-```
-
-```json 500 Internal Server Error
-{
-  "error": {
-    "code": "EXEC_ERROR",
-    "message": "Command failed with exit code 1"
-  }
-}
+{ "error": { "code": "UNAUTHORIZED", "message": "Invalid API key" } }
 ```
 
 </ResponseExample>
+
+## Tips
+
+<Note>
+The `path` value omits `.md`, but every other vault endpoint that takes a path accepts both forms — `matter/foo` and `matter/foo.md` work identically against `GET /api/v1/vault/records/{path}`.
+</Note>
+
+<Warning>
+For very large vaults this endpoint reads every `.md` file and parses its frontmatter on every call. Cache the result client-side and refresh on a sensible interval rather than calling it on every request.
+</Warning>

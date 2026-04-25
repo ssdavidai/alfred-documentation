@@ -1,0 +1,132 @@
+---
+title: "Promote Triage to Task"
+description: "Convert a triage record into a task (errand), copy its body across, and mark the original triage as resolved."
+api: "POST /api/v1/vault/promote-triage"
+---
+
+## When to use
+
+The Kinetic Layer surfaces unresolved items in `triage/`. When you decide one of them is a real action, this endpoint:
+
+1. Reads the triage record and extracts its `name` from frontmatter (or filename if missing).
+2. Slugifies the name into a task filename (lowercased, non-alphanumerics stripped, max 80 chars).
+3. Writes a new task at `task/<slug>.md` with frontmatter pointing back at the source triage (`source_triage: "[[<triage-path-without-md>]]"`) and a copy of the triage body under a `# <name>` heading.
+4. Sets the triage's `status` to `resolved` via `alfred vault edit` (failure is non-fatal — the task is still created).
+
+## Body Parameters
+
+<ParamField body="triagePath" type="string" required>
+  Vault-relative path to the source triage record, e.g., `triage/2026-04-24-clockify-anomaly.md`. Must end in `.md`. Returns `404` if the file doesn't exist.
+</ParamField>
+
+<ParamField body="matter" type="string">
+  Optional matter slug (no `matter/` prefix, no `.md`). When set, the new task gets `matter: "[[matter/<value>]]"` in its frontmatter. Use this to immediately attach the task to an existing matter.
+</ParamField>
+
+<ParamField body="owner" type="string" default="human">
+  Value for the task's `owner` frontmatter field. Typically `human` or `alfred`.
+</ParamField>
+
+<ParamField body="priority" type="string" default="normal">
+  Value for the task's `priority` frontmatter field. Free-form string; common values: `low`, `normal`, `high`, `urgent`.
+</ParamField>
+
+## Response
+
+Returns `201 Created`.
+
+<ResponseField name="taskPath" type="string" required>
+  Vault-relative path of the new task, e.g., `task/clockify-anomaly-2026-04-24.md`.
+</ResponseField>
+
+<ResponseField name="triagePath" type="string" required>
+  The source triage path (echoed from the request).
+</ResponseField>
+
+<ResponseField name="name" type="string" required>
+  Display name written to the task — extracted from the triage's `name:` frontmatter, or its filename stem.
+</ResponseField>
+
+<ResponseField name="status" type="string" required>
+  Always `"promoted"` on success.
+</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X POST https://alfred.black/api/v1/vault/promote-triage \
+  -H "Authorization: Bearer $AAS_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "triagePath": "triage/2026-04-24-clockify-anomaly.md",
+    "matter": "alfred-product-development-launch",
+    "owner": "alfred",
+    "priority": "high"
+  }'
+```
+
+```javascript JavaScript
+await fetch('https://alfred.black/api/v1/vault/promote-triage', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${process.env.AAS_API_KEY}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    triagePath: 'triage/2026-04-24-clockify-anomaly.md',
+    owner: 'human',
+    priority: 'normal',
+  }),
+});
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 201 Created
+{
+  "taskPath": "task/clockify-anomaly-2026-04-24.md",
+  "triagePath": "triage/2026-04-24-clockify-anomaly.md",
+  "name": "Clockify anomaly 2026-04-24",
+  "status": "promoted"
+}
+```
+
+```json 400 Bad Request
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "triagePath is required"
+  }
+}
+```
+
+```json 404 Not Found
+{
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "Triage record not found: triage/missing.md"
+  }
+}
+```
+
+</ResponseExample>
+
+## Tips
+
+<Note>
+The new task is written via raw filesystem (parent directory created with `mkdir -p`) — the alfred CLI's `vault create` validation is NOT used. The frontmatter is hand-rolled from a fixed template.
+</Note>
+
+<Note>
+The triage status update is best-effort. If the `alfred vault edit` call fails, the task is still considered created and the response is still `201`. The triage will remain at its original status; you may need to set it to `resolved` manually.
+</Note>
+
+<Warning>
+The slug used for the task filename collapses non-alphanumerics (except space and hyphen) and truncates at 80 characters. Two triages with very similar names can collide. The endpoint does NOT check for an existing task at the target path — it will overwrite. Audit the response `taskPath` if collisions matter.
+</Warning>

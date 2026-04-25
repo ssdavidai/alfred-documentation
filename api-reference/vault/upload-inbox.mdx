@@ -1,62 +1,113 @@
 ---
 title: "Upload to Inbox"
-description: "Upload a single file to your inbox for processing."
+description: "Upload a single file (text or binary) to the vault inbox. Media files are auto-routed to the media-ingestion pipeline."
 api: "POST /api/v1/vault/inbox"
 ---
 
-## Overview
+## When to use
 
-Uploads a single file to your inbox. The Curator agent will automatically process it into structured vault records.
+Drop a file into `<vault>/inbox/` for processing. Two pipelines branch off the upload:
+
+- **Text** (`.md`, `.txt`, anything not in the media extension/MIME map) — handled by the Curator daemon's regular inbox scan, which runs the 4-stage analyze → entity-resolution → interlink → enrich pipeline against the file.
+- **Media** (audio, image, video, PDF, Office document) — also written to the inbox AND a `stream_type: "media"` event is emitted to the stream pipeline, which routes the file to `MediaIngestionWorkflow` for transcription / OCR / extraction. The response includes the resulting event id.
+
+Filenames are sanitised before writing — `/`, `\`, `:`, `*`, `?`, `"`, `<`, `>`, `|`, and `..` are replaced with `_`. Empty/`.`/`..` filenames are rejected.
 
 ## Body Parameters
 
 <ParamField body="filename" type="string" required>
-  Name of the file (e.g., `meeting-notes-2026-02-26.md`).
+  Name to store the file under in the inbox (e.g., `meeting-notes-2026-04-25.md`, `voice-memo.m4a`). No path separators — the file always lands directly in `<vault>/inbox/`.
 </ParamField>
 
 <ParamField body="content" type="string" required>
-  File contents as a string.
+  File contents. Plain text by default. For binary files, base64-encode and set `encoding: "base64"`.
+</ParamField>
+
+<ParamField body="encoding" type="string" default="utf-8">
+  Set to `"base64"` to indicate `content` is base64-encoded. Any other value (or omitting the field) treats `content` as a UTF-8 string.
+</ParamField>
+
+<ParamField body="mime_type" type="string">
+  Optional MIME type hint (e.g., `application/pdf`, `audio/mpeg`). When set, takes precedence over filename extension for media-category detection. Useful when uploading a file with a generic or missing extension.
 </ParamField>
 
 ## Response
 
-<ResponseField name="message" type="string">
-  Confirmation message.
+<ResponseField name="message" type="string" required>
+  Human-readable confirmation (e.g., `"Uploaded meeting-notes-2026-04-25.md to inbox"`).
 </ResponseField>
 
-<ResponseField name="filename" type="string">
-  The filename that was written to the inbox.
+<ResponseField name="filename" type="string" required>
+  The sanitised filename actually written to disk.
 </ResponseField>
+
+<ResponseField name="binary" type="boolean" required>
+  `true` when `encoding: "base64"` was supplied, otherwise `false`.
+</ResponseField>
+
+<ResponseField name="media_event_id" type="string">
+  Present only for media files. The id of the `stream_type: "media"` event emitted to the stream pipeline. Use this to track ingestion through the dashboard / streams API.
+</ResponseField>
+
+<ResponseField name="media_type" type="string">
+  Present only for media files. One of `audio`, `document`, `image`, `video`. Determined from MIME type first, then filename extension.
+</ResponseField>
+
+## Media detection rules
+
+A file is treated as media when EITHER:
+
+- **MIME type matches** `audio/*`, `image/*`, `video/*`, `application/pdf`, or one of the Office document family (`application/ms*`, `application/vnd.openxmlformats-officedocument.*`, `application/vnd.oasis.opendocument.*`).
+- **Filename extension is in** the platform's media extension map: `.mp3`, `.wav`, `.ogg`, `.m4a` (audio); `.pdf`, `.doc`, `.docx` (document); `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp` (image); `.mp4`, `.webm`, `.mov` (video).
+
+`.txt` is intentionally excluded so plain-text uploads fall through to the Curator/text path.
 
 ## Request Example
 
 <RequestExample>
 
-```bash cURL
+```bash Text upload
 curl -X POST https://alfred.black/api/v1/vault/inbox \
-  -H "Authorization: Bearer alf_your_key_here" \
+  -H "Authorization: Bearer $AAS_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "filename": "meeting-notes-2026-02-26.md",
-    "content": "# Standup Notes\n\n- Alice: Working on ML pipeline refactor\n- Bob: Reviewing PR #234\n- Carol: Debugging production issue"
+    "filename": "meeting-notes-2026-04-25.md",
+    "content": "# Q2 Planning\n\n- Ship docs rebuild\n- Onboard 2 design partners\n"
   }'
 ```
 
-```javascript JavaScript
+```bash Binary upload (audio)
+B64=$(base64 < ./voice-memo.m4a)
+curl -X POST https://alfred.black/api/v1/vault/inbox \
+  -H "Authorization: Bearer $AAS_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"filename\": \"voice-memo.m4a\",
+    \"content\": \"$B64\",
+    \"encoding\": \"base64\",
+    \"mime_type\": \"audio/mp4\"
+  }"
+```
+
+```javascript JavaScript (browser file upload)
+const file = inputElement.files[0];
+const buffer = await file.arrayBuffer();
+const b64 = btoa(String.fromCharCode(...new Uint8Array(buffer)));
+
 const response = await fetch('https://alfred.black/api/v1/vault/inbox', {
   method: 'POST',
   headers: {
-    'Authorization': 'Bearer alf_your_key_here',
-    'Content-Type': 'application/json'
+    'Authorization': `Bearer ${process.env.AAS_API_KEY}`,
+    'Content-Type': 'application/json',
   },
   body: JSON.stringify({
-    filename: 'meeting-notes-2026-02-26.md',
-    content: '# Standup Notes\n\n- Alice: Working on ML pipeline refactor\n- Bob: Reviewing PR #234\n- Carol: Debugging production issue'
-  })
+    filename: file.name,
+    content: b64,
+    encoding: 'base64',
+    mime_type: file.type,
+  }),
 });
-
-const result = await response.json();
-console.log(result);
+const { media_event_id } = await response.json();
 ```
 
 </RequestExample>
@@ -65,10 +116,21 @@ console.log(result);
 
 <ResponseExample>
 
-```json 201 Created
+```json 201 Created (text)
 {
-  "message": "Uploaded meeting-notes-2026-02-26.md to inbox",
-  "filename": "meeting-notes-2026-02-26.md"
+  "message": "Uploaded meeting-notes-2026-04-25.md to inbox",
+  "filename": "meeting-notes-2026-04-25.md",
+  "binary": false
+}
+```
+
+```json 201 Created (media)
+{
+  "message": "Uploaded voice-memo.m4a to inbox",
+  "filename": "voice-memo.m4a",
+  "binary": true,
+  "media_event_id": "evt_01HX9P2K3Z7Q4M",
+  "media_type": "audio"
 }
 ```
 
@@ -81,4 +143,27 @@ console.log(result);
 }
 ```
 
+```json 400 Bad Request (invalid filename)
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Invalid filename"
+  }
+}
+```
+
 </ResponseExample>
+
+## Tips
+
+<Warning>
+Set `encoding: "base64"` for ANY binary upload. Sending raw bytes as `content` will UTF-8-decode, corrupt them, and produce a broken file in the inbox.
+</Warning>
+
+<Note>
+For larger media (>5MB base64 = ~3.5MB raw), prefer multiple uploads via `POST /api/v1/vault/inbox/bulk` over chunking a single file — the upload endpoint reads `content` whole into memory.
+</Note>
+
+<Note>
+A successful media upload returns immediately after writing the file and emitting the stream event. The actual transcription/OCR runs asynchronously in `MediaIngestionWorkflow` — track progress via the streams pipeline using the returned `media_event_id`.
+</Note>
