@@ -1,0 +1,48 @@
+---
+title: "Routing Queue"
+description: "Vault records with status=unrouted, awaiting clerk decision."
+api: "GET /api/v1/learning/queue"
+---
+
+## Overview
+
+Walks the entire vault and returns records whose frontmatter `status` is `unrouted`. These are inputs the curator hasn't decided where to put yet — the clerk's queue.
+
+## Response
+
+<ResponseField name="items" type="array">
+  Each: `{path, name, type, created}`.
+</ResponseField>
+
+<ResponseField name="total" type="number">Count.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -H "Authorization: Bearer $AAS_API_KEY" \
+  https://alfred.black/api/v1/learning/queue
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "items": [
+    {
+      "path": "inbox/scratch-note.md",
+      "name": "Scratch note",
+      "type": "note",
+      "created": "2026-04-25T11:30:00Z"
+    }
+  ],
+  "total": 1
+}
+```
+
+</ResponseExample>

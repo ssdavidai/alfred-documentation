@@ -1,0 +1,58 @@
+---
+title: "Disable Stream"
+description: "Tear down a Composio-backed stream — config, metadata, and Temporal schedule."
+api: "POST /api/v1/integrations/:id/disable-stream"
+---
+
+## Overview
+
+Inverse of enable-stream. Finds the stream config matching `(composio_action, composio_connection_id)`, deletes the config file, removes the entry from `streams.json`, and best-effort deletes the Temporal schedule.
+
+The schedule delete is best-effort because a stale config-less schedule is harmless (StreamPullerWorkflow won't fire), whereas failing the whole request because of a Temporal hiccup would block the user from disabling the stream from the UI.
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  Composio connection id.
+</ParamField>
+
+## Body Parameters
+
+<ParamField body="action_slug" type="string" required>
+  The Composio action slug whose stream should be torn down.
+</ParamField>
+
+## Response
+
+<ResponseField name="status" type="string">`disabled`.</ResponseField>
+<ResponseField name="action_slug" type="string">Echo of the request.</ResponseField>
+<ResponseField name="stream_id" type="string">Stream id that was removed (null if no match was found).</ResponseField>
+<ResponseField name="schedule_deleted" type="boolean">Whether the Temporal schedule delete succeeded.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X POST -H "Authorization: Bearer $AAS_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"action_slug": "GMAIL_FETCH_EMAILS"}' \
+  https://alfred.black/api/v1/integrations/ca_01HXYZ/disable-stream
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "status": "disabled",
+  "action_slug": "GMAIL_FETCH_EMAILS",
+  "stream_id": "composio-gmail-gmail-fetch-emails",
+  "schedule_deleted": true
+}
+```
+
+</ResponseExample>

@@ -1,0 +1,71 @@
+---
+title: "Channel Inbound (internal)"
+description: "Receive an authorised-sender email from the SaaS webhook receiver and spawn an openclaw session."
+api: "POST /api/v1/channels/email/inbound"
+---
+
+## Overview
+
+<Note>
+Internal use only — called by the SaaS-side AgentMail webhook receiver (`packages/saas/app/src/server/agentmailReceiver.ts`) when an inbound email comes from a sender on `/vault/.auth/authorized_senders.json`. Not intended for ad-hoc invocation.
+</Note>
+
+Builds an envelope-aware prompt and fires a `sessions_spawn` call against the openclaw gateway in fire-and-forget mode. The session runs the main agent with the email pre-loaded as the initial user message; the agent reads, reasons, and replies via `/api/v1/email/reply`. The handler returns `202 Accepted` immediately while the session runs in the background.
+
+## Body Parameters
+
+<ParamField body="message" type="object" required>
+  AgentMail message envelope. Required fields are referenced by the prompt builder: `from_[]`, `to[]`, `cc[]`, `subject`, `thread_id`, `message_id`, `text` (or `preview`), `attachments[]`.
+</ParamField>
+
+<ParamField body="event_id" type="string" optional>
+  SaaS-side event id used as a session label for traceability.
+</ParamField>
+
+## Response
+
+<ResponseField name="accepted" type="boolean">Always true on success.</ResponseField>
+<ResponseField name="message_id" type="string">Echoed from the request envelope.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X POST -H "Authorization: Bearer $AAS_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "event_id": "evt_01HXYZ",
+    "message": {
+      "message_id": "msg_01HXYZ001",
+      "thread_id": "thr_01HXYZ",
+      "from_": ["\"Alice\" <alice@example.com>"],
+      "to": ["alfred.david@mail.alfred.black"],
+      "cc": [],
+      "subject": "Following up",
+      "text": "Hi David, ...",
+      "attachments": []
+    }
+  }' \
+  https://alfred.black/api/v1/channels/email/inbound
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 202 Accepted
+{ "accepted": true, "message_id": "msg_01HXYZ001" }
+```
+
+```json 400 Bad Request
+{ "error": "OpenClaw gateway token not available — cannot spawn session" }
+```
+
+</ResponseExample>
+
+<Note>
+The session runs for up to 300 seconds (`CHANNEL_SESSION_BUDGET_SECONDS`). The SaaS receiver also buffers a `StreamEvent` fallback so the message is never lost if session spawn fails.
+</Note>

@@ -1,0 +1,45 @@
+---
+title: "List Reflections"
+description: "Synthesised insights — periodic ReflectionWorkflow output."
+api: "GET /api/v1/learning/reflections"
+---
+
+## Overview
+
+Reads `vault/reflection/` newest-first. Reflections are the daily 2am Synthesis pass that folds the day's observations into higher-level patterns.
+
+## Response
+
+<ResponseField name="items" type="array">Each: `{path, name, frontmatter, body, status, created}`.</ResponseField>
+<ResponseField name="total" type="number">Count.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -H "Authorization: Bearer $AAS_API_KEY" \
+  https://alfred.black/api/v1/learning/reflections
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "items": [
+    {
+      "path": "reflection/2026-04-25-morning-pattern.md",
+      "name": "Morning routine pattern",
+      "created": "2026-04-25T02:00:00Z",
+      "body": "Sir's morning routine has shifted..."
+    }
+  ],
+  "total": 9
+}
+```
+
+</ResponseExample>

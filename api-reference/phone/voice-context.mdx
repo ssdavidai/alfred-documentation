@@ -1,0 +1,72 @@
+---
+title: "Voice Context Primer"
+description: "Bundle of MEMORY.md, voice skill, open matters/tasks, recent sessions, and Composio toolkits for the bridge."
+api: "GET /api/v1/phone/voice-context"
+---
+
+## Overview
+
+Returns the context bundle the Voice Bridge inlines into the OpenAI Realtime `instructions` at call start, so Sir's voice agent already knows about this morning's Slack chat, his open matters, and which third-party tools are wired up. Cached for 60 seconds in-memory to avoid re-walking the vault on every call.
+
+## Response
+
+<ResponseField name="memoryMd" type="string">
+  Tail of `MEMORY.md` (capped at 8KB).
+</ResponseField>
+
+<ResponseField name="voiceSkill" type="string">
+  Contents of `skills/alfred-voice/SKILL.md` (capped at 8KB).
+</ResponseField>
+
+<ResponseField name="openMatters" type="array">
+  Up to 20 active matters from `vault/matter/`. Each `{name, summary?}`.
+</ResponseField>
+
+<ResponseField name="openTasks" type="array">
+  Up to 20 active tasks from `vault/task/`. Each `{name, due?, summary?}`.
+</ResponseField>
+
+<ResponseField name="recentSessions" type="array">
+  Last 20 main-agent sessions tailed from `system-openclaw-sessions.jsonl`. Each `{at, channel, summary}`.
+</ResponseField>
+
+<ResponseField name="composioToolkits" type="array">
+  Each `{toolkit, actions: [{name, description}]}` extracted from each `alfred-composio-<toolkit>/SKILL.md` action table.
+</ResponseField>
+
+<ResponseField name="generatedAt" type="string">ISO timestamp.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -H "Authorization: Bearer $AAS_API_KEY" \
+  https://alfred.black/api/v1/phone/voice-context
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "memoryMd": "## Recent decisions\n- ...",
+  "voiceSkill": "# alfred-voice — voice channel skill\n...",
+  "openMatters": [{"name": "Hetzner migration", "summary": "Move staging to NBG"}],
+  "openTasks": [{"name": "Reply to Alice", "due": "2026-04-26"}],
+  "recentSessions": [{"at": "2026-04-25T08:00:00Z", "channel": "slack", "summary": "Morning briefing"}],
+  "composioToolkits": [
+    {"toolkit": "googlecalendar", "actions": [{"name": "GOOGLECALENDAR_QUICK_ADD", "description": "Add an event from natural-language text."}]}
+  ],
+  "generatedAt": "2026-04-25T11:35:00Z"
+}
+```
+
+</ResponseExample>
+
+<Note>
+Defaults assume tenant ctrl-api mounts: vault at `/mnt/encrypted/vault`, openclaw workspace at `/mnt/encrypted/openclaw/workspace`. Override with `VAULT_PATH` and `OPENCLAW_WORKSPACE_DIR` env vars if needed (#463 fixed the silent-empty-bundle bug from wrong defaults).
+</Note>

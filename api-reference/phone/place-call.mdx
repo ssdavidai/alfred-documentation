@@ -1,0 +1,74 @@
+---
+title: "Place Call"
+description: "Place an outbound voice call via Twilio — TTS playback or live Realtime session."
+api: "POST /api/v1/phone/call"
+---
+
+## Overview
+
+Initiates an outbound call via the SaaS internal endpoint `/api/internal/twilio/initiate-call`. Two modes:
+
+- **`tts`** (default) — one-shot TTS playback of `message` via SaaS `/api/twiml/say`. Hangs up after speaking.
+- **`realtime`** — opens a live Voice Bridge session with `initiator=alfred`. The Realtime model receives `message` as the opening intent and conducts the conversation.
+
+Logs an `voice-call-outbound` stream event for kickoff visibility. The full transcript posts back via `/api/v1/phone/transcript` when the bridge ends the call (realtime mode only).
+
+## Body Parameters
+
+<ParamField body="to" type="string" required>
+  Recipient E.164 number.
+</ParamField>
+
+<ParamField body="message" type="string" required>
+  Either the TTS script (mode=`tts`) or the opening intent for the Realtime model (mode=`realtime`).
+</ParamField>
+
+<ParamField body="mode" type="string" optional default="tts">
+  One of `tts`, `realtime`.
+</ParamField>
+
+## Response
+
+<ResponseField name="status" type="string">`initiated`, `no-tenant-meta`, `misconfigured`, `saas-call-failed`, or `saas-unreachable`.</ResponseField>
+<ResponseField name="sid" type="string">Twilio call SID (only on `initiated`).</ResponseField>
+<ResponseField name="mode" type="string">Echo of the requested mode.</ResponseField>
+<ResponseField name="error" type="string">Error message on failure.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X POST -H "Authorization: Bearer $AAS_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "to": "+15559876543",
+    "message": "Calling to confirm tomorrow's 2pm meeting.",
+    "mode": "realtime"
+  }' \
+  https://alfred.black/api/v1/phone/call
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{ "status": "initiated", "sid": "CA01HXYZ", "mode": "realtime" }
+```
+
+```json 409 Conflict
+{ "status": "no-tenant-meta", "error": "TENANT_ID or phone number not set" }
+```
+
+```json 500 Internal Server Error
+{ "status": "misconfigured", "error": "VOICE_BRIDGE_INTERNAL_TOKEN not set" }
+```
+
+</ResponseExample>
+
+<Note>
+Realtime calls cost the OpenAI Realtime per-minute rate plus Twilio per-minute. TTS calls are Twilio-only.
+</Note>

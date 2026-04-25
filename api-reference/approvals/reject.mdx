@@ -1,0 +1,55 @@
+---
+title: "Reject Task"
+description: "Reject a pending execution task — sets status=cancelled."
+api: "POST /api/v1/approvals/:path/reject"
+---
+
+## Overview
+
+Patches the vault record's frontmatter:
+
+- `requires_approval: false`
+- `status: cancelled`
+
+The task remains in the vault (for learning purposes) but `TaskRunnerWorkflow` will skip it on every future pass.
+
+## Path Parameters
+
+<ParamField path="path" type="string" required>
+  Vault-relative path. URL-encode slashes.
+</ParamField>
+
+## Response
+
+<ResponseField name="rejected" type="boolean">Always true on success.</ResponseField>
+<ResponseField name="path" type="string">Echo.</ResponseField>
+<ResponseField name="record" type="object">The updated frontmatter.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X POST -H "Authorization: Bearer $AAS_API_KEY" \
+  "https://alfred.black/api/v1/approvals/task%2F2026-04-25-archive-old-receipts.md/reject"
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "rejected": true,
+  "path": "task/2026-04-25-archive-old-receipts.md",
+  "record": {
+    "type": "task",
+    "requires_approval": "false",
+    "status": "cancelled"
+  }
+}
+```
+
+</ResponseExample>

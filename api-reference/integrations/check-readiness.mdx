@@ -1,0 +1,57 @@
+---
+title: "Check Readiness"
+description: "Check whether the connections required to run a set of tools are present and active."
+api: "POST /api/v1/integrations/check-readiness"
+---
+
+## Overview
+
+Given a list of Composio action slugs, classifies each as `available` or `missing` based on whether the calling tenant has an `ACTIVE` connection for the action's toolkit. Used by the onboarding "Connect Your Apps" step and by chore audits to flag missing dependencies before run-time.
+
+## Body Parameters
+
+<ParamField body="tools_required" type="array" required>
+  Array of Composio action slugs (e.g. `["GMAIL_FETCH_EMAILS", "GOOGLECALENDAR_LIST_EVENTS"]`).
+</ParamField>
+
+## Response
+
+<ResponseField name="ready" type="boolean">True iff every requested tool's toolkit has an active connection.</ResponseField>
+
+<ResponseField name="available" type="array">Tool slugs whose toolkit is connected.</ResponseField>
+
+<ResponseField name="missing" type="array">Tool slugs whose toolkit is not connected (or not active).</ResponseField>
+
+<ResponseField name="connected_toolkits" type="array">Sorted list of every toolkit slug currently connected for this tenant.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X POST -H "Authorization: Bearer $AAS_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"tools_required": ["GMAIL_FETCH_EMAILS", "SLACK_SEND_MESSAGE"]}' \
+  https://alfred.black/api/v1/integrations/check-readiness
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "ready": false,
+  "available": ["GMAIL_FETCH_EMAILS"],
+  "missing": ["SLACK_SEND_MESSAGE"],
+  "connected_toolkits": ["gmail", "googlecalendar", "notion"]
+}
+```
+
+</ResponseExample>
+
+<Note>
+Readiness is checked at the toolkit level — having any active Gmail connection makes every `GMAIL_*` action "available" from this endpoint's perspective. Per-action permission is enforced by Composio at execute time.
+</Note>

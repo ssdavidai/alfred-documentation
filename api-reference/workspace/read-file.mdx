@@ -1,0 +1,50 @@
+---
+title: "Read Workspace File"
+description: "Read one of the canonical workspace files (USER.md, SOUL.md, MEMORY.md, AGENTS.md, TOOLS.md)."
+api: "GET /api/v1/admin/workspace/:filename"
+---
+
+## Overview
+
+Returns the contents of one of the five permitted workspace files in `/mnt/encrypted/openclaw/workspace/`. Any other filename rejects with `400`. A file that doesn't yet exist returns empty content (not 404) so the dashboard editor can show a blank slate.
+
+## Path Parameters
+
+<ParamField path="filename" type="string" required>
+  One of: `USER.md`, `SOUL.md`, `MEMORY.md`, `AGENTS.md`, `TOOLS.md`.
+</ParamField>
+
+## Response
+
+<ResponseField name="filename" type="string">Echo.</ResponseField>
+<ResponseField name="content" type="string">File contents (empty string if the file does not exist).</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -H "Authorization: Bearer $AAS_API_KEY" \
+  https://alfred.black/api/v1/admin/workspace/MEMORY.md
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "filename": "MEMORY.md",
+  "content": "## Recent decisions\n\n- 2026-04-25: Approved..."
+}
+```
+
+```json 400 Bad Request
+{
+  "error": "Invalid workspace file: notes.md. Allowed: SOUL.md, USER.md, MEMORY.md, AGENTS.md, TOOLS.md"
+}
+```
+
+</ResponseExample>

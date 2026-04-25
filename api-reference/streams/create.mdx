@@ -1,0 +1,79 @@
+---
+title: "Create Stream"
+description: "Register a new stream on this tenant."
+api: "POST /api/v1/streams"
+---
+
+## Overview
+
+Adds a new entry to `streams.json`. The pull-engine config (if any) is written separately via `PATCH /api/v1/streams/:id`. For Composio-backed streams, prefer `POST /api/v1/integrations/:id/enable-stream` which writes both files in one call.
+
+## Body Parameters
+
+<ParamField body="id" type="string" required>
+  Globally unique stream id (within this tenant).
+</ParamField>
+
+<ParamField body="name" type="string" required>
+  Display name.
+</ParamField>
+
+<ParamField body="type" type="string" optional default="custom">
+  Stream classification.
+</ParamField>
+
+<ParamField body="source" type="string" optional default="custom">
+  Source identifier.
+</ParamField>
+
+<ParamField body="enabled" type="boolean" optional default="true">
+  Set to `false` to register paused.
+</ParamField>
+
+<ParamField body="webhookToken" type="string" optional>
+  Bearer token for inbound webhook receivers (e.g. Omi audio).
+</ParamField>
+
+## Response
+
+<ResponseField name="stream" type="object">The newly registered stream entry.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X POST -H "Authorization: Bearer $AAS_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"id": "my-custom-stream", "name": "Custom Webhook", "type": "webhook"}' \
+  https://alfred.black/api/v1/streams
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 201 Created
+{
+  "stream": {
+    "id": "my-custom-stream",
+    "name": "Custom Webhook",
+    "type": "webhook",
+    "source": "custom",
+    "enabled": true,
+    "status": "idle",
+    "last_event_at": null,
+    "event_count": 0
+  }
+}
+```
+
+```json 409 Conflict
+{
+  "error": "Stream my-custom-stream already exists"
+}
+```
+
+</ResponseExample>

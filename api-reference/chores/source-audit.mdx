@@ -1,0 +1,112 @@
+---
+title: "Source + Anti-Hallucination Audit"
+description: "Read the generated Python source, list its activity calls, and probe data readiness for each one."
+api: "GET /api/v1/chores/:slug/source"
+---
+
+## Overview
+
+The anti-hallucination audit. For a generated chore, returns:
+
+1. The raw Python source from `/mnt/encrypted/alfred/user-chores/<module>.py`.
+2. A list of imported `chore_actions` (extracted by regex — single-line and parenthesised import forms both supported).
+3. A list of `workflow.execute_activity(name, ...)` call sites with line number + 6-line snippet.
+4. A per-activity dependency manifest from `chore_manifest_data.ts` (what the activity reads/writes, whether it uses an LLM, what data it requires).
+5. A live readiness check per `vault` data source — present + non-empty, present-but-empty, or missing.
+
+This catches "the weekly cashflow forecast has no data source" before the chore silently runs and reports "0 anomalies" forever.
+
+For standard-library (non-generated) chores, returns the chore record but `source: null` and a pointer to the platform repo.
+
+## Path Parameters
+
+<ParamField path="slug" type="string" required>
+  Chore slug.
+</ParamField>
+
+## Response (generated chore)
+
+<ResponseField name="slug" type="string">Echo.</ResponseField>
+<ResponseField name="generated" type="boolean">`true`.</ResponseField>
+<ResponseField name="template" type="string">Module name (filename stem).</ResponseField>
+<ResponseField name="workflow_class_name" type="string">Class name from frontmatter.</ResponseField>
+<ResponseField name="source" type="string">Full Python source.</ResponseField>
+<ResponseField name="source_size_bytes" type="number">Source length.</ResponseField>
+<ResponseField name="source_line_count" type="number">Line count.</ResponseField>
+<ResponseField name="imported_activities" type="array">Activities imported from `chore_actions`.</ResponseField>
+<ResponseField name="activity_calls" type="array">Each `{name, line, snippet}`.</ResponseField>
+<ResponseField name="manifest" type="array">
+  Per-activity: `{activity, description, reads, writes, llm, required_data, readiness_checks: [{kind, resource, status, detail}]}`. `status` is one of `ok`, `empty`, `missing`, `untested`.
+</ResponseField>
+<ResponseField name="unknown_activities" type="array">Imports that are NOT in the manifest — likely a bug or rename.</ResponseField>
+
+## Response (standard chore)
+
+<ResponseField name="slug" type="string">Echo.</ResponseField>
+<ResponseField name="generated" type="boolean">`false`.</ResponseField>
+<ResponseField name="template" type="string">Workflow type from the record.</ResponseField>
+<ResponseField name="message" type="string">Pointer to the platform repo.</ResponseField>
+<ResponseField name="source" type="any">`null`.</ResponseField>
+
+## Response (source file missing)
+
+Returns `404` with `error` plus the same shape so the UI can render a graceful empty state.
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -H "Authorization: Bearer $AAS_API_KEY" \
+  https://alfred.black/api/v1/chores/weekly-cashflow-forecast/source
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK (generated)
+{
+  "slug": "weekly-cashflow-forecast",
+  "generated": true,
+  "template": "weekly_cashflow_forecast",
+  "workflow_class_name": "WeeklyCashflowForecastWorkflow",
+  "source": "from temporalio import workflow\n...",
+  "source_size_bytes": 4120,
+  "source_line_count": 142,
+  "imported_activities": ["load_chore_context", "fetch_financial_events"],
+  "activity_calls": [
+    {"name": "load_chore_context", "line": 24, "snippet": "ctx = await workflow.execute_activity(\n    load_chore_context,\n    ..."}
+  ],
+  "manifest": [
+    {
+      "activity": "fetch_financial_events",
+      "description": "Pull payment events from the vault for the given window.",
+      "reads": [{"kind": "vault", "resource": "event/", "check_path": "vault/event/"}],
+      "writes": [],
+      "llm": false,
+      "required_data": "Event records tagged with payment classification.",
+      "readiness_checks": [
+        {"kind": "vault", "resource": "event/", "status": "ok", "detail": "847 records available"}
+      ]
+    }
+  ],
+  "unknown_activities": []
+}
+```
+
+```json 200 OK (standard library)
+{
+  "slug": "morning-briefing",
+  "generated": false,
+  "template": "MorningBriefingWorkflow",
+  "message": "This is a standard-library chore. Source lives in packages/learn/src/workflows/chores/ in the alfred-platform repo.",
+  "source": null,
+  "imported_activities": [],
+  "activity_calls": []
+}
+```
+
+</ResponseExample>

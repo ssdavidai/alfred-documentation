@@ -1,0 +1,45 @@
+---
+title: "Delete Chore"
+description: "Mark a chore completed and best-effort delete its Temporal schedule."
+api: "DELETE /api/v1/chores/:slug"
+---
+
+## Overview
+
+Sets `status: completed` in the vault record (the file is preserved for history) and best-effort runs `temporal schedule delete chore-<slug>`. The schedule delete is wrapped in a `try`/`catch` — already-deleted schedules don't error out the call.
+
+## Path Parameters
+
+<ParamField path="slug" type="string" required>
+  Chore slug.
+</ParamField>
+
+## Response
+
+<ResponseField name="slug" type="string">Echo.</ResponseField>
+<ResponseField name="status" type="string">`completed`.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X DELETE -H "Authorization: Bearer $AAS_API_KEY" \
+  https://alfred.black/api/v1/chores/weekly-cashflow-forecast
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{ "slug": "weekly-cashflow-forecast", "status": "completed" }
+```
+
+</ResponseExample>
+
+<Note>
+The vault record is not unlinked — Sir can still browse the body and the activity audit. To fully scrub, delete the markdown file via the vault DELETE endpoint after this call.
+</Note>

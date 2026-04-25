@@ -1,0 +1,56 @@
+---
+title: "Send SMS"
+description: "Send an outbound SMS via the master SaaS Twilio account."
+api: "POST /api/v1/phone/sms"
+---
+
+## Overview
+
+Agent-initiated outbound SMS. ctrl-api ships the message through the SaaS internal endpoint `/api/internal/twilio/send-sms` using `VOICE_BRIDGE_INTERNAL_TOKEN`. Logs an `sms-outbound` stream event for vault visibility and dashboard recall.
+
+## Body Parameters
+
+<ParamField body="to" type="string" required>
+  Recipient E.164 number. Must be non-empty after trim.
+</ParamField>
+
+<ParamField body="body" type="string" required>
+  SMS text. Must be non-empty after trim.
+</ParamField>
+
+## Response
+
+<ResponseField name="status" type="string">`sent` or `ship-failed`.</ResponseField>
+<ResponseField name="sid" type="string">Twilio message SID (only on `sent`).</ResponseField>
+<ResponseField name="error" type="string">Error message (only on failure).</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X POST -H "Authorization: Bearer $AAS_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"to": "+15559876543", "body": "Right, sir."}' \
+  https://alfred.black/api/v1/phone/sms
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{ "status": "sent", "sid": "SM01HXYZ" }
+```
+
+```json 502 Bad Gateway
+{ "status": "ship-failed", "error": "SaaS send-sms 401: ..." }
+```
+
+</ResponseExample>
+
+<Warning>
+Tenants without `TENANT_ID` or `AGENTPHONE_PHONE_NUMBER` set in their `.env` will get `409 Conflict` on this endpoint — they have no phone subnumber provisioned.
+</Warning>

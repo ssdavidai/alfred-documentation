@@ -1,0 +1,53 @@
+---
+title: "Mark Event Processed"
+description: "Record that a stream event has been folded into the vault."
+api: "POST /api/v1/streams/events/:id/processed"
+---
+
+## Overview
+
+Updates `processed-events.json` to record processing status. The event itself stays in the JSONL file until `POST /api/v1/streams/prune` reaps stale entries (default after 7 days).
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  StreamEvent id (UUID).
+</ParamField>
+
+## Body Parameters
+
+<ParamField body="vault_path" type="string" optional>
+  Vault record path the event was folded into (e.g. `event/2026-04-25-payment-stripe.md`).
+</ParamField>
+
+<ParamField body="classification" type="string" optional>
+  Free-form classifier label (e.g. `payment`, `meeting`, `notification`).
+</ParamField>
+
+## Response
+
+<ResponseField name="status" type="string">`marked_processed`.</ResponseField>
+<ResponseField name="event_id" type="string">Echo.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X POST -H "Authorization: Bearer $AAS_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"vault_path": "event/2026-04-25-payment-stripe.md", "classification": "payment"}' \
+  https://alfred.black/api/v1/streams/events/550e8400-e29b-41d4/processed
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{ "status": "marked_processed", "event_id": "550e8400-e29b-41d4" }
+```
+
+</ResponseExample>

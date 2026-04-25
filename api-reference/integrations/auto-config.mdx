@@ -1,0 +1,70 @@
+---
+title: "Auto-Configure"
+description: "Wire up streams, tools, and skills for a freshly connected Composio integration."
+api: "POST /api/v1/integrations/:id/auto-config"
+---
+
+## Overview
+
+Runs after the user completes OAuth (or API-key connect). One call performs all of:
+
+1. Validate the connection belongs to this tenant and is `ACTIVE`.
+2. Add `composio_execute` to `gateway.tools.allow` if missing — triggers a debounced gateway restart.
+3. Create the recommended stream + Temporal schedule for the toolkit (from `RECOMMENDED_STREAMS`).
+4. Disable any legacy non-Composio stream for the same source (e.g. legacy Gmail OAuth stream when Composio Gmail connects).
+5. Generate the `alfred-composio-<toolkit>/SKILL.md` file in both openclaw and openclaw-workers workspaces.
+
+Idempotent — safe to call multiple times. Surfaces the work done in the response so the UI can show a "Configured" toast.
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  Composio connection id (must be `ACTIVE` and owned by the calling tenant).
+</ParamField>
+
+## Response
+
+<ResponseField name="connection_id" type="string">Echo.</ResponseField>
+<ResponseField name="toolkit" type="string">Resolved toolkit slug.</ResponseField>
+<ResponseField name="composio_execute_enabled" type="boolean">Always true after this call.</ResponseField>
+<ResponseField name="gateway_restart_triggered" type="boolean">True iff `composio_execute` was newly added.</ResponseField>
+<ResponseField name="stream_created" type="string">Stream id that was created (null if no recommended stream for this toolkit).</ResponseField>
+<ResponseField name="schedule_created" type="string">Temporal schedule id (or "...(already exists)").</ResponseField>
+<ResponseField name="legacy_streams_disabled" type="array">Old-style stream ids that were disabled in favour of the Composio-backed one.</ResponseField>
+<ResponseField name="skill_generated" type="string">Path to the generated `SKILL.md`.</ResponseField>
+<ResponseField name="actions_count" type="number">Number of actions documented in the skill file.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X POST -H "Authorization: Bearer $AAS_API_KEY" \
+  https://alfred.black/api/v1/integrations/ca_01HXYZ/auto-config
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "connection_id": "ca_01HXYZABCDEFGH",
+  "toolkit": "gmail",
+  "composio_execute_enabled": true,
+  "gateway_restart_triggered": true,
+  "stream_created": "composio-gmail-gmail-fetch-emails",
+  "schedule_created": "al-stream-pull-composio-composio-gmail-",
+  "legacy_streams_disabled": ["gmail-oauth-legacy"],
+  "skill_generated": "/home/node/.openclaw/workspace/skills/alfred-composio-gmail/SKILL.md",
+  "actions_count": 23
+}
+```
+
+</ResponseExample>
+
+<Warning>
+The first ever auto-config on a tenant adds `composio_execute` to the gateway allowlist, which triggers a ~40s openclaw restart. Subsequent auto-configs skip that step. The dashboard masks the restart window via `GET /api/v1/openclaw/ready`.
+</Warning>

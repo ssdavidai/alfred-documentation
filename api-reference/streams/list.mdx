@@ -1,0 +1,63 @@
+---
+title: "List Streams"
+description: "List all configured streams plus live event counts."
+api: "GET /api/v1/streams"
+---
+
+## Overview
+
+Returns every stream registered in `streams.json` (system + user). Each stream's `event_count` and `last_event_at` are recomputed from the on-disk JSONL file on every call, so paused/orphaned streams reflect reality.
+
+## Response
+
+<ResponseField name="streams" type="array">
+  Each entry: `{id, name, type, source, enabled, status, last_event_at, event_count, system?, webhookToken?}`.
+
+  - `system: true` marks built-in streams that cannot be paused, resumed, or deleted (`system-openclaw-sessions`, `system-inbox`).
+  - `webhookToken` is present only for streams that accept inbound webhooks.
+</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -H "Authorization: Bearer $AAS_API_KEY" \
+  https://alfred.black/api/v1/streams
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "streams": [
+    {
+      "id": "system-inbox",
+      "name": "Inbox Uploads",
+      "type": "system",
+      "source": "inbox",
+      "enabled": true,
+      "status": "idle",
+      "last_event_at": "2026-04-25T11:20:00Z",
+      "event_count": 12,
+      "system": true
+    },
+    {
+      "id": "composio-gmail-gmail-fetch-emails",
+      "name": "Fetch Emails",
+      "type": "composio",
+      "source": "composio:gmail",
+      "enabled": true,
+      "status": "idle",
+      "last_event_at": "2026-04-25T11:30:00Z",
+      "event_count": 142
+    }
+  ]
+}
+```
+
+</ResponseExample>

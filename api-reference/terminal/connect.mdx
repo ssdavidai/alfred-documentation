@@ -1,0 +1,67 @@
+---
+title: "Terminal WebSocket"
+description: "Bidirectional terminal connection to the OpenClaw container via Docker exec."
+api: "WS /terminal"
+---
+
+## Overview
+
+The terminal is a WebSocket endpoint, not an HTTP route. It upgrades a connection to a raw bidirectional stream backed by `docker exec` against the OpenClaw container, with a real PTY allocated via Docker's `Tty: true` flag. Resize calls translate to `SIGWINCH` so full-screen TUI apps (vi, OpenClaw configure, etc.) work correctly.
+
+Only one session may be active at a time — connecting while another session is open returns `409 Conflict` and closes the socket.
+
+## Connection
+
+Connect to `wss://alfred.black/terminal`. Authenticate one of two ways:
+
+1. **`Authorization: Bearer $AAS_API_KEY`** header (preferred for server-side clients).
+2. **`?token=$AAS_API_KEY`** query parameter (browsers can't set headers on the WS handshake).
+
+If auth fails the upgrade responds `401 Unauthorized` and the socket is destroyed.
+
+## Wire Protocol
+
+Every message is a single binary frame of `<type byte><payload>`:
+
+| Type | Direction | Payload |
+|------|-----------|---------|
+| `0x00` (DATA) | Bidirectional | Raw stdin/stdout bytes for the PTY |
+| `0x01` (CONTROL) | Bidirectional | UTF-8 JSON control message |
+
+### Control messages
+
+**Server → client**:
+
+- `{"type": "connected"}` — exec started, PTY ready.
+- `{"type": "disconnect", "reason": "..."}` — session ending. Reasons: `idle timeout`, `shell exited`, `shell closed`, `client disconnected`, `OpenClaw container not found`, `exec failed: ...`.
+
+**Client → server**:
+
+- `{"type": "resize", "cols": <int>, "rows": <int>}` — translate to a Docker exec resize (sends SIGWINCH).
+
+## Idle Timeout
+
+Sessions auto-disconnect after **15 minutes** of inactivity. Activity = any DATA or CONTROL frame in either direction.
+
+## Container Resolution
+
+Looks for `compose-openclaw-1` first; falls back to any container whose name contains `openclaw`. If no match, sends `{"type": "disconnect", "reason": "OpenClaw container not found"}` and closes.
+
+## Setup Run Inside the Container
+
+Before starting the interactive shell, the handler runs a non-interactive setup that wires up:
+
+- `/tmp/openclaw` — wrapper script that runs `node /app/openclaw.mjs "$@"` so `openclaw` is on PATH.
+- `/tmp/.ocrc` — exports `PATH=/tmp:/app/node_modules/.bin:$PATH` and `TERM=xterm-256color`.
+
+The interactive shell starts as `sh -l` with these env vars pre-set.
+
+## Notes
+
+<Note>
+This endpoint requires WebSocket support in the client and is not testable via curl. Use a thin browser client or `wscat`. The dashboard's terminal pane is the canonical consumer.
+</Note>
+
+<Warning>
+The shell runs as the OpenClaw container's user (typically uid 1000). It has full read/write access to `/home/node/.openclaw/` including the workspace and `openclaw.json`. Treat this as root-equivalent for the agent's runtime.
+</Warning>

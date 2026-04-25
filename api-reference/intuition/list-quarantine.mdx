@@ -1,0 +1,48 @@
+---
+title: "List Quarantine"
+description: "List files the curator quarantined — couldn't process, can't be safely auto-routed."
+api: "GET /api/v1/learning/quarantine"
+---
+
+## Overview
+
+Reads the quarantine directory (typically `/mnt/encrypted/alfred/quarantine/`). Each entry is a file the curator refused to handle.
+
+## Response
+
+<ResponseField name="files" type="array">
+  Each: `{id, filename, size, modified_at}`.
+</ResponseField>
+
+<ResponseField name="total" type="number">Count.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -H "Authorization: Bearer $AAS_API_KEY" \
+  https://alfred.black/api/v1/learning/quarantine
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "files": [
+    {
+      "id": "broken-pdf-attachment.pdf",
+      "filename": "broken-pdf-attachment.pdf",
+      "size": 142567,
+      "modified_at": "2026-04-25T10:00:00Z"
+    }
+  ],
+  "total": 1
+}
+```
+
+</ResponseExample>

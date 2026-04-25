@@ -1,0 +1,75 @@
+---
+title: "Curator Route + Process"
+description: "Route an input through the Curator pipeline with explicit routing context."
+api: "POST /api/v1/curator/route-and-process"
+---
+
+## Overview
+
+Lower-level cousin of `/learning/route`. Takes a free-form `routing_context` object so callers can hand the Curator hints (suggested entities, classification, urgency, etc.). Same fallback behaviour: raw move on Curator failure.
+
+Returns 500 if both Curator and the fallback move fail.
+
+## Body Parameters
+
+<ParamField body="input_path" type="string" required>
+  Vault-relative path of the input file.
+</ParamField>
+
+<ParamField body="destination" type="string" required>
+  Vault-relative target directory.
+</ParamField>
+
+<ParamField body="routing_context" type="object" optional default="{}">
+  Hints for the Curator (suggested entity links, classification, urgency, source channel, etc.). Schema is open — Curator inspects what it recognises.
+</ParamField>
+
+## Response
+
+<ResponseField name="processed" type="boolean">True iff Curator succeeded.</ResponseField>
+<ResponseField name="note_path" type="string">Final path (null on full failure).</ResponseField>
+<ResponseField name="entities_created" type="array" />
+<ResponseField name="entities_linked" type="array" />
+<ResponseField name="observation_path" type="string">Routing observation.</ResponseField>
+<ResponseField name="error" type="string">Set on partial or full failure.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X POST -H "Authorization: Bearer $AAS_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "input_path": "inbox/email-from-alice.md",
+    "destination": "note/",
+    "routing_context": {"suggested_entities": ["person/Alice Chen"], "channel": "email"}
+  }' \
+  https://alfred.black/api/v1/curator/route-and-process
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "processed": true,
+  "note_path": "note/email-from-alice.md",
+  "entities_created": [],
+  "entities_linked": ["person/Alice Chen"],
+  "observation_path": "observation/2026-04-25-routed-email-from-alice.md"
+}
+```
+
+```json 500 Internal Server Error
+{
+  "processed": false,
+  "error": "curator_failed: timeout; fallback_move_failed: ENOENT",
+  "observation_path": "observation/2026-04-25-routed-email-from-alice.md"
+}
+```
+
+</ResponseExample>

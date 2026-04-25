@@ -1,0 +1,54 @@
+---
+title: "List Pending Approvals"
+description: "List execution-task records waiting for Sir's approve/reject decision."
+api: "GET /api/v1/approvals/pending"
+---
+
+## Overview
+
+Walks the vault for `task` records with `requires_approval: true` and `status` in `queued` or `todo`. Returns enough metadata for the dashboard's Approval card to render the gist (description, source instinct, trust tier, confidence score) without a second fetch.
+
+Tasks are created by `JudgmentWorkflow` when an instinct fires below the trust threshold (Tier <10 obs forced approval, 10–50 configurable, 50+ autonomous).
+
+## Response
+
+<ResponseField name="results" type="array">
+  Each entry: `{path, name, description, status, created, tier, source_instinct, confidence_score}`. Sorted by `created` desc.
+</ResponseField>
+
+<ResponseField name="count" type="number">Total pending.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -H "Authorization: Bearer $AAS_API_KEY" \
+  https://alfred.black/api/v1/approvals/pending
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "results": [
+    {
+      "path": "task/2026-04-25-archive-old-receipts.md",
+      "name": "Archive old receipts",
+      "description": "Move receipts older than 90 days to the archive vault.",
+      "status": "queued",
+      "created": "2026-04-25T08:00:00Z",
+      "tier": 2,
+      "source_instinct": "instinct/clean-old-receipts.md",
+      "confidence_score": "0.62"
+    }
+  ],
+  "count": 1
+}
+```
+
+</ResponseExample>

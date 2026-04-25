@@ -1,0 +1,78 @@
+---
+title: "Execute Action"
+description: "Run a Composio action against a connected third-party app."
+api: "POST /api/v1/integrations/execute"
+---
+
+## Overview
+
+Resolves the active connection for the action's toolkit (scoped to the calling tenant), merges `DEFAULT_ARGS[action]` with the user-supplied args, then runs the Composio Python SDK inside the `alfred-learn` container via `docker exec`. Returns Composio's raw result.
+
+This is the endpoint behind the gateway's `composio_execute` tool — every Gmail send, Calendar create, Notion update, GitHub PR create, Slack post, etc. funnels through here.
+
+## Body Parameters
+
+<ParamField body="action" type="string" required>
+  Composio action slug, e.g. `GMAIL_SEND_EMAIL`.
+</ParamField>
+
+<ParamField body="arguments" type="object" optional>
+  Action-specific arguments. Merged on top of `DEFAULT_ARGS[action]` so server defaults can be overridden.
+</ParamField>
+
+## Response
+
+<ResponseField name="action" type="string">Echo of the request.</ResponseField>
+
+<ResponseField name="toolkit" type="string">Resolved toolkit slug (derived as `action.split('_')[0].toLowerCase()`).</ResponseField>
+
+<ResponseField name="result" type="object">
+  Composio's raw response — schema varies per action.
+</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X POST -H "Authorization: Bearer $AAS_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "action": "GOOGLECALENDAR_QUICK_ADD",
+    "arguments": {"text": "Coffee with Miguel tomorrow at 10am"}
+  }' \
+  https://alfred.black/api/v1/integrations/execute
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "action": "GOOGLECALENDAR_QUICK_ADD",
+  "toolkit": "googlecalendar",
+  "result": {
+    "successful": true,
+    "data": {
+      "id": "abc123",
+      "summary": "Coffee with Miguel",
+      "start": {"dateTime": "2026-04-26T10:00:00Z"}
+    }
+  }
+}
+```
+
+```json 400 Bad Request
+{
+  "error": "No active gmail connection found. Connect gmail first via the Apps page."
+}
+```
+
+</ResponseExample>
+
+<Note>
+This is the canonical surface the agent reaches via `self({endpoint: "/api/v1/integrations/execute", method: "POST", body: {...}})`. Per-toolkit `alfred-composio-<toolkit>/SKILL.md` files are auto-generated on connect and tell Alfred exactly which actions exist + their args.
+</Note>

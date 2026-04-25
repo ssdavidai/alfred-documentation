@@ -1,0 +1,62 @@
+---
+title: "Voice Call Transcript (internal)"
+description: "Receive the full transcript posted by the Voice Bridge when a call ends."
+api: "POST /api/v1/phone/transcript"
+---
+
+## Overview
+
+<Note>
+Internal use only — called by the Voice Bridge (`packages/voice-bridge/`) after a Realtime call hangs up. Not intended for ad-hoc invocation.
+</Note>
+
+Persists a `voice-call` stream event with the full turn-by-turn transcript and best-effort posts a session message to the main openclaw agent so the next Slack/email/SMS exchange has fresh context.
+
+## Body Parameters
+
+<ParamField body="from" type="string" optional>Caller E.164 number.</ParamField>
+<ParamField body="to" type="string" optional>Tenant E.164 number.</ParamField>
+<ParamField body="callId" type="string" optional>Twilio call SID. Used as `source_ref`.</ParamField>
+<ParamField body="started_at" type="string" optional>ISO timestamp (defaults to now).</ParamField>
+<ParamField body="ended_at" type="string" optional>ISO timestamp (defaults to now).</ParamField>
+<ParamField body="transcript" type="array" optional>Array of turn objects (shape determined by the bridge).</ParamField>
+<ParamField body="summary" type="string" optional>Bridge-supplied summary (defaults to `Call from <from>`).</ParamField>
+
+## Response
+
+<ResponseField name="status" type="string">`ingested`.</ResponseField>
+<ResponseField name="event_id" type="string">UUID of the created stream event.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X POST -H "Authorization: Bearer $AAS_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "from": "+15559876543",
+    "to": "+15551234567",
+    "callId": "CA01HXYZ",
+    "started_at": "2026-04-25T11:30:00Z",
+    "ended_at": "2026-04-25T11:32:22Z",
+    "transcript": [
+      {"role": "user", "text": "Hi Alfred"},
+      {"role": "assistant", "text": "Good morning, sir."}
+    ],
+    "summary": "Confirmed 2pm meeting"
+  }' \
+  https://alfred.black/api/v1/phone/transcript
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 201 Created
+{ "status": "ingested", "event_id": "550e8400-..." }
+```
+
+</ResponseExample>

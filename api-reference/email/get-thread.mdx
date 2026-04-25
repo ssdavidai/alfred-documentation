@@ -1,0 +1,53 @@
+---
+title: "Get Thread"
+description: "Fetch a full email thread by id."
+api: "GET /api/v1/email/thread/:thread_id"
+---
+
+## Overview
+
+Direct passthrough to AgentMail. Returns the entire thread (every message + metadata). The agent uses this to assemble context before composing replies.
+
+## Path Parameters
+
+<ParamField path="thread_id" type="string" required>
+  AgentMail thread id (URL-encoded if needed).
+</ParamField>
+
+## Response
+
+AgentMail's raw thread object: `{thread_id, subject, participants, messages: [...], created_at, ...}`.
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -H "Authorization: Bearer $AAS_API_KEY" \
+  https://alfred.black/api/v1/email/thread/thr_01HXYZGHIJKL
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "thread_id": "thr_01HXYZGHIJKL",
+  "subject": "Following up",
+  "participants": ["alice@example.com", "alfred.david@mail.alfred.black"],
+  "messages": [
+    {"message_id": "msg_01HXYZ001", "from_": ["alice@example.com"], "text": "..."},
+    {"message_id": "msg_01HXYZ002", "from_": ["alfred.david@mail.alfred.black"], "text": "..."}
+  ],
+  "created_at": "2026-04-24T18:00:00Z"
+}
+```
+
+```json 404 Not Found
+{ "error": "thread thr_01HXYZ not found" }
+```
+
+</ResponseExample>

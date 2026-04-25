@@ -1,0 +1,55 @@
+---
+title: "Get Instinct"
+description: "Read one instinct record by id."
+api: "GET /api/v1/learning/instincts/:id"
+---
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  Instinct filename (e.g. `clean-old-receipts.md`). Sanitised.
+</ParamField>
+
+## Response
+
+<ResponseField name="path" type="string">Vault-relative path.</ResponseField>
+<ResponseField name="frontmatter" type="object">Parsed frontmatter, including the `execution` block.</ResponseField>
+<ResponseField name="body" type="string">Markdown body — the natural-language instinct description.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -H "Authorization: Bearer $AAS_API_KEY" \
+  https://alfred.black/api/v1/learning/instincts/clean-old-receipts.md
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "path": "intuition/instincts/clean-old-receipts.md",
+  "frontmatter": {
+    "type": "instinct",
+    "name": "Clean old receipts",
+    "status": "active",
+    "execution": "enabled: true\ntier: 2\nrequires_approval: true"
+  },
+  "body": "When receipts older than 90 days..."
+}
+```
+
+```json 404 Not Found
+{ "error": "Instinct not found: clean-old-receipts.md" }
+```
+
+</ResponseExample>
+
+<Note>
+This route reads from the legacy `intuition/instincts/` path. New instincts written via the ctrl-api land in `instinct/` and are not currently reachable through this single-record endpoint — use the list endpoint to find their full path.
+</Note>

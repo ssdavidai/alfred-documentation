@@ -1,0 +1,45 @@
+---
+title: "List Sessions"
+description: "Conversation sessions tracked by the SessionTrackerWorkflow."
+api: "GET /api/v1/learning/sessions"
+---
+
+## Overview
+
+Reads `vault/session/` newest-first. Sessions are the rolled-up summaries of openclaw conversations across channels (Slack, dashboard, email, voice, SMS).
+
+## Response
+
+<ResponseField name="items" type="array">Each: `{path, name, frontmatter, body, status, created}`.</ResponseField>
+<ResponseField name="total" type="number">Count.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -H "Authorization: Bearer $AAS_API_KEY" \
+  https://alfred.black/api/v1/learning/sessions
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "items": [
+    {
+      "path": "session/2026-04-25-morning-slack.md",
+      "name": "Morning Slack chat",
+      "created": "2026-04-25T08:00:00Z",
+      "body": "Sir asked about Q3 projections..."
+    }
+  ],
+  "total": 1842
+}
+```
+
+</ResponseExample>

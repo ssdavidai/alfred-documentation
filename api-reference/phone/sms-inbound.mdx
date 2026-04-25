@@ -1,0 +1,81 @@
+---
+title: "SMS Inbound (internal)"
+description: "Receive an inbound SMS from the SaaS Twilio webhook receiver and route it."
+api: "POST /api/v1/phone/sms/inbound"
+---
+
+## Overview
+
+<Note>
+Internal use only — called by the SaaS-side Twilio webhook (`POST /webhooks/twilio/sms`) after signature verification. Not intended for ad-hoc invocation.
+</Note>
+
+Dual-mode dispatch:
+
+- **Authorised sender**: openclaw `/v1/chat/completions` → reply text → ship via SaaS `/api/internal/twilio/send-sms` → audit-echo through openclaw `/v1/sessions/message` for cross-channel memory. Per-thread context lives at `/mnt/encrypted/alfred/streams/sms-phone-<sanitised-from>.jsonl`.
+- **Unauthorised sender**: append a `sms-inbound` event to the stream pipeline for hourly enrichment.
+
+## Body Parameters
+
+<ParamField body="from" type="string" required>Sender E.164 number.</ParamField>
+<ParamField body="to" type="string" required>Tenant E.164 number.</ParamField>
+<ParamField body="body" type="string" optional>SMS text (may be empty for media-only messages).</ParamField>
+<ParamField body="messageSid" type="string" optional>Twilio message SID — used as `source_ref` for dedup.</ParamField>
+
+## Response
+
+For unauthorised senders:
+
+<ResponseField name="status" type="string">`stream-ingested`.</ResponseField>
+<ResponseField name="event_id" type="string">UUID of the new stream event.</ResponseField>
+
+For authorised senders:
+
+<ResponseField name="status" type="string">`replied` (success), `completion-failed`, or `ship-failed`.</ResponseField>
+<ResponseField name="reply" type="string">The reply Alfred composed (only on `replied`).</ResponseField>
+<ResponseField name="sid" type="string">Twilio message SID of the sent reply.</ResponseField>
+<ResponseField name="error" type="string">Error message on failure.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X POST -H "Authorization: Bearer $AAS_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "from": "+15559876543",
+    "to": "+15551234567",
+    "body": "What time is the meeting?",
+    "messageSid": "SM01HXYZ"
+  }' \
+  https://alfred.black/api/v1/phone/sms/inbound
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK (authorised)
+{
+  "status": "replied",
+  "reply": "Two o'clock, sir.",
+  "sid": "SM01HXYZRPLY"
+}
+```
+
+```json 200 OK (unauthorised)
+{ "status": "stream-ingested", "event_id": "550e8400-..." }
+```
+
+```json 502 Bad Gateway
+{ "status": "completion-failed", "error": "chat completions failed: 500" }
+```
+
+</ResponseExample>
+
+<Note>
+The reply path uses openclaw's `/v1/chat/completions` (synchronous), NOT `/v1/sessions/message` (fire-and-forget). The `sessions_send` audit echo runs AFTER the reply is shipped — purely for cross-channel memory.
+</Note>

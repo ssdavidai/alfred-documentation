@@ -1,0 +1,88 @@
+---
+title: "Ingest Event"
+description: "Append a StreamEvent to the named stream — universal write endpoint."
+api: "POST /api/v1/streams/ingest"
+---
+
+## Overview
+
+The single endpoint every stream event flows through, regardless of source — webhook receivers, Composio pulls, voice-call transcripts, SMS, AgentMail (unauthorised senders), inbox scans. Appends one JSONL line per event to `<stream_id>.jsonl` and updates `streams.json` metadata. Dedups by `source_ref` if provided.
+
+## Body Parameters
+
+<ParamField body="stream_id" type="string" required>
+  Target stream id.
+</ParamField>
+
+<ParamField body="stream_type" type="string" required>
+  Event classification (e.g. `email`, `voice-call`, `sms`, `payment`, `calendar`). Used by the zero-LLM templates in `stream_vault.py`.
+</ParamField>
+
+<ParamField body="raw" type="object" optional default="{}">
+  The unmodified upstream payload. Templates and (later) hourly enrichment read from here.
+</ParamField>
+
+<ParamField body="summary" type="string" optional>
+  Short human-readable summary (used by dashboards).
+</ParamField>
+
+<ParamField body="source_ref" type="string" optional>
+  Idempotency key. If a line with this `source_ref` already exists in the stream's JSONL, the request returns `{"status": "duplicate"}` and writes nothing.
+</ParamField>
+
+<ParamField body="received_at" type="string" optional>
+  ISO timestamp. Defaults to `now()`.
+</ParamField>
+
+<ParamField body="tenant_id" type="string" optional>Tenant marker for multi-tenant pipelines.</ParamField>
+
+<ParamField body="metadata" type="object" optional>Free-form metadata attached to the event.</ParamField>
+
+## Response
+
+<ResponseField name="status" type="string">`ingested` or `duplicate`.</ResponseField>
+<ResponseField name="event_id" type="string">UUID of the created event (only on `ingested`).</ResponseField>
+<ResponseField name="source_ref" type="string">Echo of the source ref (only on `duplicate`).</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X POST -H "Authorization: Bearer $AAS_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "stream_id": "voice-call",
+    "stream_type": "voice-call",
+    "source_ref": "CA01HXYZABCDEF",
+    "raw": {"from": "+15551234567", "duration_seconds": 142, "transcript": [...]},
+    "summary": "Call from +15551234567 — 2m22s"
+  }' \
+  https://alfred.black/api/v1/streams/ingest
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 201 Created
+{
+  "status": "ingested",
+  "event_id": "550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+```json 200 OK
+{
+  "status": "duplicate",
+  "source_ref": "CA01HXYZABCDEF"
+}
+```
+
+</ResponseExample>
+
+<Note>
+The new zero-LLM ingest pipeline (#394) means every event becomes a vault `event/` record via Python templates with no LLM calls. Hourly batch enrichment then folds those events into vault context with one LLM call per hour total.
+</Note>

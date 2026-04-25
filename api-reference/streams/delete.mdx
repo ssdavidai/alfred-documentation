@@ -1,0 +1,48 @@
+---
+title: "Delete Stream"
+description: "Remove a stream and its event history."
+api: "DELETE /api/v1/streams/:id"
+---
+
+## Overview
+
+Removes the stream from `streams.json` and unlinks its JSONL events file. System streams cannot be deleted.
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  Stream id.
+</ParamField>
+
+## Response
+
+<ResponseField name="status" type="string">`deleted`.</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X DELETE -H "Authorization: Bearer $AAS_API_KEY" \
+  https://alfred.black/api/v1/streams/my-custom-stream
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{ "status": "deleted" }
+```
+
+```json 400 Bad Request
+{ "error": "Cannot delete a system stream" }
+```
+
+</ResponseExample>
+
+<Warning>
+The pull-engine config file (under `configs/`) is not removed by this call. If the config remains, it will be ignored because the metadata entry is gone. To fully scrub a Composio-backed stream, use `POST /api/v1/integrations/:id/disable-stream` instead.
+</Warning>

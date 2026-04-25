@@ -1,0 +1,95 @@
+---
+title: "Send Email"
+description: "Send a new email (new thread) via AgentMail."
+api: "POST /api/v1/email/send"
+---
+
+## Overview
+
+Sends a new outbound email from the tenant's AgentMail inbox. Proxies the inbox-scoped AgentMail API key — no upstream creds needed in the request.
+
+## Body Parameters
+
+<ParamField body="to" type="string | array" required>
+  Recipient address(es). Single string or array of strings.
+</ParamField>
+
+<ParamField body="subject" type="string" required>
+  Email subject. Must be non-empty.
+</ParamField>
+
+<ParamField body="text" type="string" required>
+  Plain-text body. Must be non-empty.
+</ParamField>
+
+<ParamField body="html" type="string" optional>
+  HTML body (for rich rendering).
+</ParamField>
+
+<ParamField body="cc" type="string | array" optional>
+  CC recipients.
+</ParamField>
+
+<ParamField body="bcc" type="string | array" optional>
+  BCC recipients.
+</ParamField>
+
+<ParamField body="reply_to" type="string" optional>
+  Reply-To header.
+</ParamField>
+
+<ParamField body="labels" type="string | array" optional>
+  AgentMail labels for organisation.
+</ParamField>
+
+<ParamField body="attachments" type="array" optional>
+  Each: `{filename, content_base64, content_type}`. Only attach files Alfred has actually rendered/fetched in the current turn — never invent attachment names.
+</ParamField>
+
+## Response
+
+Returns AgentMail's raw send response (passthrough). Includes the new `message_id` and `thread_id`.
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -X POST -H "Authorization: Bearer $AAS_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "to": "alice@example.com",
+    "subject": "Following up on yesterday",
+    "text": "Hello Alice,\n\nAs discussed...\n\nBest,\nDavid"
+  }' \
+  https://alfred.black/api/v1/email/send
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "message_id": "msg_01HXYZABCDEF",
+  "thread_id": "thr_01HXYZGHIJKL",
+  "from": "alfred.david@mail.alfred.black",
+  "to": ["alice@example.com"],
+  "subject": "Following up on yesterday",
+  "sent_at": "2026-04-25T11:35:00Z"
+}
+```
+
+```json 400 Bad Request
+{
+  "error": "AgentMail is not configured on this tenant. Set AGENTMAIL_API_KEY and AGENTMAIL_INBOX_ID in /opt/alfred/compose/.env."
+}
+```
+
+</ResponseExample>
+
+<Warning>
+Never let Alfred hallucinate attachments. The skill (`alfred-email-channel`) includes an explicit guard: only reference attachments actually rendered in the current turn (#465).
+</Warning>

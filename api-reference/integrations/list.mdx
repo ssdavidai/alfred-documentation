@@ -1,0 +1,67 @@
+---
+title: "List Integrations"
+description: "List the third-party apps connected via Composio for this tenant."
+api: "GET /api/v1/integrations"
+---
+
+## Overview
+
+Returns the connected Composio accounts (Gmail, Google Calendar, Notion, GitHub, Slack, etc.) scoped to the current tenant via `COMPOSIO_USER_ID`. Defence-in-depth filtering ensures another tenant's connections cannot leak through if the upstream Composio API drops the `user_id` filter.
+
+## Response
+
+<ResponseField name="integrations" type="array">
+  Array of connected accounts. Each entry has:
+
+  - `id` (string) — Composio connected-account id.
+  - `toolkit` (string) — Toolkit slug (e.g. `gmail`, `notion`, `googlecalendar`).
+  - `toolkit_name` (string) — Human-friendly toolkit name.
+  - `toolkit_icon` (string) — URL to the toolkit logo, may be empty.
+  - `status` (string) — Composio status (`ACTIVE`, `INITIATED`, `EXPIRED`, etc.).
+  - `auth_scheme` (string) — `OAUTH2`, `API_KEY`, `BEARER_TOKEN`, etc.
+  - `user_id` (string) — Internal Composio member id; identifies the tenant.
+  - `created_at` (string) — ISO timestamp.
+</ResponseField>
+
+<ResponseField name="count" type="number">
+  Number of connections returned.
+</ResponseField>
+
+## Request Example
+
+<RequestExample>
+
+```bash cURL
+curl -H "Authorization: Bearer $AAS_API_KEY" \
+  https://alfred.black/api/v1/integrations
+```
+
+</RequestExample>
+
+## Response Example
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "integrations": [
+    {
+      "id": "ca_01HXYZABCDEFGH",
+      "toolkit": "gmail",
+      "toolkit_name": "Gmail",
+      "toolkit_icon": "https://composio.dev/static/icons/gmail.png",
+      "status": "ACTIVE",
+      "auth_scheme": "OAUTH2",
+      "user_id": "tenant-david",
+      "created_at": "2026-04-14T12:34:56Z"
+    }
+  ],
+  "count": 1
+}
+```
+
+</ResponseExample>
+
+<Note>
+Read isolation is enforced server-side via Composio's `user_id` query filter and re-checked client-side with `accountMatchesUserId`. If a tenant's `COMPOSIO_USER_ID` is unset or `default`, the route fails — see the per-tenant isolation gotcha in the platform notes.
+</Note>
