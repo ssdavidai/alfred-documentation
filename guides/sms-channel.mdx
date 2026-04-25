@@ -1,0 +1,163 @@
+---
+title: "SMS Channel"
+description: "Texting Alfred from an authorised number gets a real agent reply with cross-channel memory. Other senders go to stream ingest."
+icon: "message-circle"
+---
+
+## What's in scope
+
+The SMS half of AgentPhone uses the same Twilio number as voice — Sir can send a text and get a reply from his Alfred. Like email, SMS dispatches in two modes depending on who sent it:
+
+| Sender | Path | Effect |
+|---|---|---|
+| **On the authorised list** | Channel — synchronous reply via openclaw `/v1/chat/completions` with per-thread context | Alfred replies in 1–2 short sentences over SMS |
+| **Not on the authorised list** | Stream — `/api/v1/streams/ingest` with `stream_type: "sms"` | Zero-LLM ingest; the message becomes a vault `event/` record |
+
+Cross-channel memory threads through both paths. When Sir later asks Alfred (on Slack, web, voice, email) about something he texted earlier, the context is there.
+
+---
+
+## Authorising a number
+
+The authorised list lives at `/mnt/encrypted/alfred/.authorized-phone-numbers.json` on Sir's tenant. Manage it via API:
+
+```bash
+# List
+curl -s "$ALFRED_API_BASE/api/v1/phone/authorized-numbers" \
+  -H "Authorization: Bearer $ALFRED_API_KEY" | jq
+
+# Add
+curl -s -X POST "$ALFRED_API_BASE/api/v1/phone/authorized-numbers" \
+  -H "Authorization: Bearer $ALFRED_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"number": "+36706209518"}' | jq
+
+# Replace the whole list
+curl -s -X PUT "$ALFRED_API_BASE/api/v1/phone/authorized-numbers" \
+  -H "Authorization: Bearer $ALFRED_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"numbers": ["+36706209518", "+15551234567"]}' | jq
+
+# Remove (URL-encode the +)
+curl -s -X DELETE "$ALFRED_API_BASE/api/v1/phone/authorized-numbers/%2B36706209518" \
+  -H "Authorization: Bearer $ALFRED_API_KEY" | jq
+```
+
+Numbers are stored in **E.164** format. Conversational management works too — tell Alfred "authorise +36706209518" and he'll handle it.
+
+### Bootstrap trust
+
+If the authorised list is empty when the first inbound SMS arrives, the system **auto-trusts** that first sender's number. The reasoning: Sir's freshly-provisioned Twilio number is known only to him at first, so the inaugural SMS is almost certainly from Sir's own phone. This avoids the awkward UX where a brand-new tenant has to hand-configure trust before any SMS reply works.
+
+The SaaS spam filter runs **before** auto-trust, so the bootstrap window can't be exploited by random scrapers.
+
+---
+
+## How the dual dispatch works
+
+Sir texts his number. Twilio fires `POST /webhooks/twilio/sms` on the SaaS:
+
+1. Twilio signature verification
+2. Spam pre-filter
+3. Tenant lookup by destination number
+4. Proxy to tenant `POST /api/v1/phone/sms/inbound` with `{from, to, body, messageSid}`
+
+On the tenant, `phone.ts` then:
+
+1. Normalises the sender number (strip whitespace, parens, hyphens)
+2. Compares against the authorised list (with bootstrap-trust if list is empty)
+3. **Authorised** → openclaw chat completion → ship reply via Twilio + audit echo
+4. **Unauthorised** → emit a stream event with `stream_type: "sms"` and return
+
+---
+
+## The authorised reply path
+
+For authorised senders, the tenant runs a synchronous LLM call against openclaw's `/v1/chat/completions` endpoint, NOT the fire-and-forget `/v1/sessions/message`. The synchronous endpoint returns the reply text in the response body, which the tenant then ships to Sir via Twilio.
+
+The chat completion uses `model: "openclaw/main"` so the main agent's persona, tools, and config apply. The system prompt is composed from:
+
+- `SOUL.md` (the persona)
+- An SMS overlay (max 2 short sentences, no markdown, no asterisks, no lists)
+- `MEMORY.md` (long-running notes)
+- The cross-channel context bundle (open matters, open tasks, recent conversations)
+
+The user-turn history comes from a per-sender thread file at `/mnt/encrypted/alfred/streams/sms-phone-<sanitised-from>.jsonl` — append-only, last 20 turns loaded for context.
+
+After the reply ships, an **audit echo** is sent to the main agent's openclaw session via `/v1/sessions/message`:
+
+```
+[SMS from +36706209518]
+> <user message>
+
+Reply: <assistant reply>
+```
+
+This is the cross-channel memory mechanism. The main agent's session sees the SMS exchange, so when Sir hops to Slack or web chat later, Alfred remembers the SMS context.
+
+---
+
+## Latency
+
+Cold session bootstrap (first SMS each session) is ~15–30s — the main agent loads workspace skills, MEMORY, the tool allowlist, and runs the LLM call. Subsequent SMS in the same session window are fast (1–3s round-trip).
+
+Twilio's webhook timeout is 15s, but the SaaS returns 200 to Twilio **before** calling the tenant — so the long wait only affects how soon Sir sees the reply on his phone, not Twilio delivery.
+
+---
+
+## Outbound — Alfred texting Sir
+
+Either the agent (conversationally — "Sir, I'll text you the address") or the API:
+
+```bash
+curl -X POST "$ALFRED_API_BASE/api/v1/phone/sms" \
+  -H "Authorization: Bearer $ALFRED_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "to": "+36706209518",
+    "body": "Sir, the kitchen team confirmed for nine. — Alfred"
+  }' | jq
+```
+
+The outbound is shipped through the SaaS internal endpoint (`POST $SAAS_INTERNAL_URL/api/internal/twilio/send-sms`) using `VOICE_BRIDGE_INTERNAL_TOKEN`. It's also logged to the `sms-outbound` stream so the dashboard's Phone page can show it.
+
+`to` must be E.164. `body` must be non-empty. The 1600-character SMS body limit applies (Twilio handles segmentation).
+
+---
+
+## Limits and edge cases
+
+- **No multi-recipient SMS** — one `to` per call. Send multiple times for multiple recipients.
+- **MMS (images)** — not yet supported on this channel; use email for image delivery.
+- **Long replies** — the SMS overlay enforces max 2 short sentences. If Sir asks for something that requires more (a list of meetings, a quote), Alfred suggests Slack or email.
+- **Spam senders** — filtered at SaaS before reaching the tenant. Unauthorised non-spam senders go to stream ingest.
+
+---
+
+## Per-thread context file
+
+`/mnt/encrypted/alfred/streams/sms-phone-<sanitised-from>.jsonl` is the per-sender thread state. Each line is a JSON record:
+
+```json
+{"role": "user", "content": "Did you book the dentist?", "ts": "2026-04-25T08:14:22.412Z"}
+{"role": "assistant", "content": "Yes, sir — Tuesday at three. — Alfred", "ts": "2026-04-25T08:14:24.018Z"}
+```
+
+The last 20 turns are loaded as context for each new exchange. The file is on the LUKS-encrypted volume.
+
+---
+
+<CardGroup cols={2}>
+  <Card title="Voice Channel" icon="phone" href="/guides/voice-channel">
+    Same number, the call side
+  </Card>
+  <Card title="Email Channel" icon="mail" href="/guides/email-channel">
+    Same dual-mode pattern, different medium
+  </Card>
+  <Card title="Recipes" icon="book-open" href="/guides/recipes">
+    Send SMS by API, authorise a number
+  </Card>
+  <Card title="Your AI Agents" icon="users" href="/guides/your-ai-agents">
+    Cross-channel memory in detail
+  </Card>
+</CardGroup>

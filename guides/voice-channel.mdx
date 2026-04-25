@@ -1,0 +1,185 @@
+---
+title: "Voice Channel"
+description: "Sir's tenant phone number — call Alfred, ask Alfred to call you, with full cross-channel context primed at every connect."
+icon: "phone"
+---
+
+## What's in scope
+
+Every Alfred Black tenant gets a dedicated phone number — Twilio-provisioned, owned by the SaaS Twilio account, but routed through Sir's tenant alone. Sir can:
+
+- **Call Alfred** — inbound voice. The call connects to OpenAI Realtime via the Voice Bridge, primed with Sir's MEMORY.md, recent session summaries, open matters, and open tasks.
+- **Ask Alfred to call someone** — outbound voice in two modes: `tts` (one-shot text-to-speech announcement, no live agent) or `realtime` (live agent conversation).
+- **Text Alfred** — see [SMS Channel](/guides/sms-channel) for the SMS half.
+
+The phone number is shown on the dashboard's **Phone** page. If Sir hasn't been provisioned a number yet (some plans, some regions), the page will say so.
+
+---
+
+## Architecture
+
+```
+Sir's phone  ──Twilio──>  SaaS webhook /webhooks/twilio/voice
+                                │
+                                │  Twilio signature verified
+                                │  Tenant looked up by destination phone number
+                                │  TwiML <Connect><Stream> returned
+                                ▼
+                          Voice Bridge (packages/voice-bridge on SaaS VM)
+                                │
+                                │  WebSocket bridge:
+                                │  Twilio Media Stream (g711_ulaw) ↔ OpenAI Realtime (g711_ulaw)
+                                │  No resampling, no transcoding round-trip
+                                ▼
+                       OpenAI Realtime model is the agent
+                                │
+                                │  Function-call dispatch on agent's tool calls:
+                                │  HTTP → tenant ctrl-api on Tailscale
+                                ▼
+                          Sir's tenant ctrl-api
+```
+
+The voice agent **is** the Realtime model itself, primed with the workspace `alfred-voice/SKILL.md` as its persona and Sir's primer bundle as additional context. Function calls in the Realtime loop dispatch via HTTP to Sir's tenant — same `self`-equivalent endpoint surface the main agent uses.
+
+The Voice Bridge is a Node WebSocket service that runs on the SaaS VM (not grafted into Wasp — long-lived WS doesn't fit). It's reachable via `voice.alfred.black` (a DNS-only Cloudflare subdomain that bypasses the WAF, which would otherwise drop Twilio's WS upgrades).
+
+---
+
+## The voice context primer
+
+When a call connects, the Voice Bridge fetches `GET /api/v1/phone/voice-context` from Sir's tenant and inlines the bundle into the Realtime session's `instructions`. The bundle includes:
+
+- **MEMORY.md** — long-running notes Alfred maintains about Sir
+- **alfred-voice/SKILL.md** — the voice persona and behavioural rules
+- **Open matters** (max 6) — currently active matters by name
+- **Open tasks** (max 6) — currently active tasks with due dates if set
+- **Recent main-agent sessions** (last 6) — summaries from the cross-channel memory stream
+- **Composio toolkits** — what apps Alfred can act on
+
+The bundle is cached for 60s on the tenant; consecutive calls within a minute share the same primer. This is the cross-channel memory mechanism — when Sir calls Alfred at 5pm, Alfred already knows about the morning Slack chat.
+
+---
+
+## Voice persona overlays
+
+The `alfred-voice` skill defines voice-specific overlays on top of the standard `SOUL.md` persona:
+
+| Rule | Why |
+|---|---|
+| **1–2 sentences per turn** | Voice is not text. Lists are not spoken. |
+| **Speak names, not IDs** | Never "matter ID 47" — say "your matter about the new lease." |
+| **Numbers spoken in full** | "Twelve thousand euros," not "12,000 EUR." |
+| **No markdown** | No bullets, tables, code, asterisks. |
+| **"One moment, sir." before EVERY tool call** | Latency masking. Silence during a 3-second tool call sounds broken. |
+| **Speak only what the tool returned** | Never invent results. If the tool returned three calendar events, name those three; don't add a fourth from memory. |
+| **Greet with "Yes, sir?" on inbound** | Wait for the request. |
+| **Sign off with "Good day, sir."** | Nothing more. |
+
+The skill also covers caller-number handling — when Sir says "text this to me", Alfred reads his caller number from the primer (never a placeholder) and ships an SMS via `POST /api/v1/phone/sms`.
+
+---
+
+## Latency budget
+
+Realtime voice has a baseline ~800ms–1.2s round-trip floor. Tool calls add 1–3s on top. The "One moment, sir" filler before every tool call is mandatory UX, not polish — silence during a 3-second ctrl-api call reads as a broken connection.
+
+Function call sequencing in Realtime must be: `function_call_arguments.done` → `function_call_output` → `response.create`, in that order. The Voice Bridge enforces this; the agent doesn't have to think about it.
+
+---
+
+## Outbound calls
+
+`POST /api/v1/phone/call` initiates a call from Sir's number to anyone:
+
+```bash
+# Mode: tts — one-shot text-to-speech announcement, no live agent
+curl -X POST "$ALFRED_API_BASE/api/v1/phone/call" \
+  -H "Authorization: Bearer $ALFRED_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "to": "+36201234567",
+    "message": "Sir asks me to let you know he will be 15 minutes late. Thank you.",
+    "mode": "tts"
+  }'
+
+# Mode: realtime — opens a live Voice Bridge session with Alfred speaking
+curl -X POST "$ALFRED_API_BASE/api/v1/phone/call" \
+  -H "Authorization: Bearer $ALFRED_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "to": "+36201234567",
+    "message": "Sir, I am calling about the front desk package — could you check whether it has arrived?",
+    "mode": "realtime"
+  }'
+```
+
+Mode default is `tts`. Use `tts` for "tell my driver I'll be late," reminders, voicemails. Use `realtime` only when Sir explicitly wants a live conversation — calling the front desk to ask a question, calling a vendor to confirm a delivery.
+
+The phone number must be in **E.164** format (`+36201234567`). Placeholders like `"sir's number"` are rejected with 400.
+
+---
+
+## Inbound flow
+
+Sir calls his number. Twilio fires the webhook. The SaaS:
+
+1. Verifies Twilio's `X-Twilio-Signature` header
+2. Pre-filters the caller against the spam blocklist (rejects with `<Reject reason="busy"/>` if matched)
+3. Looks up the tenant by destination phone number
+4. Returns TwiML `<Connect><Stream url="wss://voice.alfred.black/voice/<instance-id>">` with HMAC-signed `<Parameter name="sig">` and `<Parameter name="from">` for the Voice Bridge to verify
+5. Twilio opens the WebSocket; Voice Bridge verifies the sig, fetches the primer, opens an OpenAI Realtime session, and bridges the audio
+
+Audio flows g711_ulaw end-to-end — no resampling, no transcoding round-trip. This minimises latency and CPU.
+
+---
+
+## After the call
+
+When Sir hangs up, the Voice Bridge POSTs the full transcript to `POST /api/v1/phone/transcript` on Sir's tenant. The transcript is ingested as a stream event with `stream_type: "voice-call"` and lands in the vault as a `conversation/` record.
+
+The next text turn — Slack, web chat, email — will already know what was discussed on the call. The cross-channel memory primer is updated for the next call too.
+
+---
+
+## Configuration storage
+
+Per-tenant phone metadata lives in the tenant `.env`:
+
+- `AGENTPHONE_PHONE_NUMBER` (also aliased `TWILIO_PHONE_NUMBER`) — Sir's E.164 number
+- `TENANT_ID` — used by the SaaS internal SMS/call dispatcher
+- `VOICE_BRIDGE_INTERNAL_TOKEN` — HMAC secret for the Voice Bridge
+- `SAAS_INTERNAL_URL` — where ctrl-api ships outbound SMS and call requests
+
+Twilio credentials never reach Sir's tenant. The master account lives only at the SaaS layer.
+
+---
+
+## Spam and abuse handling
+
+The SaaS pre-filters voice and SMS against a spam list before consuming Realtime minutes or burning openclaw cycles. Voice calls from spam numbers get `<Reject reason="busy"/>`. SMS from spam senders is dropped silently. Sir's authorised-numbers list is checked **after** the spam filter.
+
+---
+
+## Limits
+
+- **No multi-party calls** — Twilio Streams is single-leg.
+- **Twilio webhook timeout** — 15s. The SaaS responds within ms; the heavy lifting happens after the response.
+- **Voice Bridge session length** — bound by OpenAI Realtime's session limits. Long calls (>20 min) may need to chunk; uncommon for typical butler use.
+- **One concurrent realtime call per tenant** — enforced by the Voice Bridge; subsequent inbound during a live call gets `<Reject/>`.
+
+---
+
+<CardGroup cols={2}>
+  <Card title="SMS Channel" icon="message-circle" href="/guides/sms-channel">
+    The other half of AgentPhone
+  </Card>
+  <Card title="Email Channel" icon="mail" href="/guides/email-channel">
+    Email's dual-mode dispatch
+  </Card>
+  <Card title="Recipes" icon="book-open" href="/guides/recipes">
+    Place an outbound call by API
+  </Card>
+  <Card title="Your AI Agents" icon="users" href="/guides/your-ai-agents">
+    The voice agent in context
+  </Card>
+</CardGroup>

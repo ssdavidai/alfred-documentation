@@ -1,167 +1,102 @@
 ---
 title: "Using the Inbox"
-description: "How to share content with Alfred."
+description: "Drop a file in front of Alfred and let the Curator do the rest. How upload, scan, and the media pipeline work."
 icon: "inbox"
 ---
 
-## Overview
+## What the inbox is for
 
-Most data reaches Alfred automatically through **Streams** — integrations with Gmail, Notion, Omi, and other services that feed events into your vault continuously. You don't need to copy-paste or upload anything for these sources. The flow is:
+The inbox is Sir's manual upload channel — anything that doesn't arrive via a stream or a Connected App goes here. Meeting notes, voice memos, scanned documents, screenshots, PDFs from a research session, a CSV from your accountant. Drop it in and the Curator (one of your five AI specialists) takes over.
 
-1. **Stream event arrives** (e.g., a new Gmail thread, a Notion page update, an Omi recording)
-2. The **Event Processor** reads and classifies it
-3. The **Curator** creates structured vault records and links them together
-4. Records appear in your vault within seconds
+Files land in `vault/inbox/` on the tenant. The Curator processes them through its 4-stage pipeline (analyse → entity resolution → interlink → enrich) and writes structured vault records. Binaries take a different path — they're routed to `MediaIngestionWorkflow`, which calls Whisper for audio, OCR for images, or document extraction for PDFs before the structured records get written.
 
-During onboarding, a **100-day Gmail backfill** runs automatically — populating your vault with recent email history so Alfred has meaningful context from day one.
+---
 
-For sources that aren't connected as streams, you can still share content manually through the inbox. This is useful for ad-hoc data like one-off meeting notes, pasted research, or documents from tools you haven't integrated yet.
+## How to put something in the inbox
 
-## Automatic sources (Streams)
+<Tabs>
+  <Tab title="From the dashboard">
+    Click **Inbox** in the sidebar. Drag and drop one or more files onto the drop zone, or click to open the file picker. Multi-file uploads are supported.
 
-The following integrations feed events into your vault without any manual effort:
+    The dashboard shows the upload progress and, once accepted, the file appears in the Inbox tab of the Intelligence menu with a status of `processing`. When the Curator finishes, the file disappears from Inbox and the resulting vault records appear in the relevant tabs (Matters, Errands, or as standalone notes).
+  </Tab>
 
-- **Gmail** — emails, threads, and attachments (100-day backfill + continuous sync)
-- **Notion** — pages and database entries as they change
-- **Omi** — ambient recordings and transcriptions
-- **OpenClaw sessions** — chat sessions with Alfred's agents are captured as stream events via the `alfred-inbox` hook
+  <Tab title="From Alfred conversationally">
+    Tell Alfred over Slack, web chat, voice, or email: "I'm sending you the meeting notes from this morning, please file them with the kitchen renovation matter." Attach the file. Alfred will upload it through the inbox API on your behalf, then make sure the resulting records get linked to the right matter.
+  </Tab>
 
-Connect and manage streams from the [Streams page](/guides/streams-and-integrations) on your dashboard.
+  <Tab title="Via API">
+    The ctrl-api accepts uploads at `POST /api/v1/vault/inbox` with a JSON body of `{filename, content}` (content base64-encoded for binaries). For text content (markdown, plain text), pass it as-is. See the [Recipes](/guides/recipes) guide for a copy-pastable example.
+  </Tab>
+</Tabs>
 
-## Manual sharing (ad-hoc data)
+---
 
-For content that doesn't come through a stream, share it manually:
+## Scan vs upload — two routes, one inbox
 
-### From the dashboard
+The dashboard upload and the conversational upload both end up calling the same endpoint, which writes the file to `vault/inbox/` and immediately emits a stream event so the Curator picks it up.
 
-1. Go to your [Alfred Black dashboard](https://alfred.black)
-2. On the Home page, click **Upload to Vault** in the Quick Actions section
-3. Enter a title and paste your content
-4. Click **Submit**
+There's also a **scan** endpoint — `POST /api/v1/streams/inbox/scan` — that walks the inbox directory and ingests anything not yet seen. It's idempotent (uses `inbox:<filename>` as the dedup key), so triggering it repeatedly is safe. The scan runs automatically on a periodic Temporal schedule, but you can fire it manually if you've dropped files into the inbox directory by some out-of-band route.
 
-The Curator begins attending to it immediately.
+---
 
-### Via the API — single item
+## What happens to binary files
 
-<CodeGroup>
-```bash cURL
-curl -X POST /api/v1/vault/inbox \
-  -H "Authorization: Bearer alf_your_key_here" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "filename": "meeting-2026-02-26.md",
-    "content": "# Product Sync\n\nAttendees: Alice, Bob\n\nAlice presented the Q1 roadmap. Decision: prioritize mobile app over desktop.\nBob will handle the API migration by end of March."
-  }'
-```
+When the inbox upload sees a media file (audio, image, video, document), it emits the event with `stream_type: "media"` instead of `stream_type: "inbox-upload"`. That routing change matters: media events go to `MediaIngestionWorkflow`, which:
 
-```javascript JavaScript
-const response = await fetch('/api/v1/vault/inbox', {
-  method: 'POST',
-  headers: {
-    'Authorization': 'Bearer alf_your_key_here',
-    'Content-Type': 'application/json'
-  },
-  body: JSON.stringify({
-    filename: 'meeting-2026-02-26.md',
-    content: '# Product Sync\n\nAttendees: Alice, Bob\n\nAlice presented the Q1 roadmap. Decision: prioritize mobile app over desktop.\nBob will handle the API migration by end of March.'
-  })
-});
-```
+| File type | Pipeline |
+|---|---|
+| **Audio** (`.mp3`, `.m4a`, `.wav`, `.ogg`, …) | Groq Whisper transcription → topic-split if it's a braindump → vault `conversation/` records |
+| **Images** (`.png`, `.jpg`, `.heic`, …) | Vision model description → vault `event/` or `note/` records |
+| **Documents** (`.pdf`, `.docx`, `.xlsx`, …) | Text extraction → Curator pipeline as if it were inline text |
+| **Video** (`.mp4`, `.mov`, …) | Audio extracted → Whisper → as audio above |
 
-```python Python
-import requests
+Plain text and markdown files skip the media route entirely and go straight to the Curator, which reads the body and decides what kind of record(s) to write.
 
-response = requests.post(
-    '/api/v1/vault/inbox',
-    headers={'Authorization': 'Bearer alf_your_key_here'},
-    json={
-        'filename': 'meeting-2026-02-26.md',
-        'content': '# Product Sync\n\nAttendees: Alice, Bob\n\nAlice presented the Q1 roadmap. Decision: prioritize mobile app over desktop.\nBob will handle the API migration by end of March.'
-    }
-)
-```
-</CodeGroup>
+---
 
-### Via the API — multiple items at once
+## Braindumps
 
-Share several items in a single request:
+The MediaIngestionWorkflow has a special path for **braindumps** — long-form audio (typically a recording of you walking and talking through several topics at once). The braindump detector checks length, speaker count, and topic drift. If it triggers, the workflow splits the transcript by topic and creates one vault record per topic, each linked to the original conversation record.
 
-```bash
-curl -X POST /api/v1/vault/inbox/bulk \
-  -H "Authorization: Bearer alf_your_key_here" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "files": [
-      {"filename": "standup-monday.md", "content": "# Monday Standup\n\n..."},
-      {"filename": "standup-tuesday.md", "content": "# Tuesday Standup\n\n..."},
-      {"filename": "research-notes.md", "content": "# Competitor Analysis\n\n..."}
-    ]
-  }'
-```
+This is what lets you walk for thirty minutes thinking out loud about three different projects, hand the recording to Alfred, and end up with three separate matters updated rather than one giant note.
 
-## What to share
+---
 
-Alfred works best with rich, natural-language content:
+## What the Curator produces
 
-- **Meeting notes** — standups, planning sessions, 1:1s, retrospectives
-- **Conversation exports** — email threads, chat logs, discussion summaries
-- **Research** — competitor analysis, market research, technical investigations
-- **Voice transcripts** — transcribed calls, voice memos, interviews
-- **Ideas and brainstorms** — rough thoughts, feature proposals, strategy notes
-- **Project updates** — status reports, progress summaries, post-mortems
+For a single document or text upload, the Curator runs four passes:
 
-<Tip>
-  For best results, include names (people, companies, projects), dates, and specific details. The more context you provide, the richer the records Alfred creates for you.
-</Tip>
+1. **Analyse** — read the body, identify what kind of content this is (meeting notes, contract, research summary, …)
+2. **Entity resolution** — for every person, organisation, project, or location mentioned, look up the existing vault record or create a new one
+3. **Interlink** — wire the new content's mentions to the resolved entities via vault frontmatter
+4. **Enrich** — derive tags, add a summary if missing, surface decisions and action items
 
-## What happens next
+The output is typically a primary record (usually a `note/` or `conversation/`) plus updates to any related `person/`, `org/`, `matter/`, or `event/` records. A single meeting note can produce ten or more vault writes — every participant, every action item, every decision becomes its own record connected to the meeting.
 
-Once content reaches the inbox:
+---
 
-1. The **Curator** picks it up within seconds
-2. It identifies entities: people, organizations, projects, tasks, decisions
-3. It creates structured records for each entity
-4. All records are cross-linked to each other
-5. The original input is marked as attended to
+## Watching it happen
 
-## Seeing what Alfred prepared
+The Activity tab in the Intelligence menu shows every Curator pass as it runs. Each pass logs its input file, the records it touched, and any failures. If something looks wrong — Curator missed an entity, picked the wrong matter, mis-summarised — you can promote the inbox event back, tag what was wrong, and the Reflection workflow uses that signal as a future correction.
 
-After sharing content, you can see what Alfred created:
+<Note>
+**Read before writing.** If you upload a doc that's already in the vault (a re-export of the same PDF, a duplicate meeting note), the Curator's entity resolution will detect existing records and update them rather than creating duplicates. The dedup key is the source_ref, and for re-uploaded files that's the filename — rename a file before re-uploading if you want a fresh record.
+</Note>
 
-**From the dashboard:** Browse your vault, filter by type, and see newly created records.
+---
 
-**Via the API:**
-
-<CodeGroup>
-```bash List recent people
-curl -s /api/v1/vault/list/person \
-  -H "Authorization: Bearer alf_your_key_here" | jq .
-```
-
-```bash List recent decisions
-curl -s /api/v1/vault/list/decision \
-  -H "Authorization: Bearer alf_your_key_here" | jq .
-```
-
-```bash Search for a keyword
-curl -s "/api/v1/vault/search?grep=Q1+roadmap" \
-  -H "Authorization: Bearer alf_your_key_here" | jq .
-```
-</CodeGroup>
-
-## Tips for best results
-
-- **Include people's full names** — "Alice Smith" works better than just "Alice"
-- **Mention project names explicitly** — "the Platform v2 project" helps Alfred create proper links
-- **Be specific about decisions** — "Decision: use PostgreSQL" is clearer than "we talked about databases"
-- **Include dates** — helps Alfred create accurate timelines
-- **Don't worry about formatting** — raw text, markdown, or bullet points all work
-
-<Columns cols={2}>
+<CardGroup cols={2}>
+  <Card title="Your AI Agents" icon="users" href="/guides/your-ai-agents">
+    Meet the Curator and the rest of the specialists
+  </Card>
   <Card title="Browsing Your Vault" icon="vault" href="/guides/browsing-your-vault">
-    See what Alfred created from your content
+    See where the records ended up
   </Card>
-  <Card title="API Reference: Inbox" icon="code" href="/api-reference/vault/upload-inbox">
-    Full inbox API documentation
+  <Card title="Recipes" icon="book-open" href="/guides/recipes">
+    Bulk-upload meeting notes via API
   </Card>
-</Columns>
+  <Card title="Streams & Integrations" icon="radio" href="/guides/streams-and-integrations">
+    The other side — passive data feeds
+  </Card>
+</CardGroup>

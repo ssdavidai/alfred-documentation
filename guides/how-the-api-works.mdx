@@ -1,149 +1,160 @@
 ---
 title: "How the API Works"
-description: "Understand the secure proxy architecture that connects your API calls to your Alfred."
+description: "The proxy chain from your script to your tenant — auth, encryption, transport, and what each hop does."
 icon: "route"
 ---
 
-## Overview
+## The shape of a request
 
-When you make an API call with your `alf_` key, the request travels through a secure proxy layer before reaching your Alfred. This guide explains the full request lifecycle and the security model behind it.
-
-## The request path
-
-```mermaid
-sequenceDiagram
-    participant Script as Your Script
-    participant SaaS as SaaS Proxy<br/>(alfred.black)
-    participant TS as Tailscale Network
-    participant Tenant as Your Alfred<br/>(alfred-ctrl)
-    participant Docker as Services
-
-    Script->>SaaS: POST /api/v1/vault/inbox<br/>Authorization: Bearer alf_xxx
-    SaaS->>SaaS: Hash key (SHA-256)<br/>Look up ApiKey row<br/>Find your Alfred
-    SaaS->>SaaS: Decrypt internal key<br/>(AES-256-GCM)
-    SaaS->>TS: Forward request via Tailscale<br/>https://{hostname}:3100/api/v1/vault/inbox<br/>Authorization: Bearer {internal_key}
-    TS->>Tenant: Deliver to your Alfred
-    Tenant->>Tenant: Authenticate with internal key
-    Tenant->>Docker: Execute operation
-    Docker-->>Tenant: Result
-    Tenant-->>TS: Response
-    TS-->>SaaS: Response
-    SaaS-->>Script: Response (same status + body)
-```
-
-In plain terms:
+Every API call Sir makes from outside his tenant follows the same path:
 
 ```
-Your Script (alf_xxx) --> SaaS Proxy --> Tailscale --> Your Alfred --> Services
+Your script  →  https://alfred.black/api/...  →  SaaS proxy
+                                                      │
+                                                      │  Tailscale (WireGuard)
+                                                      ▼
+                                        Sir's tenant ctrl-api :3100
+                                                      │
+                                                      │  internal docker network
+                                                      ▼
+                                        openclaw / temporal / alfred / alfred-learn
 ```
 
-## Step-by-step breakdown
+Three hops, three different auth mechanisms, no public IP exposure of Sir's tenant.
 
-### 1. You send a request with your API key
+---
 
-You create API keys in your [dashboard](https://alfred.black) under **Settings > API Keys**. Each key starts with `alf_` followed by 32 hex characters:
+## Step 1 — Bearer auth at the SaaS edge
 
-```bash
-curl -X GET /api/v1/vault/context \
-  -H "Authorization: Bearer alf_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"
-```
+Your request lands at `alfred.black/api/...` carrying `Authorization: Bearer alf_…`. The SaaS:
 
-Your request hits the SaaS server at `alfred.black`.
+1. SHA-256 hashes the token
+2. Looks up the matching `ApiKey` row by hash
+3. Reads the row's `userId`
+4. Looks up the user's `Instance` (their tenant)
+5. Checks the instance is `running` and has both `tailscaleHostname` and `apiKey` set
+6. Updates `lastUsedAt` fire-and-forget
 
-### 2. The proxy authenticates your key
+If the key doesn't exist, the instance isn't ready, or the instance isn't running, the SaaS returns the relevant 401/503 with a generic message. Internal details about the tenant are never leaked in the error body.
 
-The proxy extracts the Bearer token from the `Authorization` header and validates the `alf_` prefix. It then computes a SHA-256 hash of the full key and looks it up in the `ApiKey` database table.
+---
 
-The raw key is never stored — only its hash. This means even if the database were compromised, your API keys could not be recovered.
+## Step 2 — AES-256-GCM decrypt of the per-instance API key
 
-```
-alf_a1b2c3d4... --> SHA-256 --> keyHash --> ApiKey table lookup
-```
+Sir's tenant ctrl-api uses a different bearer token internally — the `AAS_API_KEY` baked into the tenant's `.env` at provision time. The SaaS holds this per-instance key encrypted with AES-256-GCM under `COLUMN_ENCRYPTION_KEY` and decrypts it on demand for each proxied request.
 
-If the key is valid, the proxy loads the associated account and locates your Alfred. The `lastUsedAt` timestamp on the key is updated asynchronously.
+Sir never sees this internal token. Sir's `alf_…` key authenticates Sir to the SaaS; the SaaS has its own credentials to talk to each tenant.
 
-### 3. The proxy validates readiness
+---
 
-Before forwarding, the proxy checks three conditions:
+## Step 3 — Tailscale transport
 
-| Check | Error if failed |
-|-------|----------------|
-| Alfred exists | `404` — No Alfred found |
-| Tailscale hostname and internal key are set | `503` — Not ready yet |
-| Status is `running` | `503` — Not running |
+The SaaS host and every tenant share a Tailscale tailnet. The SaaS sends the upstream request to `https://<tenant-tailscale-hostname>:3100/api/v1/...` over WireGuard. Routes:
 
-### 4. The internal key is decrypted
+- `tailscaleHostname` if the SaaS container can reach the tenant's MagicDNS name directly
+- `subdomainUrl` (a per-tenant Cloudflare Tunnel hostname) as a fallback when the SaaS container is on a Docker bridge network without Tailscale access
 
-Your Alfred's internal API key (used for communication between the SaaS and your Alfred) is stored encrypted using AES-256-GCM. The proxy decrypts it at request time using a server-side encryption key.
+Either way, the tenant's port 3100 is **never** exposed to the public internet. The Hetzner firewall on every tenant allows only SSH (22) and ICMP inbound. All Alfred services bind to localhost; external access is exclusively through Tailscale or Cloudflare Tunnel.
 
-The encrypted format is `iv:authTag:ciphertext`, providing both confidentiality and integrity verification.
+---
 
-### 5. The request is forwarded via Tailscale
+## Step 4 — Tenant ctrl-api dispatches the request
 
-The proxy constructs a URL using your Alfred's Tailscale hostname and forwards the request:
+ctrl-api validates the inbound `Authorization: Bearer <internal-token>` against its own `AAS_API_KEY` using a constant-time comparison. If valid, the route handler runs.
 
-```
-https://{tailscaleHostname}:3100/api/v1/vault/context
-```
+Most routes pass through to:
 
-The forwarded request includes:
-- The decrypted internal key as a Bearer token
-- The original request method (GET, POST, PATCH, DELETE)
-- The original request body (for non-GET requests)
-- Query parameters from the original request
+- The vault filesystem at `/mnt/encrypted/vault` for record CRUD
+- Docker exec into containers for chore source, openclaw config, alfred CLI commands
+- The Temporal client at `temporal:7233` for workflow operations
+- The OpenClaw gateway at `openclaw:18789` for the AI gateway
+- AgentMail's API for outbound email
+- The SaaS internal Twilio endpoint for outbound SMS / voice
 
-A 15-second timeout is enforced on the forwarded request.
+The response — JSON, almost always — flows back the same chain in reverse: ctrl-api → Tailscale → SaaS proxy → your script.
 
-### 6. Your Alfred authenticates and executes
+---
 
-Your Alfred's API server (alfred-ctrl running on port 3100) receives the request and authenticates it against its own internal key. If valid, it executes the operation — which may involve running CLI commands, managing services, or reading and writing vault files.
+## Endpoints
 
-### 7. The response flows back
+The full endpoint catalogue is in the [API Reference](/api-reference/introduction). The table below lists the major route groups; every entry is reachable as `https://alfred.black/api/v1/<path>` from outside, or as `self({endpoint: "/api/v1/<path>"})` for the agent inside.
 
-Your Alfred's response (status code, headers, and body) flows back through Tailscale to the SaaS proxy, which forwards it to your script unchanged. JSON responses are parsed and re-serialized; non-JSON responses are passed through as-is.
+| Group | Purpose |
+|---|---|
+| `vault/*` | Read, write, search, list records by type, fetch the full graph or schema |
+| `streams/*` | List streams, fetch events, ingest manually, manage configurations, prune old events |
+| `learning/*` | Status, queue, observations, instincts, reflections, sessions |
+| `workflows/*` | List Temporal workflows, inspect, signal, terminate, cancel |
+| `schedules/*` | List, create, trigger, pause, unpause, rewrite cron |
+| `chores/*` | List, fetch source + dependency audit, pause, resume, trigger, create, edit, delete |
+| `workers/*` | Worker status, restart |
+| `admin/*` | Dashboard, health, system info, containers (list, restart, logs), credentials, models |
+| `integrations/*` | Composio: list, catalog, connect, auto-config, enable/disable streams + tools, regenerate skills |
+| `email/*` | AgentMail outbound — send, reply, forward, fetch message, fetch thread, fetch attachment |
+| `phone/*` | AgentPhone — config, voice-context, sms (outbound), call (outbound), authorized-numbers CRUD |
+| `auth/senders` | AgentMail authorized-senders allowlist CRUD |
+| `devices/*` | OpenClaw device pairing, approve, reject, remove, rotate token, revoke |
+| `omi/*` | Omi wearable upload + state |
+| `tools/*`, `models/*`, `agents/*` | Internal — agent/model/tool registry queries |
 
-## Two proxy paths
+---
 
-The SaaS server exposes two URL patterns that both route through the same proxy logic:
+## Rate limits
 
-| Path pattern | Description |
-|-------------|-------------|
-| `/api/v1/...` | Primary API path. The URL is forwarded as-is. |
-| `/user-api/...` | Legacy path. The prefix is stripped and rewritten to `/api/v1/...` before forwarding. |
+There is no global rate limit at the SaaS edge today. The constraints you'll hit instead are:
 
-Both paths use the same authentication and proxy logic. Use `/api/v1/...` for all new integrations.
+- **Tenant request timeout** — 15 seconds per request at the SaaS proxy. Long-running operations (workflow polling, big vault searches) should be polled, not held open.
+- **OpenClaw gateway restart** — connecting or disconnecting a Composio app triggers a ~40-second gateway restart. During that window, anything hitting the gateway returns 502. Use `GET /api/v1/openclaw/ready` to check readiness before retrying.
+- **alfred-learn restart** — chore-driven restarts of alfred-learn are rate-limited to once every 30 seconds. Excess requests return 429 with a `retry_after_seconds` field.
+- **Composio per-action limits** — Composio's upstream APIs (Gmail, Slack, …) have their own per-app rate limits. Errors returned from the third-party are surfaced verbatim.
 
-## Error handling
+---
 
-The proxy translates errors at each stage:
+## Error codes
 
-| Scenario | HTTP Status | Error message |
-|----------|-------------|---------------|
-| Missing `Authorization` header | `401` | Missing or invalid Authorization header |
-| Key doesn't start with `alf_` | `401` | Invalid API key format |
-| Key hash not found in database | `401` | Invalid API key |
-| No Alfred provisioned | `404` | No instance found |
-| Not ready or not running | `503` | Instance is not ready / not running |
-| Request timed out (15s) | `504` | Request timed out |
-| Unreachable | `502` | Failed to reach instance |
+| Status | Meaning |
+|---|---|
+| `200` | Success |
+| `201` | Resource created |
+| `204` | Success, no body (acks) |
+| `400` | Validation error — body details what's wrong |
+| `401` | Bad or missing API key, or missing `X-Confirm-Self-Restart` header on a self-restart route |
+| `403` | Twilio webhook signature failed (only on inbound Twilio routes) |
+| `404` | Resource not found |
+| `409` | Conflict — phone integration not provisioned, etc. |
+| `429` | Rate-limited |
+| `500` | Internal error |
+| `502` | Upstream service unavailable (openclaw gateway down, Twilio rejected, …) |
+| `503` | Tenant not ready (still provisioning, suspended) |
+| `504` | Tenant API timeout |
 
-Errors from your Alfred itself (400, 404, 500, etc.) are passed through with their original status codes.
+Error bodies are JSON: `{error: "<short message>"}`. The proxy sanitises 5xx from the tenant to "Internal tenant error" rather than leaking internal stack traces. Specific 4xx messages from the tenant are passed through (truncated to 200 chars).
 
-## Security model
+---
 
-The proxy layer provides several security guarantees:
+## Response shapes
 
-- **No raw key storage** — API keys are hashed with SHA-256 before storage. The full key is shown only once at creation time.
-- **Encrypted internal credentials** — The internal API key is encrypted at rest with AES-256-GCM. It is decrypted only in memory during request forwarding.
-- **Network isolation** — Your Alfred is accessible only via Tailscale, a WireGuard-based mesh VPN. It is not exposed to the public internet.
-- **Scoped authentication** — Your `alf_` key authenticates you to the SaaS. The SaaS uses a separate, internal key to authenticate to your Alfred. These credentials are independent.
-- **Key limits** — Each account can have at most 10 API keys, reducing the attack surface.
+JSON throughout. The shape is documented per-endpoint in the [API Reference](/api-reference/introduction). Common patterns:
 
-<Columns cols={2}>
-  <Card title="API Keys Guide" icon="key" href="/guides/api-keys">
-    Creating and managing your API keys
+- List endpoints return an array directly, or `{records: [...], total: N}` for paginated views
+- Single-record reads return the parsed frontmatter + body, e.g. `{name, type, status, body, ...}`
+- Mutating endpoints return `{status: "..."}` or the updated resource
+- Workflow-triggering endpoints return `{workflow_id, run_id}`
+- Phone / email actions return provider details (`{sid, mode}` for calls, AgentMail's response body for emails)
+
+---
+
+<CardGroup cols={2}>
+  <Card title="API Keys" icon="key" href="/guides/api-keys">
+    How to obtain and rotate your bearer token
   </Card>
-  <Card title="Authentication Reference" icon="lock" href="/api-reference/authentication">
-    API authentication details
+  <Card title="Recipes" icon="book-open" href="/guides/recipes">
+    Concrete copy-pastable examples
   </Card>
-</Columns>
+  <Card title="Security" icon="shield-check" href="/guides/security">
+    The full security model end-to-end
+  </Card>
+  <Card title="API Reference" icon="code" href="/api-reference/introduction">
+    Every endpoint, every parameter
+  </Card>
+</CardGroup>

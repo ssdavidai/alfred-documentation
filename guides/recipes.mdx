@@ -1,583 +1,352 @@
 ---
 title: "Recipes"
-description: "Real-world workflows — hand Alfred your content and watch your vault come alive."
+description: "Concrete worked examples. Every curl command below is copy-pastable — replace the placeholder API key with your own."
 icon: "book-open"
 ---
 
-This guide walks you through six practical recipes. Each one shows you how to share something with Alfred and what Alfred prepares for you in return.
+## Setup
 
-## Recipe 1: Meeting Notes
-
-Hand Alfred your meeting notes and watch it create people, tasks, decisions, and action items — all connected.
-
-<Steps>
-<Step title="Share Meeting Notes">
-Prepare your meeting notes as plain text:
-
-```
-Meeting: Q1 Planning - Product Team
-Date: 2026-02-28
-Attendees: Alice Chen (PM), Bob Smith (Lead Dev), Carol Lee (Design), David Park (QA)
-
-Agenda Items:
-1. Review Q4 outcomes - Alice presented metrics showing 32% user growth
-2. Q1 roadmap - focus on mobile app redesign and API performance
-3. Technical debt - Bob raised concerns about database migrations
-4. Timeline - Carol needs 3 weeks for design mockups, Bob estimates 6 weeks for dev
-
-Decisions Made:
-- Freeze new feature requests after March 15th
-- Hire 2 additional QA engineers (David to provide job descriptions)
-- Use PostgreSQL 15 for migration (previously debated MySQL)
-- Ship MVP by May 1st
-
-Action Items:
-- Alice: Schedule stakeholder check-in by March 5th
-- Bob: Create migration timeline and risk assessment
-- Carol: Deliver design mockups by March 21st
-- David: Submit QA test plan by March 1st
-```
-
-Share these notes via the inbox:
+Every recipe below assumes:
 
 ```bash
-curl -X POST "https://alfred.black/api/v1/vault/inbox" \
-  -H "Authorization: Bearer YOUR_API_KEY" \
+export ALFRED_API_BASE="https://alfred.black"
+export ALFRED_API_KEY="alf_replace_me_with_your_real_key"
+```
+
+Get a key from Settings → API Keys. See [API Keys](/guides/api-keys) for details.
+
+All endpoints respond with JSON. Pipe to `jq` for readable output.
+
+---
+
+## 1. List everything in your vault
+
+A one-shot overview — record counts per type and a sample of each:
+
+```bash
+curl -s "$ALFRED_API_BASE/api/v1/vault/context" \
+  -H "Authorization: Bearer $ALFRED_API_KEY" \
+  | jq '.records_by_type | to_entries | map({type: .key, count: (.value | length)})'
+```
+
+---
+
+## 2. List your active matters
+
+```bash
+curl -s "$ALFRED_API_BASE/api/v1/vault/list/matter" \
+  -H "Authorization: Bearer $ALFRED_API_KEY" \
+  | jq '.records[] | select(.status == "active") | {name, path}'
+```
+
+---
+
+## 3. Search the vault
+
+Full-text search across record bodies, optionally filtered by type:
+
+```bash
+curl -s "$ALFRED_API_BASE/api/v1/vault/search?q=lease&type=matter" \
+  -H "Authorization: Bearer $ALFRED_API_KEY" \
+  | jq
+```
+
+---
+
+## 4. Read a specific record
+
+```bash
+curl -s "$ALFRED_API_BASE/api/v1/vault/records/matter/kitchen-renovation.md" \
+  -H "Authorization: Bearer $ALFRED_API_KEY" \
+  | jq
+```
+
+---
+
+## 5. Create a vault note
+
+```bash
+curl -s -X POST "$ALFRED_API_BASE/api/v1/vault/records" \
+  -H "Authorization: Bearer $ALFRED_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "filename": "Q1_Planning_Meeting_2026-02-28.md",
-    "content": "Meeting: Q1 Planning - Product Team\nDate: 2026-02-28\nAttendees: Alice Chen (PM), Bob Smith (Lead Dev), Carol Lee (Design), David Park (QA)\n\nAgenda Items:\n1. Review Q4 outcomes - Alice presented metrics showing 32% user growth\n2. Q1 roadmap - focus on mobile app redesign and API performance\n3. Technical debt - Bob raised concerns about database migrations\n4. Timeline - Carol needs 3 weeks for design mockups, Bob estimates 6 weeks for dev\n\nDecisions Made:\n- Freeze new feature requests after March 15th\n- Hire 2 additional QA engineers (David to provide job descriptions)\n- Use PostgreSQL 15 for migration (previously debated MySQL)\n- Ship MVP by May 1st\n\nAction Items:\n- Alice: Schedule stakeholder check-in by March 5th\n- Bob: Create migration timeline and risk assessment\n- Carol: Deliver design mockups by March 21st\n- David: Submit QA test plan by March 1st"
-  }'
+    "type": "note",
+    "name": "team-standup-2026-04-25",
+    "content": "---\ntype: note\nname: team-standup-2026-04-25\ndate: 2026-04-25\n---\n# Team Standup — 25 April 2026\n\n- Sarah: still chasing the Q3 contract. ETA Friday.\n- Marcus: deployed v0.42, monitoring rollout.\n- Decision: ship the new pricing page on Tuesday."
+  }' | jq
 ```
-
-</Step>
-
-<Step title="See What Alfred Created">
-
-Wait a few seconds for the Curator to read your notes, then check what records Alfred prepared:
-
-```bash
-# See all people Alfred identified
-curl -s "https://alfred.black/api/v1/vault/list/person" \
-  -H "Authorization: Bearer YOUR_API_KEY" | jq .
-
-# See decisions captured
-curl -s "https://alfred.black/api/v1/vault/list/decision" \
-  -H "Authorization: Bearer YOUR_API_KEY" | jq .
-
-# See tasks extracted
-curl -s "https://alfred.black/api/v1/vault/list/task" \
-  -H "Authorization: Bearer YOUR_API_KEY" | jq .
-```
-
-From a single meeting note, Alfred creates records for each person (Alice, Bob, Carol, David), the decisions made (PostgreSQL 15, feature freeze), tasks with owners and due dates, and the conversation record linking everything together.
-
-</Step>
-
-<Step title="Explore a Record">
-
-Read the full detail of any record:
-
-```bash
-curl -s "https://alfred.black/api/v1/vault/records/person/Alice%20Chen.md" \
-  -H "Authorization: Bearer YOUR_API_KEY" | jq .
-```
-
-You'll see Alice's record with her role, organization link, connections to the meeting, her tasks, and the decisions she was part of. Every record links back to every other relevant record.
-
-</Step>
-</Steps>
-
-<Tip>
-The Curator runs continuously. New content shared via the inbox is attended to automatically — typically within 30 seconds. You can also trigger an immediate run with `POST /api/v1/workers/process`.
-</Tip>
 
 ---
 
-## Recipe 2: Email Thread Digest
+## 6. Drop a file into the inbox (text)
 
-Share a long email thread and Alfred extracts every decision, action item, and participant — so you can catch up in seconds instead of minutes.
-
-<Steps>
-<Step title="Share the Email Thread">
-
-Save a representative email thread as plain text and share it:
+For text content (markdown, plain text, JSON), pass it as-is:
 
 ```bash
-curl -X POST "https://alfred.black/api/v1/vault/inbox" \
-  -H "Authorization: Bearer YOUR_API_KEY" \
+curl -s -X POST "$ALFRED_API_BASE/api/v1/vault/inbox" \
+  -H "Authorization: Bearer $ALFRED_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "filename": "email_thread_api_rate_limiting.md",
-    "content": "From: sarah@company.com\nTo: eng-team@company.com\nDate: 2026-02-25 09:15 AM\nSubject: Re: API Rate Limiting Implementation\n\nSarah: Team, we need to finalize the rate limiting strategy. Current API is getting 5M requests/day, mostly from dashboard. Two proposals:\n\n1. Token bucket with 1000 req/min per API key (Alice proposal)\n2. Sliding window counter, 500 req/min per key (Bob proposal)\n\nLet me know thoughts by EOD. We need to ship by March 15th.\n\n---\n\nFrom: bob@company.com\nDate: 2026-02-25 02:30 PM\n\nSarah, I prefer sliding window. Token bucket can have clock skew issues in distributed systems. Also prefer 500/min to be conservative. Can we do a quick load test?\n\n---\n\nFrom: alice@company.com\nDate: 2026-02-25 03:45 PM\n\nBob makes a good point on clock skew. Fine with sliding window. However 500/min might be aggressive for power users. 750/min as a compromise. Load test is smart.\n\nCarol, timeline for updating client SDKs to handle 429s?\n\n---\n\nFrom: carol@company.com\nDate: 2026-02-25 04:15 PM\n\nSDK updates: I can have 429 handling in v2.1.0 by March 10th if you freeze the spec by March 1st.\n\n---\n\nFrom: sarah@company.com\nDate: 2026-02-25 05:00 PM\n\nDECISION: Sliding window counter, 750 req/min per API key.\nLoad test Tuesday. Spec freeze: March 1st. Ship: March 15th.\n\nAction items:\n- Bob: Run load test (due Tuesday)\n- Alice: Finalize implementation spec (due Feb 29)\n- Carol: SDK v2.1.0 with 429 handling (due March 10)\n- Me: Notify customers, update API docs (due March 5)"
-  }'
+    "filename": "research-notes-ai-pricing.md",
+    "content": "# AI Pricing Research\n\nKey findings from 4 hours of survey work...\n\n- Most SaaS AI tools cluster around $20-50/seat/month\n- Per-token pricing has lower psychological friction\n- Bundle pricing (seat + included credits) outperforms pure per-token by ~30% conversion"
+  }' | jq
 ```
 
-</Step>
-
-<Step title="See What Alfred Extracted">
-
-After the Curator reads the thread, search for what it found:
-
-```bash
-# Find the decisions
-curl -s "https://alfred.black/api/v1/vault/search?grep=rate+limit" \
-  -H "Authorization: Bearer YOUR_API_KEY" | jq .
-
-# List all tasks from this thread
-curl -s "https://alfred.black/api/v1/vault/list/task" \
-  -H "Authorization: Bearer YOUR_API_KEY" | jq .
-```
-
-Alfred creates records for all four participants, the rate limiting decision with its rationale, a constraint (spec freeze deadline), and individual tasks for each action item with owners and due dates — all linked together.
-
-</Step>
-</Steps>
-
-<Note>
-The Curator understands email threading conventions. It identifies participants from email headers, decisions from explicit markers, and action items from lists — even when spread across multiple replies.
-</Note>
+The file lands at `vault/inbox/research-notes-ai-pricing.md` and the Curator picks it up on the next sweep.
 
 ---
 
-## Recipe 3: Vault Maintenance
+## 7. List recent stream events
 
-Have the Janitor scan your vault for broken links, missing metadata, and structural issues — then repair them.
-
-<Steps>
-<Step title="Run a Scan">
-
-Ask the Janitor to look things over:
+What's coming in across all your streams in the last hour:
 
 ```bash
-curl -X POST "https://alfred.black/api/v1/workers/janitor/scan" \
-  -H "Authorization: Bearer YOUR_API_KEY"
+curl -s "$ALFRED_API_BASE/api/v1/streams/events?status=unprocessed" \
+  -H "Authorization: Bearer $ALFRED_API_KEY" \
+  | jq '.events[] | {stream_id, stream_type, summary, received_at}'
 ```
-
-The Janitor walks through your entire vault checking for broken links, invalid frontmatter, orphaned records, missing required fields, and duplicate entries.
-
-</Step>
-
-<Step title="Check the Results">
-
-See what the Janitor found:
-
-```bash
-curl -s "https://alfred.black/api/v1/workers/janitor/status" \
-  -H "Authorization: Bearer YOUR_API_KEY" | jq .
-```
-
-The scan report groups issues by category and severity — broken links, invalid frontmatter, orphaned records, missing fields, and potential duplicates.
-
-</Step>
-
-<Step title="Repair the Issues">
-
-Have the Janitor fix what it found:
-
-```bash
-curl -X POST "https://alfred.black/api/v1/workers/janitor/fix" \
-  -H "Authorization: Bearer YOUR_API_KEY"
-```
-
-The Janitor repairs broken links, fills in missing metadata, and resolves structural issues. It works carefully — creating missing records where needed and updating links to point to the right places.
-
-</Step>
-
-<Step title="Verify">
-
-Run another scan to confirm everything is clean:
-
-```bash
-curl -X POST "https://alfred.black/api/v1/workers/janitor/scan" \
-  -H "Authorization: Bearer YOUR_API_KEY"
-```
-
-</Step>
-</Steps>
-
-<Tip>
-The Janitor also runs periodic scans automatically. For hands-off maintenance, you can schedule scans using Temporal workflows — see the [Schedules API](/api-reference/schedules/create).
-</Tip>
 
 ---
 
-## Recipe 4: Knowledge Extraction
-
-After your vault has accumulated operational records, ask the Distiller to surface the knowledge hiding between the lines — assumptions, decisions, constraints, and contradictions.
-
-<Steps>
-<Step title="Understand What the Distiller Finds">
-
-The Distiller reads your records and surfaces:
-- **Assumptions**: Beliefs underlying decisions (e.g., "users prefer mobile over desktop")
-- **Decisions**: Past choices and their rationales
-- **Constraints**: Limitations that shape decisions (e.g., "limited budget", "compliance requirements")
-- **Contradictions**: Conflicting assumptions or decisions that need resolution
-- **Syntheses**: Connections between concepts across your vault
-
-For best results, have at least 20-30 operational records in your vault before running the Distiller.
-
-</Step>
-
-<Step title="Scan for Extractable Knowledge">
+## 8. List your chores
 
 ```bash
-curl -X POST "https://alfred.black/api/v1/workers/distiller/scan" \
-  -H "Authorization: Bearer YOUR_API_KEY"
+curl -s "$ALFRED_API_BASE/api/v1/chores" \
+  -H "Authorization: Bearer $ALFRED_API_KEY" \
+  | jq '.chores[] | {slug, name, status, schedule}'
 ```
-
-The Distiller identifies which records could yield learning records.
-
-</Step>
-
-<Step title="Run the Extraction">
-
-```bash
-curl -X POST "https://alfred.black/api/v1/workers/distiller/run" \
-  -H "Authorization: Bearer YOUR_API_KEY"
-```
-
-The Distiller reads through your records and creates learning records — each linked back to the source records it was surfaced from.
-
-</Step>
-
-<Step title="Browse What Was Surfaced">
-
-```bash
-# See assumptions the Distiller found
-curl -s "https://alfred.black/api/v1/vault/list/assumption" \
-  -H "Authorization: Bearer YOUR_API_KEY" | jq .
-
-# See contradictions that need attention
-curl -s "https://alfred.black/api/v1/vault/list/contradiction" \
-  -H "Authorization: Bearer YOUR_API_KEY" | jq .
-
-# See synthesized insights
-curl -s "https://alfred.black/api/v1/vault/list/synthesis" \
-  -H "Authorization: Bearer YOUR_API_KEY" | jq .
-```
-
-Each learning record includes the evidence trail — which records it was surfaced from, the reasoning, and suggested actions.
-
-</Step>
-</Steps>
-
-<Tip>
-Run the Distiller monthly or quarterly. As your world evolves — new decisions, new constraints, shifting priorities — the Distiller reveals how your knowledge landscape is changing. It's a good way to catch outdated assumptions before they cause problems.
-</Tip>
 
 ---
 
-## Recipe 5: Bulk Document Import
+## 9. Trigger a chore on demand
 
-Share a batch of related documents at once — requirements, architecture, timeline — and Alfred creates an interconnected project graph from all of them together.
-
-<Steps>
-<Step title="Prepare Your Documents">
-
-Organize your documents. For a new project, you might have requirements, an architecture overview, and a timeline.
-
-</Step>
-
-<Step title="Share Them Together">
-
-Use the bulk inbox endpoint:
+For a chore named `weekly-team-digest`:
 
 ```bash
-curl -X POST "https://alfred.black/api/v1/vault/inbox/bulk" \
-  -H "Authorization: Bearer YOUR_API_KEY" \
+curl -s -X POST "$ALFRED_API_BASE/api/v1/chores/weekly-team-digest/trigger" \
+  -H "Authorization: Bearer $ALFRED_API_KEY" \
+  | jq
+```
+
+To inspect a chore's source and dependency audit before running:
+
+```bash
+curl -s "$ALFRED_API_BASE/api/v1/chores/weekly-team-digest/source" \
+  -H "Authorization: Bearer $ALFRED_API_KEY" \
+  | jq
+```
+
+---
+
+## 10. Send an email via AgentMail (Sir's own inbox)
+
+Send a new email from `alfred.<username>@mail.alfred.black`:
+
+```bash
+curl -s -X POST "$ALFRED_API_BASE/api/v1/email/send" \
+  -H "Authorization: Bearer $ALFRED_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "files": [
-      {
-        "filename": "requirements.md",
-        "content": "PROJECT: Mobile Payment Integration\nDATE: 2026-02-28\n\nREQUIREMENTS:\n\n1. Payment Processing\n   - Support Stripe, PayPal, Apple Pay, Google Pay\n   - PCI DSS compliance required\n\n2. User Experience\n   - Checkout flow < 2 minutes\n   - Biometric auth on mobile\n\n3. Compliance\n   - PCI DSS Level 1\n   - SOC 2 Type II certification"
-      },
-      {
-        "filename": "architecture.md",
-        "content": "SYSTEM ARCHITECTURE: Payment Integration\n\nComponents:\n- Payment API (Node.js, Express)\n- Vault Service (encrypted payment data storage)\n- Webhook Processor (async event handling)\n\nScalability:\n- 10,000 payments/day capacity\n- Auto-scale on 70% CPU"
-      },
-      {
-        "filename": "timeline.md",
-        "content": "PROJECT TIMELINE: Mobile Payment Integration\n\nPhase 1: Infrastructure (Feb 28 - Mar 15)\n- Assign: Bob (API), Carol (Vault), David (Ops)\n\nPhase 2: MVP (Mar 16 - Apr 15)\n- Assign: Alice (UI), Bob (Backend)\n\nPhase 3: Extended Providers (Apr 16 - May 30)\n\nPhase 4: Launch (Jun 1)\n\nMilestones:\n- Mar 15: Infrastructure complete\n- Apr 15: MVP shipped\n- Jun 1: General availability"
-      }
-    ]
-  }'
+    "to": ["sarah@acme.com"],
+    "subject": "Q3 contract — quick sync?",
+    "text": "Sarah,\n\nI saw your reply this morning. Free for a 15-minute call this week to walk through the redlines?\n\nThanks,\nAlfred (on behalf of Sir)"
+  }' | jq
 ```
 
-</Step>
-
-<Step title="Explore the Project Graph">
-
-The Curator reads all three documents together, finding cross-document relationships. Check what was created:
-
-```bash
-# Search for the project
-curl -s "https://alfred.black/api/v1/vault/search?grep=Payment+Integration" \
-  -H "Authorization: Bearer YOUR_API_KEY" | jq .
-
-# See all tasks
-curl -s "https://alfred.black/api/v1/vault/list/task" \
-  -H "Authorization: Bearer YOUR_API_KEY" | jq .
-
-# See all people
-curl -s "https://alfred.black/api/v1/vault/list/person" \
-  -H "Authorization: Bearer YOUR_API_KEY" | jq .
-```
-
-Alfred creates a complete project graph: the project record linked to team members, requirements, architecture components, tasks with phase assignments, and milestone dates — all cross-referenced.
-
-</Step>
-</Steps>
-
-<Note>
-Bulk imports are ideal when starting a new project or initiative. Share all relevant docs at once and Alfred finds the relationships between them — requirements linked to tasks, milestones linked to deliverables, team members linked to their assignments.
-</Note>
+To reply in an existing thread, use `/api/v1/email/reply` with `{message_id, text, reply_all?: false, attachments?}`. See the [Email Channel](/guides/email-channel) guide.
 
 ---
 
-## Recipe 6: Automated Inbox via Script
-
-Create a script that watches a local folder and automatically shares new files with Alfred. Perfect for continuous input from notes apps, email exports, or document processors.
-
-<Steps>
-<Step title="Create the Watcher Script">
-
-Save this as `watch_and_upload.sh`:
+## 11. List your Connected Apps
 
 ```bash
-#!/bin/bash
-
-# Alfred Inbox Auto-Uploader
-# Watches a local folder and shares new files with Alfred
-
-set -e
-
-# Configuration
-WATCH_DIR="${WATCH_DIR:-.}"
-API_KEY="${ALFRED_API_KEY:?Error: ALFRED_API_KEY not set}"
-API_BASE_URL="${ALFRED_API_URL:-https://alfred.black}"
-STATE_FILE=".alfred_upload_state"
-LOG_FILE="alfred_uploads.log"
-
-# Initialize state file (tracks uploaded files)
-if [ ! -f "$STATE_FILE" ]; then
-  touch "$STATE_FILE"
-fi
-
-log() {
-  echo "[$(date +'%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE"
-}
-
-upload_file() {
-  local file="$1"
-  local filename=$(basename "$file")
-
-  log "Sharing: $filename"
-
-  # Read file content
-  local content=$(cat "$file")
-
-  # Upload via API
-  local response=$(curl -s -X POST "$API_BASE_URL/api/v1/vault/inbox" \
-    -H "Authorization: Bearer $API_KEY" \
-    -H "Content-Type: application/json" \
-    -d @- <<EOF
-{
-  "filename": "$filename",
-  "content": $(echo "$content" | jq -Rs .)
-}
-EOF
-  )
-
-  # Check for success
-  if echo "$response" | jq -e '.success' > /dev/null 2>&1; then
-    log "SUCCESS: $filename"
-    echo "$file" >> "$STATE_FILE"
-  else
-    log "FAILED: $filename"
-    log "Response: $response"
-    return 1
-  fi
-}
-
-monitor_directory() {
-  log "Watching: $WATCH_DIR"
-
-  # Initial scan
-  while IFS= read -r file; do
-    if grep -q "^$file$" "$STATE_FILE"; then
-      continue
-    fi
-    if [[ "$file" == .* ]] || [[ "$file" == *"~" ]]; then
-      continue
-    fi
-    upload_file "$file"
-  done < <(find "$WATCH_DIR" -maxdepth 1 -type f)
-
-  # Watch for new files using fswatch (install: brew install fswatch)
-  # Falls back to polling if fswatch is not available
-  if command -v fswatch &> /dev/null; then
-    log "Using fswatch for real-time monitoring"
-    fswatch -r "$WATCH_DIR" | while read file; do
-      if [ -f "$file" ] && ! grep -q "^$file$" "$STATE_FILE"; then
-        upload_file "$file"
-      fi
-    done
-  else
-    log "fswatch not available, polling every 60s"
-    while true; do
-      while IFS= read -r file; do
-        if [ -f "$file" ] && ! grep -q "^$file$" "$STATE_FILE"; then
-          upload_file "$file"
-        fi
-      done < <(find "$WATCH_DIR" -maxdepth 1 -type f -newer "$STATE_FILE")
-      sleep 60
-    done
-  fi
-}
-
-if [ ! -d "$WATCH_DIR" ]; then
-  log "ERROR: Directory not found: $WATCH_DIR"
-  exit 1
-fi
-
-monitor_directory
+curl -s "$ALFRED_API_BASE/api/v1/integrations" \
+  -H "Authorization: Bearer $ALFRED_API_KEY" \
+  | jq '.[] | {toolkit, status, connection_id}'
 ```
-
-</Step>
-
-<Step title="Set Up and Run">
-
-```bash
-# Set your API key
-export ALFRED_API_KEY="alf_your_key_here"
-
-# Make the script executable
-chmod +x watch_and_upload.sh
-
-# Create a test file
-cat > "team_meeting_2026-02-28.txt" << 'EOF'
-Team Meeting - Feb 28, 2026
-
-Attendees: Alice, Bob, Carol
-
-Topics:
-1. Q1 Planning - on track
-2. API Performance - improvements needed
-3. Team Growth - hiring 2 engineers
-
-Decision: Focus on API optimization for March
-EOF
-
-# Run the script
-./watch_and_upload.sh
-```
-
-</Step>
-
-<Step title="Run as Background Service">
-
-For continuous monitoring:
-
-```bash
-# Start in background
-export ALFRED_API_KEY="alf_your_key_here"
-./watch_and_upload.sh > /dev/null 2>&1 &
-echo $! > .watch_and_upload.pid
-
-# Stop when done
-kill $(cat .watch_and_upload.pid)
-```
-
-Or use a launchd plist (macOS) or systemd service (Linux) for persistence.
-
-</Step>
-</Steps>
-
-<AccordionGroup>
-<Accordion title="Integration: Obsidian">
-
-Point the watch script at your Obsidian Inbox folder:
-
-```bash
-export WATCH_DIR="$HOME/Obsidian Vault/Inbox"
-./watch_and_upload.sh
-```
-
-Whenever you create a new note in your Obsidian Inbox, it's automatically shared with Alfred. After the Curator reads it, Alfred creates structured records that you can reference from within Obsidian via wikilinks.
-
-</Accordion>
-
-<Accordion title="Integration: Email Forwarding">
-
-Set up email forwarding to auto-save messages as text:
-
-1. Forward relevant emails to a folder (e.g., `~/email_archive/`)
-2. Use a tool like `mail2json` to export emails as plaintext
-3. Point the watch script at that folder
-4. Alfred reads incoming emails and extracts decisions, action items, and participants
-
-</Accordion>
-
-<Accordion title="Troubleshooting">
-
-**"API Key not set"**
-```bash
-source .env && ./watch_and_upload.sh
-```
-
-**Files uploaded twice**
-```bash
-rm .alfred_upload_state  # Reset tracking
-```
-
-**fswatch not found**
-```bash
-brew install fswatch  # macOS
-# The script falls back to polling if fswatch is unavailable
-```
-
-</Accordion>
-</AccordionGroup>
 
 ---
 
-## Quick Reference
+## 12. Send an SMS from Sir's phone number
 
-<CodeGroup>
-```bash Share Meeting Notes
-curl -X POST "https://alfred.black/api/v1/vault/inbox" \
-  -H "Authorization: Bearer YOUR_API_KEY" \
+```bash
+curl -s -X POST "$ALFRED_API_BASE/api/v1/phone/sms" \
+  -H "Authorization: Bearer $ALFRED_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "filename": "meeting.md",
-    "content": "..."
-  }'
+    "to": "+36201234567",
+    "body": "Sir asks me to remind you that the kitchen team arrives at nine. — Alfred"
+  }' | jq
 ```
 
-```bash Search Your Vault
-curl -s "https://alfred.black/api/v1/vault/search?grep=TERM" \
-  -H "Authorization: Bearer YOUR_API_KEY"
-```
+The number must be in E.164 format. The reply (if any) lands as a stream event in `sms-inbound`. The outbound also writes itself to `sms-outbound` for vault visibility.
 
-```bash Run Janitor Scan
-curl -X POST "https://alfred.black/api/v1/workers/janitor/scan" \
-  -H "Authorization: Bearer YOUR_API_KEY"
-```
+---
 
-```bash Run Distiller
-curl -X POST "https://alfred.black/api/v1/workers/distiller/run" \
-  -H "Authorization: Bearer YOUR_API_KEY"
-```
+## 13. Initiate an outbound voice call
 
-```bash Bulk Upload
-curl -X POST "https://alfred.black/api/v1/vault/inbox/bulk" \
-  -H "Authorization: Bearer YOUR_API_KEY" \
+Two modes — `tts` (one-shot text-to-speech) or `realtime` (live agent conversation):
+
+```bash
+# Mode: tts — Alfred says the message and hangs up
+curl -s -X POST "$ALFRED_API_BASE/api/v1/phone/call" \
+  -H "Authorization: Bearer $ALFRED_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "files": [...]
-  }'
+    "to": "+36201234567",
+    "message": "Sir asks me to let you know he will be 15 minutes late. Thank you.",
+    "mode": "tts"
+  }' | jq
+
+# Mode: realtime — Alfred opens a live conversation
+curl -s -X POST "$ALFRED_API_BASE/api/v1/phone/call" \
+  -H "Authorization: Bearer $ALFRED_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "to": "+36201234567",
+    "message": "Sir, I am calling on his behalf about the front-desk package — could you check whether it has arrived?",
+    "mode": "realtime"
+  }' | jq
 ```
-</CodeGroup>
+
+See the [Voice Channel](/guides/voice-channel) guide for what realtime mode actually does.
+
+---
+
+## 14. Create a custom webhook stream
+
+For ingesting from a system Composio doesn't cover (a custom internal tool, a Zapier hook, an Airtable automation):
+
+```bash
+curl -s -X POST "$ALFRED_API_BASE/api/v1/streams" \
+  -H "Authorization: Bearer $ALFRED_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": "internal-deploy-events",
+    "name": "Internal Deploy Events",
+    "type": "webhook",
+    "source": "internal-deploy-system",
+    "enabled": true,
+    "webhookToken": "deploy-events-2026-04"
+  }' | jq
+```
+
+The response includes the webhook URL. Configure your external system to POST events to it. The endpoint accepts JSON bodies up to 50 MB.
+
+---
+
+## 15. Manually push a stream event
+
+For testing your own webhook integration, push events directly:
+
+```bash
+curl -s -X POST "$ALFRED_API_BASE/api/v1/streams/ingest" \
+  -H "Authorization: Bearer $ALFRED_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "stream_id": "internal-deploy-events",
+    "stream_type": "deploy",
+    "source_ref": "deploy-2026-04-25-1",
+    "summary": "Deployed v0.42 to production",
+    "raw": {
+      "version": "0.42",
+      "environment": "production",
+      "actor": "marcus",
+      "duration_seconds": 142
+    }
+  }' | jq
+```
+
+---
+
+## 16. Authorize a sender for the email channel
+
+By default, only authorized senders trigger a live agent reply on Sir's `alfred.<username>@mail.alfred.black` inbox. Everyone else goes to stream ingest.
+
+```bash
+# Add an authorized sender
+curl -s -X POST "$ALFRED_API_BASE/api/v1/auth/senders" \
+  -H "Authorization: Bearer $ALFRED_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"email": "sarah@acme.com"}' | jq
+
+# List authorized senders
+curl -s "$ALFRED_API_BASE/api/v1/auth/senders" \
+  -H "Authorization: Bearer $ALFRED_API_KEY" \
+  | jq
+
+# Remove one
+curl -s -X DELETE "$ALFRED_API_BASE/api/v1/auth/senders/sarah%40acme.com" \
+  -H "Authorization: Bearer $ALFRED_API_KEY" \
+  | jq
+```
+
+---
+
+## 17. Authorize a phone number
+
+Same dispatch model as email — authorised numbers get an agent SMS reply, others go to stream ingest.
+
+```bash
+curl -s -X POST "$ALFRED_API_BASE/api/v1/phone/authorized-numbers" \
+  -H "Authorization: Bearer $ALFRED_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"number": "+36706209518"}' | jq
+```
+
+---
+
+## 18. Regenerate Composio skills
+
+After a Composio template change (new actions, edited descriptions), rebuild every connected app's `SKILL.md` so the agent picks up the changes:
+
+```bash
+curl -s -X POST "$ALFRED_API_BASE/api/v1/integrations/regenerate-skills" \
+  -H "Authorization: Bearer $ALFRED_API_KEY" \
+  | jq
+```
+
+No body required. Returns the list of skills regenerated.
+
+---
+
+## 19. Health check the whole tenant
+
+```bash
+curl -s "$ALFRED_API_BASE/api/v1/admin/dashboard" \
+  -H "Authorization: Bearer $ALFRED_API_KEY" \
+  | jq
+```
+
+Returns containers + service health + vault stats in one shot. Good first call when something feels off.
+
+---
+
+## 20. Tail container logs
+
+For the openclaw container, last 100 lines:
+
+```bash
+curl -s "$ALFRED_API_BASE/api/v1/admin/containers/openclaw/logs?tail=100" \
+  -H "Authorization: Bearer $ALFRED_API_KEY" \
+  | jq -r '.logs'
+```
+
+Replace `openclaw` with `alfred-learn`, `alfred`, `temporal`, or `ctrl-api` to switch container.
+
+---
+
+<CardGroup cols={2}>
+  <Card title="API Keys" icon="key" href="/guides/api-keys">
+    How to obtain the bearer token used above
+  </Card>
+  <Card title="How the API Works" icon="route" href="/guides/how-the-api-works">
+    The full proxy architecture
+  </Card>
+  <Card title="API Reference" icon="code" href="/api-reference/introduction">
+    Every endpoint, every parameter
+  </Card>
+  <Card title="Connected Apps" icon="puzzle" href="/guides/connected-apps">
+    Wire up the integrations that drive most of the action
+  </Card>
+</CardGroup>
