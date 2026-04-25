@@ -1,104 +1,151 @@
 ---
 title: "API Reference"
-description: "The Alfred API — programmatic access to your vault, specialists, and services."
+description: "Programmatic access to Sir's vault, specialists, workflows, integrations, and channels."
 icon: "code"
 ---
 
 ## Overview
 
-The Alfred API gives you full programmatic access to your vault, specialists, workflows, and service management. Everything you can do in the dashboard, you can do via the API.
+Every operation Alfred performs is exposed as an HTTP endpoint on Sir's `ctrl-api`. The dashboard, the channels, the workflows, and the agent itself all use the same surface. This is the same API Sir's own scripts and integrations should use.
 
 <Note>
-  The base URL for all API endpoints is `https://alfred.black/api/v1`. Authenticate every request with your API key.
+  Base URL: `https://alfred.black/api/v1/...`. Authenticate every request with `Authorization: Bearer ${AAS_API_KEY}`.
 </Note>
+
+## The proxy chain
+
+Sir's requests do not hit the tenant directly. The path is:
+
+```
+Sir's client
+   │
+   ▼
+https://alfred.black            (SaaS edge — auth, rate limit, billing checks)
+   │  authenticates request, decrypts tenant key
+   ▼
+Tailscale mesh                  (private WireGuard, no public route)
+   │
+   ▼
+Cloudflare Tunnel               (no inbound ports on Sir's tenant)
+   │
+   ▼
+ctrl-api :3100 on Sir's VPS    (the actual handler)
+```
+
+The SaaS layer is responsible for authentication and billing. The tenant `ctrl-api` is responsible for the real work — vault writes, worker control, workflow management, channel dispatch. Sir never opens a public port on the tenant.
+
+## Versioning
+
+The current version is **v1**. All endpoints are prefixed with `/api/v1/`. Breaking changes will move under `/api/v2/`; v1 will not silently change.
 
 ## Authentication
 
-Every request requires a Bearer token in the `Authorization` header:
+Every request requires a Bearer token. The token is Sir's tenant API key (the `AAS_API_KEY` issued at provisioning). Sir gets it from the dashboard under **Settings → API Keys** or via `GET /api/v1/admin/credentials`.
 
 ```bash
 curl https://alfred.black/api/v1/vault/context \
-  -H "Authorization: Bearer alf_your_key_here"
+  -H "Authorization: Bearer ${AAS_API_KEY}"
 ```
 
-Create API keys in your [dashboard](https://alfred.black) under **Settings > API Keys**. See the [Authentication](/api-reference/authentication) page for details.
+A 401 is returned for missing, malformed, or wrong tokens. See [Authentication](/api-reference/authentication) for the full flow.
+
+<Note>
+Each API key authorises **one tenant** — Sir's. The SaaS layer maps the bearer token to Sir's instance and proxies only into that instance. There is no cross-tenant access through this surface (cross-tenant tools exist on Alfred Prime but go through a separate, tenant-to-tenant route).
+</Note>
 
 ## Request format
 
-All requests that send data must use `application/json` as the `Content-Type`:
+All requests sending data must use `Content-Type: application/json`:
 
 ```bash
 curl -X POST https://alfred.black/api/v1/vault/inbox \
-  -H "Authorization: Bearer alf_your_key_here" \
+  -H "Authorization: Bearer ${AAS_API_KEY}" \
   -H "Content-Type: application/json" \
-  -d '{"filename": "notes.md", "content": "..."}'
+  -d '{"filename": "meeting-note.md", "content": "..."}'
 ```
 
 ## Response format
 
-All responses return JSON. Successful responses have a structure specific to each endpoint. Error responses follow a consistent format:
+Responses are JSON. Successful responses have an endpoint-specific shape. Errors follow:
 
 ```json
 {
   "error": {
     "code": "ERROR_CODE",
     "message": "Human-readable message",
-    "details": {
-      "additional": "context"
-    }
+    "details": { "additional": "context" }
   }
 }
 ```
 
 ## Error codes
 
-| Code | HTTP Status | Description |
-|------|-------------|-------------|
-| `UNAUTHORIZED` | 401 | Missing, malformed, or invalid API key |
-| `VALIDATION_ERROR` | 400 | Request body failed validation (missing required fields, invalid types) |
-| `NOT_FOUND` | 404 | Requested resource does not exist |
-| `CONFLICT` | 409 | Operation conflicts with current state (e.g., record already exists) |
+| Code | HTTP | Meaning |
+|------|------|---------|
+| `UNAUTHORIZED` | 401 | Missing, malformed, or invalid bearer token |
+| `VALIDATION_ERROR` | 400 | Request body failed validation |
+| `NOT_FOUND` | 404 | The resource does not exist |
+| `CONFLICT` | 409 | Operation conflicts with current state |
 | `EXEC_ERROR` | 500 | Operation execution failed |
 | `INTERNAL_ERROR` | 500 | Unexpected server error |
 
+## Rate limits
+
+There are no fixed per-second rate limits today. Sir's instance is dedicated, so resource pressure is a function of Sir's own usage. The `tenant-proxy` enforces a 15-second timeout per call from the SaaS edge into the tenant — long-running operations should be triggered as workflows (`POST /api/v1/workflows/start`) rather than blocking on a single HTTP call.
+
 ## Endpoint groups
 
-The API is organized into 8 functional groups with 86 endpoints:
+The API is organised into groups by capability:
 
-<Columns cols={2}>
-  <Card title="Vault (12 endpoints)" icon="vault" href="/api-reference/vault/get-context">
-    Record CRUD, search, inbox management, schema inspection.
+<CardGroup cols={2}>
+  <Card title="Vault" icon="vault" href="/api-reference/vault/get-context">
+    Record CRUD, search, inbox, schema inspection
   </Card>
-  <Card title="Workers (15 endpoints)" icon="gears" href="/api-reference/workers/status">
-    Curator, Janitor, Distiller, and Surveyor control. Start, stop, scan, run.
+  <Card title="Workers" icon="gears" href="/api-reference/workers/status">
+    Curator, Janitor, Distiller, Surveyor — start, stop, scan, run
   </Card>
-  <Card title="Workflows (7 endpoints)" icon="diagram-project" href="/api-reference/workflows/list">
-    Workflow management. List, start, terminate, signal, cancel, view history.
+  <Card title="Workflows" icon="diagram-project" href="/api-reference/workflows/list">
+    Temporal workflow management — list, start, signal, terminate, history
   </Card>
-  <Card title="Schedules (7 endpoints)" icon="calendar" href="/api-reference/schedules/list">
-    Recurring workflows. Create, pause, unpause, trigger, delete schedules.
+  <Card title="Schedules" icon="calendar" href="/api-reference/schedules/list">
+    Recurring workflows — create, pause, trigger, delete
   </Card>
-  <Card title="Devices (7 endpoints)" icon="mobile" href="/api-reference/devices/list">
-    Device pairing. Approve, reject, remove, rotate keys, revoke access.
+  <Card title="Devices" icon="mobile" href="/api-reference/devices/list">
+    Device pairing for Obsidian sync and direct vault access
   </Card>
-  <Card title="OpenClaw (13 endpoints)" icon="claw-marks" href="/api-reference/openclaw/health">
-    Gateway management. Health, skills, sessions, agents, plugins, hooks, secrets.
+  <Card title="OpenClaw" icon="claw-marks" href="/api-reference/openclaw/health">
+    Gateway control — health, sessions, agents, skills, plugins, hooks
   </Card>
-  <Card title="Logs (1 endpoint)" icon="scroll" href="/api-reference/logs/stream">
-    Real-time SSE log streaming from your services.
+  <Card title="Integrations" icon="puzzle-piece" href="/api-reference/admin/health">
+    Composio connect, disconnect, list, action execution
   </Card>
-  <Card title="Instance (24 endpoints)" icon="server" href="/api-reference/admin/health">
-    Health checks, system info, service management, credentials, specialist config.
+  <Card title="Channels — Email" icon="envelope" href="/api-reference/admin/health">
+    Inbound dispatch, outbound send/reply/forward, attachments, threads
   </Card>
-</Columns>
+  <Card title="Channels — Phone" icon="phone" href="/api-reference/admin/health">
+    Voice context primer, SMS routing, outbound SMS and calls
+  </Card>
+  <Card title="Streams" icon="wave-pulse" href="/api-reference/admin/health">
+    Stream config, ingest, polling, sync state
+  </Card>
+  <Card title="Learning" icon="brain" href="/api-reference/learning/status">
+    Observations, instincts, reflection, judgment, discretion
+  </Card>
+  <Card title="Logs" icon="scroll" href="/api-reference/logs/stream">
+    Real-time SSE log streaming from Sir's services
+  </Card>
+  <Card title="Instance" icon="server" href="/api-reference/admin/health">
+    Health, system info, container management, credentials
+  </Card>
+</CardGroup>
 
-## Next steps
+## Next
 
-<Columns cols={2}>
+<CardGroup cols={2}>
   <Card title="Authentication" icon="key" href="/api-reference/authentication">
-    Learn how to authenticate API requests
+    Token format, headers, rotation, error handling
   </Card>
-  <Card title="Vault endpoints" icon="vault" href="/api-reference/vault/get-context">
-    Start with vault operations
+  <Card title="Vault — Get Context" icon="vault" href="/api-reference/vault/get-context">
+    Start with the most-used endpoint
   </Card>
-</Columns>
+</CardGroup>
