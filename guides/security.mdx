@@ -51,6 +51,18 @@ All of it lives on the encrypted volume. At rest, the volume content is unreadab
 
 ---
 
+## Per-tenant Vaultwarden
+
+Every tenant runs its own **Vaultwarden** — a self-hosted, Bitwarden-compatible password manager — on the VPS. It's where Sir's ~45 tenant secrets live: third-party API keys, admin credentials, OAuth tokens for accounts Alfred needs to act on, and anything else that would otherwise be loose in scripts or `.env` files. The Vaultwarden database sits on `/mnt/encrypted/vaultwarden`, so the entire vault inherits LUKS2 protection at the volume layer **and** Bitwarden's per-record AES-256 encryption derived from Sir's master password on top.
+
+The master password lives in the tenant `.env` as `BW_PASSWORD` (it's also a service credential used internally by the `vault-init` sidecar to unlock the CLI on boot). It's surfaced in the dashboard at **Settings → Claude Setup → Vault Login**, with click-to-reveal — Sir copies it to his personal password manager once and never again. Don't rotate it via Vaultwarden's "Change Master Password" dialog; that would desync the service-credential side and break boot.
+
+When Sir asks Alfred to do something that needs a stored credential — "log into the broker and pull this month's statement", "rotate the Stripe webhook secret" — the main agent reads from Vaultwarden through the ctrl-api `/api/v1/vaultwarden/*` routes (list, search, get, create, update, delete on login items; folders are read/write; collections and orgs are read-only and managed in the web UI). Reads return passwords and TOTPs in the response envelope; writes go through the same authenticated bearer surface as the rest of the admin API.
+
+Cross-tenant boundary: Vaultwarden runs **inside** the tenant's Docker stack, bound to localhost, encrypted at rest under the tenant's own LUKS volume. There is no shared Vaultwarden, no shared org, no shared collection. Peers cannot reach into each other's vault — vault data is per-tenant in the same hard sense as the rest of the dedicated-VPS model. See [the full Vaultwarden guide](/guides/vaultwarden) for usage details.
+
+---
+
 ## Network model
 
 Inbound to Sir's tenant:

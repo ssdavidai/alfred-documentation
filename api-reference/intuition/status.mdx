@@ -8,7 +8,7 @@ api: "GET /api/v1/learning/status"
 
 Single dashboard endpoint that aggregates everything about the learning subsystem (observations, instincts, reflections), the routing queue, the activity log, and the most recent daily digest. Reads `ALFRED_LEARN_ENABLED` from `/opt/alfred/compose/.env`.
 
-Reads instincts from BOTH the legacy `intuition/instincts/` path AND the newer `instinct/` path so old + new records both count.
+Instinct counts are read from BOTH the legacy `intuition/instincts/` path AND the newer canonical `instinct/` path. This dual-read is a back-compat measure (no data migration was performed when records moved to `instinct/`); it may be removed once legacy records are reconciled.
 
 ## Response
 

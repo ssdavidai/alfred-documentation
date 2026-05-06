@@ -1,6 +1,6 @@
 ---
 title: "Agent"
-description: "OpenClaw, the main Alfred agent, the four vault specialists, the Clerk, and the ephemeral subagents that execute on Sir's behalf."
+description: "OpenClaw, the main Alfred agent, the vault specialists, the Clerk, the Steward, and the ephemeral subagents that execute on Sir's behalf."
 icon: "user-tie"
 ---
 
@@ -10,7 +10,9 @@ The agent layer is everything that thinks. The infrastructure layer hosts it; th
 
 ## A small staff, with clear roles
 
-Sir does not interact with one monolithic AI. He interacts with a household: a main butler who handles the conversation, four specialists who attend to the vault behind the scenes, a Clerk who is dispatched for analytical tasks, and short-lived subagents who execute discrete actions on connected services.
+Sir does not interact with one monolithic AI. He interacts with a household: a main butler who handles the conversation, four specialists who attend to the vault behind the scenes, a Steward who watches each ongoing matter, a Clerk who is dispatched for analytical tasks, and short-lived subagents who execute discrete actions on connected services.
+
+Two camps, by where they run and what they touch. **Vault-side specialists** — Curator, Janitor, Distiller, Surveyor — read or reorganize the vault as background daemons. **Learn-side specialists** — Clerk and Steward — live inside `alfred-learn`: the Clerk is a stateless LLM dispatcher for batch and async work, the Steward is a per-matter perception loop that mutates matter-level state. See [Steward](/architecture/steward) for the full per-matter design.
 
 | Role | Where it runs | What it does |
 |---|---|---|
@@ -20,6 +22,7 @@ Sir does not interact with one monolithic AI. He interacts with a household: a m
 | Distiller | `alfred` container, daemon process | Reads across records to surface implicit knowledge: assumptions, decisions, constraints, contradictions, syntheses. |
 | Surveyor | `alfred` container, daemon process | Embeds every vault record, clusters by meaning, labels clusters, suggests cross-links. |
 | Clerk | `openclaw-workers` container, port `18790` | Stateless LLM worker dispatched by `alfred-learn` for classification, batch enrichment, daily digests, reflection. |
+| [Steward](/architecture/steward) | `alfred-learn` worker, one Temporal Schedule per matter | Per-matter perception loop — reads signals targeted at a matter, mutates state / context / `parent_matter` / `related_*` when confidence clears the discretion threshold. |
 | Ephemeral subagents | `openclaw-workers`, scoped per task | Short-lived agents created by the Task Runner with a narrow tool surface to execute a single errand, then deleted. |
 
 The main agent and the workers are intentionally separate OpenClaw processes (`packages/ctrl/src/templates/docker-compose.yaml.njk`). A long-running batch enrichment in `alfred-learn` cannot stall Sir's chat in `openclaw`.
@@ -135,7 +138,15 @@ Suggested relationships are written back into record frontmatter as `related_*` 
 - Reflection — nightly synthesis of observations into instincts
 - Session boundary detection — deciding whether two conversations are the same session
 
-The Clerk runs on whatever model the tenant has configured for the `learn-clerk` agent in `openclaw.json`. The current fleet default is `xai/grok-4-1-fast-reasoning` via the shared `XAI_API_KEY`.
+The Clerk runs on whatever model the tenant has configured in its OpenClaw config. The fleet defaults that ship with every newly provisioned tenant are: the main conversational agent (Sir-facing) on `openrouter/x-ai/grok-4.1-fast` (`packages/ctrl/src/templates/openclaw-config.json.njk`), and all five worker agents — `learn-clerk`, `vault-curator`, `vault-distiller`, `vault-janitor`, `vault-surveyor` — on `openrouter/openai/gpt-5.4-nano` (`packages/ctrl/src/templates/openclaw-workers-config.json.njk`). No fallback is configured by default. An Anthropic auth profile is provisioned on every tenant but isn't wired to any agent's default. Sir can flip the primary (and add a fallback) per agent from **Settings → Agents** in the dashboard.
+
+## The Steward
+
+Source: `packages/learn/src/workflows/steward.py` and `packages/learn/src/activities/steward.py`. Where the Clerk is a stateless dispatcher, the Steward is a stateful perception loop — one Temporal Schedule per matter (`al-steward-<slug>`), ticking every 30 minutes against `vault/matter/<slug>.md`. Each tick reads recent signals targeted at that matter, decides whether anything has happened that should change the matter's state, and either applies the change or files an audit record proposing it.
+
+The Steward is the only specialist that mutates matter-level lifecycle state — `state` transitions, `context_edit`s, `parent_matter` regroups, `related_*` membership shifts. The four vault specialists above leave that scope alone. Mode (`shadow` / `live` / `live_high_confidence_only`), discretion thresholds tied to per-source observation count, and a sliding-window rate-guard all gate when a tick is allowed to mutate vault state.
+
+See [Steward](/architecture/steward) for the full design — phases, signal layer, mutation classes, audit and undo, and the pre-flight rules for editing replayed Temporal code.
 
 ## Ephemeral subagents
 
@@ -160,8 +171,9 @@ Each specialist's permissions are checked in code, not in a prompt. The constrai
 | Janitor | Never | All | Anything (autofix) | Yes (orphaned auto-generated artifacts only) |
 | Distiller | Learning types only (decision/assumption/constraint/contradiction/synthesis) | All | Never | Never |
 | Surveyor | Never | All | Frontmatter `related_*` fields only | Never |
+| Steward | Audit `event/` records | All | Matter `state` / context fields / `parent_matter` / `related_*` only | Never |
 
-If the model behind a specialist tries to do something outside its scope — by hallucination, by prompt injection, by a malformed plan — the CLI rejects the call before it reaches the filesystem. The model sees an error; the vault stays consistent.
+If the model behind a specialist tries to do something outside its scope — by hallucination, by prompt injection, by a malformed plan — the CLI rejects the call before it reaches the filesystem. The model sees an error; the vault stays consistent. The Steward additionally has its own runtime gates — mode, discretion threshold, rate-guard — layered on top of these CLI-level scope checks; see [Steward](/architecture/steward).
 
 ## Federated tools (Alfred Prime only)
 

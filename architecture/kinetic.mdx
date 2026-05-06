@@ -202,6 +202,10 @@ A stream event becomes a vault record instantly. Hourly enrichment adds intellig
 
 ## What runs when
 
+The intelligence layer runs ~27 workflows on Temporal. The base loop is six recurring workflows; everything else extends it — per-matter Steward instances, two-way Plane sync, the signal layer, meeting capture, maintenance sweeps, and dynamically loaded chores.
+
+### Base loop
+
 | Workflow | Schedule | Source |
 |---|---|---|
 | EventProcessorWorkflow | every 15 min | `packages/learn/src/workflows/event_processor.py` |
@@ -209,16 +213,78 @@ A stream event becomes a vault record instantly. Hourly enrichment adds intellig
 | LearningWorkflow | every 15 min | `learning.py` |
 | JudgmentWorkflow | every 15 min | `judgment.py` |
 | TaskRunnerWorkflow | every 15 min | `task_runner.py` |
-| HourlyEnrichmentWorkflow | every 1 hour | `hourly_enrichment.py` |
-| OmiAudioProcessorWorkflow | every 10 min | `omi_processor.py` |
-| DailyDigestWorkflow | daily 18:00 | `daily_digest.py` |
-| ReflectionWorkflow | daily 02:00 | `reflection.py` |
-| NightlyMaintenanceWorkflow | daily 03:00 | `nightly_maintenance.py` |
-| ChorePromotionReflectionWorkflow | weekly Sunday 03:00 | `chore_promotion.py` |
-| StreamPullerWorkflow | per-stream interval | `stream_puller.py` |
-| Dynamically loaded chores | per-chore cron | `/alfred-data/user-chores/*.py` |
+| DailyDigestWorkflow | daily 18:00 (tenant tz) | `daily_digest.py` |
+| ReflectionWorkflow | daily 02:00 (tenant tz) | `reflection.py` |
 
-All schedules are registered by `packages/learn/scripts/register_schedules.py` on the worker's first boot, idempotently.
+### Steward — per-matter perception loop
+
+| Workflow | Schedule | Source |
+|---|---|---|
+| StewardWorkflow | every 30 min, one schedule per `matter/*.md` (id `al-steward-<slug>`) | `steward.py` |
+
+The Steward registrar enumerates every matter in the vault and creates-or-updates one schedule per matter; orphaned schedules (whose matter has been deleted) are swept out on the next registration run.
+
+### Plane two-way sync (gated `PLANE_SYNC_ENABLED`)
+
+| Workflow | Schedule | Source |
+|---|---|---|
+| PlaneSyncWorkflow | every 15s | `plane_sync.py` |
+| PlaneReverseSyncWorkflow | every 10s | `plane_reverse_sync.py` |
+| PlaneReconciliationWorkflow | hourly | `plane_reconciliation.py` |
+| PlaneSyncNudgeWorkflow | on-demand (fired by ctrl-api) | `plane_sync_nudge.py` |
+
+### Signal layer (gated `STEWARD_SIGNAL_EXTRACT_ENABLED` / `STEWARD_SIGNAL_ROUTER_ENABLED` / `STEWARD_STREAM_EVENT_PURGE_ENABLED`)
+
+| Workflow | Schedule | Source |
+|---|---|---|
+| SignalExtractWorkflow | every 5 min | `signals.py` |
+| SignalRouterWorkflow | every 2 min | `signal_router.py` |
+| StreamEventPurgeWorkflow | daily 03:00 UTC | `stream_event_purge.py` |
+| ReversalCalibrationWorkflow | every 10 min (gated `STEWARD_REVERSAL_CALIBRATION_ENABLED`) | `reversal_calibration.py` |
+
+### Meeting capture (gated `VEXA_ENABLED`)
+
+| Workflow | Schedule | Source |
+|---|---|---|
+| MeetingCaptureWorkflow | every 60s | `meeting_capture.py` |
+| TranscriptIntakeWorkflow | every 60s | `transcript_intake.py` |
+
+### Maintenance and ingestion
+
+| Workflow | Schedule | Source |
+|---|---|---|
+| HourlyEnrichmentWorkflow | every 1 hour | `hourly_enrichment.py` |
+| NightlyMaintenanceWorkflow | daily 03:00 (tenant tz) | `nightly_maintenance.py` |
+| OmiAudioProcessorWorkflow | every 10 min | `omi_processor.py` |
+| ComposioReconnectCleanupWorkflow | every 15 min | `composio_reconnect_cleanup.py` |
+| MediaIngestionWorkflow | triggered (no schedule) | `media_ingestion.py` |
+| StreamPullerWorkflow | per-stream interval | `stream_puller.py` |
+| FleetAuditWorkflow | daily 02:00 UTC (gated `FLEET_AUDIT_ENABLED`, default on) | `fleet_audit.py` |
+
+### Bootstrap and chores
+
+| Workflow | Schedule | Source |
+|---|---|---|
+| OnboardingPipelineWorkflow | manual (per new tenant) | `onboarding_pipeline.py` |
+| ChorePromotionReflectionWorkflow | weekly Sunday 03:00 UTC | `chore_promotion.py` |
+| Dynamically loaded chores (`chore-*`) | per-chore cron | `/alfred-data/user-chores/*.py` via `chores/_dynamic_loader.py` |
+
+All recurring schedules are registered by `packages/learn/scripts/register_schedules.py` on the worker's first boot, idempotently. Feature-gated schedules are created or deleted based on the corresponding env var at registration time, so a tenant flipping a flag off doesn't leave a zombie schedule running.
+
+<CardGroup cols={2}>
+  <Card title="Steward" icon="user-shield" href="/architecture/steward">
+    Per-matter perception loop, signal extraction, and the trust gradient in motion.
+  </Card>
+  <Card title="Signal layer" icon="wave-pulse" href="/architecture/signal-layer">
+    How `signal/` records turn stream events into mutations or pending actions.
+  </Card>
+  <Card title="Plane integration" icon="circle-nodes" href="/architecture/plane-integration">
+    Two-way sync between vault matters/tasks and Plane projects/issues.
+  </Card>
+  <Card title="Meeting capture" icon="microphone" href="/architecture/meeting-capture">
+    Vexa bot dispatch, transcript intake, and meeting-derived action candidates.
+  </Card>
+</CardGroup>
 
 <CardGroup cols={2}>
   <Card title="Interface" icon="display" href="/architecture/interface">

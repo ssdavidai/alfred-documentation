@@ -6,9 +6,15 @@ api: "POST /api/v1/curator/route-and-process"
 
 ## Overview
 
-Lower-level cousin of `/learning/route`. Takes a free-form `routing_context` object so callers can hand the Curator hints (suggested entities, classification, urgency, etc.). Same fallback behaviour: raw move on Curator failure.
+Lower-level cousin of [`/learning/route`](/api-reference/intuition/route). Both endpoints exist and are canonical — pick based on whether you have routing hints to pass:
 
-Returns 500 if both Curator and the fallback move fail.
+<Note>
+**When to use which:**
+- **`POST /api/v1/curator/route-and-process`** (this endpoint) — use when you have explicit `routing_context` to give the Curator (suggested entities, classification, urgency, source channel). Identifies the file by `input_path`. Returns **500** if both Curator and the fallback move fail.
+- **`POST /api/v1/learning/route`** — simpler wrapper. Identifies the file by `input_id`, no routing context. Always returns **200** with the routing observation (Curator failure is reported via `processed: false`, not as an HTTP error).
+
+Both share the same fallback behaviour (raw file move on Curator failure) and both write a routing observation to the vault.
+</Note>
 
 ## Body Parameters
 

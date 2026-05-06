@@ -1,0 +1,213 @@
+---
+title: "Steward"
+description: "The per-matter perception loop: how Alfred autonomously tracks and updates each ongoing matter without prompting."
+icon: "person-shelter"
+---
+
+<Note>
+The Steward is the only specialist that mutates matter-level state on its own. Curator, Distiller, Surveyor, and Janitor read the vault or write fresh records into it; the Steward watches a single matter, decides whether the world has changed enough that the matter's frontmatter should change with it, and either edits the matter or surfaces the proposal for Sir to review.
+</Note>
+
+## What the Steward is
+
+A Steward is not one process. There is one Steward per matter — one Temporal Schedule named `al-steward-<slug>` per `vault/matter/<slug>.md` file, ticking independently every 30 minutes (`packages/learn/src/activities/steward.py:70`, `STEWARD_DEFAULT_INTERVAL = timedelta(minutes=30)`). When Sir creates a new matter, the next worker boot sees it and provisions its Steward. When a matter is archived or deleted, the orphan Steward is removed on the same boot.
+
+Each tick is a perception loop: the Steward reads recent **signals** targeted at its matter, decides whether anything has happened that should change the matter's state, and — depending on how confident it is and what live-mode the operator has set — either applies the change or files an audit record proposing the change for Sir.
+
+The Steward's source lives in two files. `packages/learn/src/workflows/steward.py` is the deterministic Temporal workflow (the "when"). `packages/learn/src/activities/steward.py` is where every side effect happens (the "what"): vault reads, vault writes, audit emission, Plane comments. Roughly 3,500 lines of activity code; one short workflow that orchestrates them.
+
+The Steward is shipped in phases (`steward.py:1-13`):
+
+| Phase | Issue | What it added |
+|---|---|---|
+| 0 | #835 | Schema + scaffold. Per-matter schedule registration. `evaluate_task` no-op. |
+| 0.5 | #836 | `apply_state_change` audit-trail emitter. Shadow mode only. |
+| 1 | #837 | Real signal gathering + a single LLM evaluation per task with fresh signals. |
+| 2 | #838 | Per-class cadence + matter-aggregate no-signal backoff. |
+| 3 | #839 | Live-mode cutover knobs. `STEWARD_LIVE_MODE` env. |
+| 5 | #841 | Source-confidence EMA + hysteresis + rate-guard. |
+| 6 | RFC #842 | Unified signal layer. Signal extraction, signal router, reversal-driven calibration, stream-event purge. |
+
+Today's Steward is the composition of all of them.
+
+## Per-matter scheduling
+
+Steward schedules are registered by `register_steward_schedules` in `packages/learn/scripts/register_schedules.py:1138`. The function runs on every worker boot:
+
+<Steps>
+  <Step title="List every matter">
+    Call `ctrl-api`'s `/api/v1/vault/list/matter` (`register_schedules.py:985-1014`). Empty list on transport failure — better to skip a registration round than to delete every existing schedule because the API was down.
+  </Step>
+  <Step title="Create or update one schedule per matter">
+    For each `matter/<slug>.md` path, call `_create_or_update_steward_schedule` (`register_schedules.py:1044`). The schedule id is derived from the slug — `al-steward-<slug>` — so the operation is idempotent. Cadence and workflow signature are always re-issued, so a deploy that bumps the cadence lands without a manual purge.
+  </Step>
+  <Step title="Delete orphan schedules">
+    `_delete_orphan_steward_schedules` (`register_schedules.py:1101`) walks every existing schedule, finds the ones with the `al-steward-` prefix that don't have a matching live matter, and deletes them. Failures on individual deletes are logged but don't abort the sweep.
+  </Step>
+</Steps>
+
+The schedule itself is built in `_make_steward_schedule` (`register_schedules.py:1017`). Every Steward run carries the matter path as its sole argument, runs on the `alfred-learn` task queue, has a 5-minute execution + run timeout, and uses `ScheduleOverlapPolicy.SKIP` so a wedged tick can never pile on top of itself.
+
+The result: Stewards are dynamic. Drop a new file at `vault/matter/eagle-farm.md` and within one worker boot there's an `al-steward-eagle-farm` schedule ticking every half-hour against it. Archive the matter and the schedule disappears.
+
+## Tick mechanics
+
+A single Steward tick is the workflow function in `packages/learn/src/workflows/steward.py:108`. It iterates the matter's tasks rather than the matter directly — a Steward isn't only watching the matter file, it's watching every task that lives under it:
+
+<Steps>
+  <Step title="Load the matter's tasks">
+    `load_matter_tasks(matter_id)` (`activities/steward.py:288`) reads every `task/*.md` whose `parent_matter` resolves to this matter. One ctrl-api call per tick, cheap because the response carries no body preview.
+  </Step>
+  <Step title="Filter to due, non-terminal tasks">
+    Tasks in `state: done` or `state: archived` are skipped (`workflows/steward.py:88-100`). Tasks whose `next_check_after` is still in the future are skipped (`workflows/steward.py:60-85`). Everything else is evaluated.
+  </Step>
+  <Step title="Gather signals">
+    `evaluate_task` (`activities/steward.py:2119`) calls `gather_signals(task_path, since=last_check, limit=50)` (`activities/signal_gather.py:421`). This reads `vault/signal/*.md` records whose `target_path` equals the task path, whose `effect != "none"`, and whose `status != "applied"`. Newest-first, capped at 50.
+  </Step>
+  <Step title="No-signal gate">
+    If zero signals AND `surface_class != "high"`, skip the LLM entirely and return `still_active` at full confidence (`activities/steward.py:2324-2337`). Cheapest possible outcome — most ticks land here.
+  </Step>
+  <Step title="Rate-guard reservation">
+    Before any LLM dispatch: `rate_guard.check_and_reserve(task_path, matter_path)` (`activities/steward.py:2354`). If a cap is hit or a 429 backoff is active, land a `rate_guarded` decision and skip this tick (`activities/steward.py:2382-2386`).
+  </Step>
+  <Step title="LLM evaluation via clerk">
+    `evaluate_state(task_path, fm, signals, is_warm)` (`activities/steward.py:1641`). One Clerk call. Returns a structured decision: `{ decision, confidence, reasoning, evidence, source_contributions }`. Strict-JSON schema enforcement.
+  </Step>
+  <Step title="Apply state change">
+    `apply_state_change(task_path, decision, signals_summary, mode="shadow", target_kind="task")` (`activities/steward.py:3061`). Writes the audit record and, in live mode + above-threshold, mutates the task's frontmatter.
+  </Step>
+  <Step title="Stamp the cursor">
+    `record_steward_check(task_id, outcome)` (`activities/steward.py:2612`) idempotently re-writes `last_steward_check_at` and `next_check_after` so the next tick knows what's still due.
+  </Step>
+  <Step title="Update matter cadence">
+    After the per-task loop, `update_matter_cadence(matter_id, had_any_signal)` (`activities/steward.py:213`) advances the matter-aggregate no-signal backoff counter. Three consecutive no-signal ticks doubles the schedule cadence, capped at 4 hours; any signal arrival resets to base.
+  </Step>
+</Steps>
+
+## Signals, not raw streams
+
+A pre-Phase-6 Steward used to query Gmail directly, query the Sure financial stream directly, query the ctrl-api stream directly — one query per task that subscribed to overlapping data. Phase 6 (RFC #842) collapsed all of that into a single layer.
+
+Today, an upstream LLM extractor reads each new stream event once, classifies it, resolves the target task or matter, and writes one `vault/signal/<id>.md` record (`activities/signal_gather.py:8-22`). The Steward then asks one question per tick: "what signals point at me, since when?" — `gather_signals_for_matter(matter_path, since, limit=50)` (`activities/signal_gather.py:471`).
+
+A signal record carries `source_type` (gmail / slack / sure / ...), a 50-character `raw_quote` for provenance, the LLM's `reasoning`, an `effect` (one of `mutation` / `action` / `none`), and an `effect_confidence`. The Steward sees them as a uniform list of `{source, ref, note}` dicts (`activities/signal_gather.py:171-208`); the source-specific shapes never reach it.
+
+This decouples the Steward from upstream API shapes entirely. Add a new stream tomorrow — say, a Vexa transcript intake (`register_schedules.py:74-83`) — and once the extractor classifies its events, the Steward consumes them via the same path.
+
+## Mutation classes
+
+Signals carry their proposed mutation in a `mutation_proposal` block on the signal frontmatter. The router (`activities/signal_mutations.py:323`) validates `effect == "mutation"` and a `target_kind` of either `"task"` or `"matter"`, then dispatches through `apply_state_change`.
+
+Steward mutations cover the matter-level state Alfred is allowed to manage on his own:
+
+| Mutation class | Effect on the matter |
+|---|---|
+| `state` change | `state: open → done`, `state: open → archived`. The mainline lifecycle. |
+| `context_edit` | A frontmatter field on the matter (other than the lifecycle ones) is updated — for instance a refreshed summary, a corrected description, an updated owner. |
+| `parent_matter` change | A task's `parent_matter` frontmatter pointer is moved from one matter to another — a sub-matter regroup. |
+| `related_*` changes | `related_orgs`, `related_projects`, `related_to` membership shifts: an org joins or leaves the matter, a sibling task is added or removed. |
+
+Matters never get a Plane revert. Matters are not Plane projects — only tasks have Plane issues. `apply_state_change` skips the entire Plane fan-out when `target_kind == "matter"` and leaves `plane_action` and `undo_recipe.plane_revert` as `None` (`activities/steward.py:3284-3290`).
+
+## Mode gating
+
+Three values on `STEWARD_LIVE_MODE` (`activities/steward.py:2718-2740`):
+
+| Value | Behaviour |
+|---|---|
+| `shadow` (default) | Even if the caller asks for `mode="live"`, the activity downgrades to shadow. Audit records are written; no Plane writes, no vault frontmatter mutations. |
+| `live` | Live actions fire when `confidence >= STEWARD_CONFIDENCE_THRESHOLD` (default 0.6, `activities/steward.py:2722`). Below the threshold lands as `pending_confirmation: true` on the vault and skips Plane. |
+| `live_high_confidence_only` | Same as `live` but the threshold is `STEWARD_HIGH_CONFIDENCE_THRESHOLD` (default 0.85, `activities/steward.py:2723`). |
+
+The composition is operator-vetoed: the env can only **downgrade** a caller's intent (`activities/steward.py:3148-3156`). A caller passing `mode="shadow"` always lands as shadow; a caller passing `mode="live"` lands as the env says. This is defence-in-depth — a stray test invocation of `mode="shadow"` can't accidentally hit Plane just because the env happens to be live.
+
+On david today the default is `live_high_confidence_only`. Most ticks land in shadow on the rest of the fleet while the perception loop accumulates evidence.
+
+## Discretion and observation count
+
+When a signal carries an `effect_confidence` and the source has an instinct backing it, the Steward consults `get_discretion_threshold(observation_count)` (`packages/learn/src/matching/discretion.py:19`) — the same butler-discretion table that gates `Judgment`:
+
+| Observations behind the source | Threshold | Butler equivalent |
+|---|---|---|
+| < 5 | 0.95 | "I've barely seen this before, sir." |
+| 5–9 | 0.90 | "I believe I know, but I'd rather confirm." |
+| 10–19 | 0.85 | "I'm fairly certain this goes here." |
+| 20–49 | 0.80 | "I've seen this many times." |
+| 50+ | 0.75 | "Routine. Already done." |
+
+A new source — say, the first time a `gmail:invoice-from-vendor-X` signal pattern lands — needs the LLM to rate it at 0.95 before Alfred will act unprompted. After the same source has produced 50 confirmed observations, 0.75 is enough. The threshold drops as the evidence base grows; that gradient is what makes Sir's Steward feel cautious early and trustworthy later.
+
+Live mode requires both: `effect_confidence` clears the source's discretion threshold, AND the rate-guard reservation succeeds. Either gate alone declines.
+
+## Rate guard
+
+`packages/learn/src/activities/rate_guard.py` enforces sliding-window caps (RFC #832 §7, `rate_guard.py:72-78`):
+
+| Cap | Window |
+|---|---|
+| 60 LLM dispatches | per minute, per tenant |
+| 600 | per hour, per tenant |
+| 6000 | per day, per tenant |
+| 6 | per task, per day |
+| 50 | per matter, per day |
+
+State persists to `/alfred-data/state/steward/rate-guard.json` (`rate_guard.py:101-102`); writes are atomic-rename. When any cap fires or a provider 429 is active, `check_and_reserve` returns `allowed=False` and the caller short-circuits the LLM call, landing a low-confidence `rate_guarded` decision (`rate_guard.py:296-311`). The next tick retries once the rolling window clears.
+
+The provider-429 path is separate (`rate_guard.py:334`). When the Clerk surfaces a 429 (Codex returns one under burst load), `record_429(retry_after_seconds)` sets a hard backoff until the wallclock passes the deadline. Subsequent ticks decline before they even hit the LLM.
+
+This is a fail-safe, not a cost knob. Sir's stack runs on a flat ChatGPT Pro / Codex subscription (`rate_guard.py:1-9`); the constraint is provider rate-limits and noise-control, not dollars. Six LLM dispatches per task per day prevents a single chatty signal source from looping the same task forever.
+
+## Audit and undo
+
+Every Steward action — shadow or live — writes one audit record under `vault/event/`:
+
+```
+event/steward-action-2026-05-06T14-32-15Z-eagle-farm.md
+```
+
+The filename is `steward-action-<ts>-<safe-slug>.md` (`activities/steward.py:3196-3202`). The frontmatter records the decision, confidence, mode, prior_state, prior_frontmatter, the evidence list, the Plane action that fired (if any), and a complete `undo_recipe` (`activities/steward.py:2874-2887`). The body has a one-line evidence summary and the LLM's reasoning.
+
+The dashboard exposes per-record **Undo** controls. Clicking Undo flips the action — vault patch reversed, Plane comment + state-transition reverted — and writes a sibling record:
+
+```
+event/steward-action-reversed-2026-05-06T14-45-02Z-eagle-farm.md
+```
+
+That reversed record is what `ReversalCalibrationWorkflow` reads (`register_schedules.py:118-125`). Every 10 minutes it scans for new `event/steward-action-reversed-*.md` and `event/signal-action-reversed-*.md` records and applies a `-0.1` confidence drop to each contributing source-type (`activities/calibration_reversal.py`). The instinct learns from the reversal — not from a clever heuristic, but from Sir literally telling Alfred he got it wrong.
+
+The undo window is seven days (`activities/steward.py:2682`, `STEWARD_UNDO_WINDOW = timedelta(days=7)`). After that the audit record stays on disk for posterity but the recipe is no longer honored.
+
+## Steward versus the rest of the household
+
+The four pre-Steward specialists (Curator, Distiller, Surveyor, Janitor — see [Agent](/architecture/agent#the-four-vault-specialists)) all leave matter-level state alone. They write fresh records, suggest cross-links in frontmatter, and clean up structural debt; none of them touches a matter's lifecycle.
+
+| Specialist | Scope | Mutates matter state? |
+|---|---|---|
+| Curator | Inbox uploads → `note/` + entity records | No |
+| Distiller | Cross-record extraction → 5 learning types | No (additive only) |
+| Surveyor | Embeddings + clustering → `related_*` frontmatter | Frontmatter `related_*` only |
+| Janitor | Structural sweep → autofix broken wikilinks | Reads anything, mutates structurally — never lifecycle |
+| **Steward** | Per-matter perception → state / context / parent_matter / related_* edits | **Yes — the only specialist that does** |
+
+A Steward decision and a Surveyor decision can both land on the same matter on the same day; they don't conflict because they edit different fields. The Surveyor adds a `related_to` link suggesting an adjacent matter; the Steward might later observe enough signals to escalate that suggestion into a `parent_matter` move. Each specialist sticks to its own scope and the schema enforces the rest.
+
+## Pre-flight check before deploying Steward
+
+Anyone editing `packages/learn/src/workflows/steward.py` or `packages/learn/src/activities/steward.py` is touching Temporal-replayed code. The replay rules in `packages/learn/CLAUDE.md` apply in full:
+
+- No activity rename without a backwards-compat shim under the old name (`@activity.defn(name="old_name")`).
+- No workflow signature change that breaks history replay (params added, removed, or reordered).
+- Logic-order changes inside the workflow gated with `workflow.patched(<name>)` or `use_compatible_version()`. The Steward already does this for Phase 2's evaluator-timeout widening (`workflows/steward.py:186`, `workflow.patched("steward-phase2-eval-timeout")`) and the matter-cadence activity (`workflows/steward.py:248`, `workflow.patched("steward-phase2-matter-cadence")`).
+- New activities registered in `packages/learn/src/worker.py`.
+- A pre-deploy plan documented for in-flight workflows: terminate, drain, OR rely on patched-version compat.
+
+PR #628 is the cautionary tale. It renamed activities and rewrote workflow logic in `plane_sync.py` without `workflow.patched()`. In-flight workflows hit `NonDeterministicError` post-deploy on david and rapali, stalled for 12+ minutes, and required manual termination. The same class of mistake on the Steward would stall every active matter at once. Read `packages/learn/CLAUDE.md` end-to-end before opening the PR.
+
+<CardGroup cols={2}>
+  <Card title="Semantic layer" icon="brain" href="/architecture/semantic">
+    Where instincts come from — the Reflection / Judgment loop that backs the discretion thresholds the Steward consults.
+  </Card>
+  <Card title="Agent layer" icon="user-tie" href="/architecture/agent">
+    The four pre-Steward specialists and where they sit in the wider household.
+  </Card>
+</CardGroup>

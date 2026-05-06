@@ -1,0 +1,91 @@
+---
+title: "Meeting Capture"
+description: "Alfred can join your video meetings as a transcription bot, capture what was said, and turn meeting decisions into tasks. How it works from your seat."
+icon: "microphone"
+---
+
+<Note>
+Meeting capture is opt-in. Off by default until Sir flips the toggle in Settings, and it only watches Sir's own calendar. Every tenant who enables it runs their own Vexa stack on their own VPS — audio never leaves Sir's machine.
+</Note>
+
+## What Sir sees from his seat
+
+Sir has a Google Calendar invite for a 3pm meeting with a Google Meet link. At 2:50pm — ten minutes before the start — a participant called **Alfred** appears in the room. The bot does not speak. It sits in the participant list as a visible tile so nobody is surprised, listens to the audio mix, and streams it to a transcription pipeline on Sir's own VPS.
+
+When the meeting ends, the transcript lands in Sir's vault as a stream event within about a minute. Shortly after, the signal extractor reads it and any action items — "send the deck to Erste by Wednesday," "we agreed to use Postgres," "schedule a follow-up with Béla" — surface as candidate tasks, same as any email or Slack DM. Sir applies the ones he wants from the signal queue and dismisses the rest.
+
+## What gets captured, and what doesn't
+
+Auto-join is intentionally narrow. A meeting only qualifies if all three are true:
+
+1. It's on Sir's own Google Calendar (the Composio stream wired up at provision).
+2. Sir is on the attendee list — invitee, organiser, or creator. BCC'd or on a colleague's calendar, no bot.
+3. The event has a Google Meet link reachable from `conferenceData`, `hangoutLink`, `location`, or the description.
+
+Today the join path is **Google Meet only**. The transcript activity dispatches `platform: "google_meet"` exclusively — no Zoom or Teams path in the workflow yet, even where Vexa supports other platforms. A Zoom link in a calendar invite will be ignored.
+
+The bot is openly attending, not covertly recording — the participant tile says "Alfred," any host can kick it like any other guest, and same-domain colleagues can be told what it is.
+
+## Setting up auto-join
+
+The control surface is deliberately small. Settings → Meetings has a single toggle: **Auto-join enabled**, on/off, default off until Sir opts in.
+
+Flipping it does two things at once: persists `VEXA_ENABLED` to the tenant's `.env` (so a future restart honours it) and pauses or unpauses the `al-meeting-capture` Temporal schedule (so the change takes effect immediately, no docker restart). Pause rather than delete — the schedule's cron, args, and overlap policy survive across toggles.
+
+Other knobs — which calendar to watch, how far ahead to dispatch, the lateness window — are tenant-level constants rather than dashboard sliders. The calendar source is whatever Composio stream was wired up at provision. The lookahead is **600 seconds** (ten minutes ahead of start); the lateness window is **1800 seconds** (a meeting that started 25 minutes ago still gets a bot if Sir joins late and the gcal poll only just delivered the event).
+
+## What the bot does in the room
+
+The bot joins as a visible participant named Alfred. It is **listen-only**: no voice, no chat messages, no screen-share. It records the audio mix, streams to the local Whisper transcriber, and produces speaker-labelled segments live. It leaves cleanly when the host hangs up.
+
+If something goes wrong upstream — Vexa wedges, the bot can't reach the meeting, the Meet link expires — `vexa_join_meeting` succeeds (Vexa accepted the dispatch) but no `meeting.completed` webhook fires and no signal is emitted. The 60-second polling cadence is the natural retry boundary: the next tick catches the event again as long as Sir is still on the attendee list and the start time is within the lateness window.
+
+## Where the transcript lands
+
+The transcript appears in Sir's vault as a `stream_event/` record, sourced from `vexa`, within about a minute of meeting end. Each segment becomes one line — `<speaker>: <text>` — in start-time order. The frontmatter carries the platform, Vexa's meeting id, the gcal event id, the scheduled start, and the attendee emails. It's searchable from the Vault Browser like every other stream event, and looks identical in the layer above to a Slack DM or inbound email — deliberately, so transcripts get the same downstream treatment.
+
+## What happens after the transcript lands
+
+The signal extractor runs on the transcript with a per-source confidence prior of **0.85**. Higher than ambient audio (Omi at 0.7) because Sir explicitly agreed to the meeting, lower than direct openclaw chat (1.0) because Whisper transcription and speaker labels are probabilistic.
+
+Common signals from a strategy session:
+
+- "Send the deck to Erste by Wednesday" → an auto-task with a due date
+- "We agreed to use Postgres not Mongo" → a comment on the relevant matter capturing the decision
+- "Schedule a follow-up with Béla next week" → a task with `due_at` set
+
+Each candidate carries the quote that anchored it — Sir sees exactly why Alfred proposed the task. The extractor caps output at 30 candidates per transcript so a runaway 4-hour standup truncates rather than flooding the queue.
+
+## Privacy and consent
+
+Three layers of gating decide whether a bot ever joins:
+
+1. **Tenant-level.** `VEXA_ENABLED` must be true. A tenant that never opts in pays zero cost — schedules don't exist, the compose block is empty.
+2. **Calendar-level.** Sir's email must appear in attendees, creator, or organiser. The bot will not join a meeting Sir wasn't invited to.
+3. **Webhook-level.** Vexa's transcript webhooks to ctrl-api are HMAC-SHA-256 verified against `VEXA_WEBHOOK_SECRET` with a 5-minute replay window. A malformed signature 401s and never touches the JSONL — the transcript queue cannot be poisoned by anything other than Sir's own Vexa stack.
+
+Transcripts live in Sir's vault only — never sent to peers, never to the SaaS layer, never to a shared cluster. Transcription happens entirely on Sir's own VPS: bot container, local Whisper transcriber, Sir's disk. No third party sees the conversation.
+
+## When a transcript comes out badly
+
+It happens — noisy rooms, a single shared mic, mid-conversation language switching. Whisper still produces output but with degraded speaker labels. The 0.85 source prior already discounts this, and any per-action confidence under 0.6 lands as `pending_confirmation` rather than auto-applied, so Sir reviews before it becomes a task.
+
+If a transcript is useless, Sir deletes the stream event from the vault — same as deleting any other source record — and the candidates that came off it go with it. If a meeting consistently transcribes badly, flip auto-join off in Settings and re-enable when conditions improve.
+
+## The Vexa stack
+
+Meeting capture runs on a self-contained nine-container Vexa pod inside the same Docker network as Alfred — api gateway, runtime API, dispatcher, live Whisper transcriber, admin dashboard, postgres, redis, minio, bot orchestrator. No shared cluster across tenants — each tenant who flips the toggle gets their own. It costs nothing extra; it's included with the tenant.
+
+Full architecture — workflows, idempotency, signal flow — is on the architecture page.
+
+<CardGroup cols={2}>
+  <Card title="Meeting capture architecture" icon="microphone-lines" href="/architecture/meeting-capture">
+    Workflows, dispatch idempotency, the Vexa container map.
+  </Card>
+  <Card title="Voice Channel" icon="phone" href="/guides/voice-channel">
+    The other live-audio channel — calls, not meetings.
+  </Card>
+  <Card title="Connected Apps" icon="puzzle" href="/guides/connected-apps">
+    Google Calendar via Composio is the upstream feed.
+  </Card>
+</CardGroup>

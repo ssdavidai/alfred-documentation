@@ -1,0 +1,129 @@
+---
+title: "Matters and Stewards"
+description: "Each ongoing matter in your life gets its own steward — a perception loop that watches for changes and surfaces what needs your attention."
+icon: "person-shelter"
+---
+
+## What a matter is
+
+A matter is a long-running area of Sir's life that has multiple connected tasks, decisions, and events tied to it — something with an arc rather than a deadline. "Trkblint Property Land Development" is a matter. So is "Health & Fitness Restart" or "Household Cash Flow — Multi-Currency Finances". A matter is the umbrella; the tasks and events that belong to it group underneath.
+
+Matters live as records in `vault/matter/` and you can browse them in the Vault Browser. Every task carries a `parent_matter` field pointing back at one — that's how the dashboard rolls a task up under the matter it belongs to. Matters are the natural unit Alfred uses to reason about your life: "what's happening with the property?" is a question about one matter, not the whole vault.
+
+A matter is born one of three ways: the onboarding pack writes a first batch the morning Alfred meets you, the Curator promotes a recurring triage topic into a matter, or Sir creates one directly through chat or the dashboard.
+
+---
+
+## Why every matter has a steward
+
+Without someone watching, signals pile up. An email confirms the surveyor finished his work; a Slack message hints the architect is on holiday; an invoice posts that looks like the deposit on the new build. None of those events arrive labelled "this changes the Trkblint matter" — they just arrive, alongside everything else.
+
+A steward is the part of Alfred that watches one matter on its own clock. It reads the signals targeted at the matter, decides whether the world has changed enough that the matter — or one of its tasks — should change with it, and either applies the change or surfaces a proposal for Sir.
+
+Each matter has its own steward, ticking every thirty minutes. That separation is deliberate: a busy matter doesn't starve a quiet one of attention, and a quiet one doesn't get re-read uselessly because something noisy is happening next door.
+
+---
+
+## What stewards do, in plain English
+
+A steward's job is narrow: it asks **does anything about this matter, or any of its tasks, need to change?** Three categories of change:
+
+- **State changes.** A delivery email confirms the parcel Sir was waiting on; the steward marks the related task `done`. A vendor email says "we're cancelling" and the task closes as `cancelled` with the email cited as evidence.
+
+- **Membership changes.** A new email arrives about the property project; the steward attaches the event to the matter and, if it implies new work, creates a sub-task for it.
+
+- **Context updates.** Sir says in chat, "the Szabostuban Kft tasks shouldn't be under Household — they're business." The next tick re-parents the affected tasks and writes an audit record explaining what moved and why.
+
+Every change leaves a trail Sir can read.
+
+---
+
+## What stewards never do
+
+A steward stays in its lane. It doesn't decide what's important to Sir — that's the intuition layer's job, learned over time from observations. It doesn't reach across matters; an Eagle Farm steward doesn't touch a Health & Fitness task even if a signal vaguely mentions both. It doesn't make irreversible changes — every action carries a complete undo recipe and a seven-day window in which Sir can reverse it with one click. If a signal looks like it might apply but the steward isn't sure, the proposal lands in shadow rather than firing. A cautious butler is preferable to a confident one who guessed wrong.
+
+---
+
+## How a matter gets a steward
+
+Automatically. The first time Alfred's worker boots and sees a `vault/matter/<slug>.md` file, it provisions a schedule named `al-steward-<slug>`. From then on, every thirty minutes the schedule wakes up, runs one perception tick, and records what it found.
+
+Archive a matter — set `state: archived`, or move the file out of `vault/matter/` — and the orphan steward disappears on the next worker boot. Matters appear with their stewards attached and disappear with them removed.
+
+---
+
+## The trust gradient applied to stewards
+
+A steward decides whether to act with the same butler's discretion that powers the rest of the trust gradient. Three operating modes:
+
+| Mode | What the steward does |
+|---|---|
+| `shadow` | Records what it would have done; doesn't do it. The default for new tenants — Alfred earns trust before he uses it. |
+| `live_high_confidence_only` | Acts only when confidence comfortably clears the source's discretion threshold. Below that, the proposal lands as pending. The default on Sir's tenant after the soak window. |
+| `live` | Acts on any non-zero confidence the source has earned. Reserved for mature matters with many observations behind them. |
+
+The mode is per-tenant; the threshold a given action has to clear is per-source. The more times a source has produced a correct signal, the lower the threshold and the more freely Alfred acts. A new vendor email pattern needs near-certainty before triggering a state change; a vendor Alfred has handled correctly fifty times needs much less.
+
+---
+
+## What you'll see on the dashboard
+
+For each matter, the detail view shows three things the steward maintains:
+
+- **Recent steward decisions.** A timeline of every tick that did something, stamped with the time, the signal that triggered it, and the change made (or proposed in shadow). Click an entry to see the reasoning, evidence list, and source contributions.
+
+- **Pending decisions awaiting Sir's review.** Anything in shadow mode, or below the live threshold, sits here with a one-line summary. Sir can approve, dismiss, or ignore — ignoring is itself a signal the calibration loop reads.
+
+- **Per-matter undo controls.** Every applied action has an Undo button that lives for seven days. Clicking it reverses the change and tells the calibration loop the steward got it wrong.
+
+The matter view, in short, is the steward's open notebook.
+
+---
+
+## When stewards reverse course
+
+When Sir undoes a steward action, the change is reverted — task state, parent_matter pointer, frontmatter all restored. The system also reads the reversal and drops the contributing source's confidence prior by 0.1.
+
+That second part is the important one. If the same source — "delivery-confirmation emails from this vendor", say — produces three reversals in a row, its prior collapses fast and the steward stops trusting it without a much higher confidence score. Sources Sir consistently approves stay strong. Alfred learns from corrections without anyone explicitly teaching him, and reversals feed the next nightly Reflection, which can fold the lesson into the underlying instinct itself.
+
+---
+
+## Recipes — how to direct a steward
+
+A few simple levers Sir can pull:
+
+- **To pause a steward**, set the matter's `state: archived`. The schedule deactivates on the next worker boot. Re-activating the matter later restores it.
+
+- **To boost a steward's autonomy**, graduate the underlying instincts. Sources backed by mature instincts have lower discretion thresholds, so the same signal acts where it would previously have only proposed. See the [Intuition guide](/guides/intuition) for how that gradient works.
+
+- **To force a re-evaluation now**, trigger the steward schedule manually from the matter's detail view or from Settings → Schedules. Sir doesn't have to wait thirty minutes if something just landed.
+
+---
+
+## The five specialists, and where the steward sits
+
+The household has five specialists, each focused on a different layer:
+
+| Specialist | What it does |
+|---|---|
+| **Curator** | Processes inbox uploads — turns each new file into a structured note plus the entities it mentions. |
+| **Distiller** | Reads the vault and surfaces assumptions, decisions, constraints, and contradictions hiding between records. |
+| **Surveyor** | Embeds and clusters the vault, labelling clusters and discovering relationships — powers the Vault Nebula. |
+| **Janitor** | Sweeps for broken links, duplicate entities, and structural drift. |
+| **Steward** | Watches one matter at a time and updates its state, membership, or context as signals arrive. |
+
+The first four read the vault, write fresh records, or fix structural debt — none of them touches a matter's lifecycle. The Steward is the only specialist that **mutates ongoing state on Sir's behalf**, the only one trusted to say "this task is done" or "this matter has moved" without Sir typing it himself. That trust is precisely why the trust gradient and the audit trail apply to it more strictly than to any of the others.
+
+---
+
+<CardGroup cols={3}>
+  <Card title="Steward — deep dive" icon="person-shelter" href="/architecture/steward">
+    The full perception loop, signal layer, and calibration mechanics.
+  </Card>
+  <Card title="Intuition" icon="brain" href="/guides/intuition">
+    How instincts and the trust gradient give the steward its sense of confidence.
+  </Card>
+  <Card title="Recipes" icon="book-open" href="/guides/recipes">
+    Worked examples for matters, signals, and the rest of the kinetic surface.
+  </Card>
+</CardGroup>

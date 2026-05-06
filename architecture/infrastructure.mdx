@@ -36,7 +36,7 @@ The fleet TUI/CLI in `packages/ctrl/src/infra/provisioner.ts` walks the same num
     Cloud-init is rendered from `cloud-init.yaml.njk` and includes the LUKS keyfile generation, fail2ban + UFW setup, Docker install, Tailscale install, and the systemd timer that pulls fresh container images every 15 minutes.
   </Step>
   <Step title="Create the server + wait for cloud-init">
-    Hetzner backups are enabled. The volume is attached. Cloud-init formats the disk with LUKS2 and creates `/mnt/encrypted/{vault,openclaw,alfred,temporal}`.
+    Hetzner backups are enabled. The volume is attached. Cloud-init formats the disk with LUKS2 and creates `/mnt/encrypted/{vault,openclaw,alfred,temporal,vaultwarden,mcp-server,vexa}`. The latter three are created unconditionally — the cost of an empty directory is zero, and creating them lazily would mean a tenant flag flip (e.g. `vexa_enabled`) would also need a re-run of cloud-init before the corresponding stack could start.
   </Step>
   <Step title="Upload secrets via SSH (not via cloud-init)">
     `.env` (LLM keys, AAS_API_KEY, Composio creds, AgentMail/AgentPhone tokens) is SFTP'd post-boot. Cloud-init `user_data` is readable through Hetzner's metadata API, so secrets never go there.
@@ -66,12 +66,19 @@ Everything that matters is on `/mnt/encrypted` — the LUKS2 volume — and noth
 | `/mnt/encrypted/alfred` | Tenant secrets file (`.gateway-token`), authorized phone numbers, onboarding state, Composio user id, stream JSONLs. |
 | `/mnt/encrypted/temporal` | Temporal SQLite database (workflow state). |
 | `/mnt/encrypted/ollama` | Cached embedding model weights for the surveyor (`nomic-embed-text`). |
+| `/mnt/encrypted/vaultwarden` | Sir's per-tenant Vaultwarden SQLite + attachments — every secret currently in `.env` plus future credentials. |
+| `/mnt/encrypted/mcp-server` | Per-tenant MCP HTTP server data (Claude Custom Connector OAuth state). |
+| `/mnt/encrypted/vexa` | Vexa transcript-bot stack data (Postgres, Redis, MinIO) when `vexa_enabled` is on. |
+| `/mnt/encrypted/plane` | Plane PM stack volumes — `pgdata/`, `redis/`, `rabbitmq/`, `uploads/` — when `plane_enabled` is on. |
+| `/mnt/encrypted/sure` | Sure personal-finance stack volumes — `pgdata/`, `redis/` — when `sure_enabled` is on. |
 
 The LUKS keyfile lives at `/opt/alfred/luks.key` on the host — readable only by root, used by the `alfred-luks.service` systemd unit to auto-unlock the volume on boot.
 
 ## The Docker stack
 
-Eight containers per tenant. All built from `docker-compose.yaml.njk`; image tags are `:latest` because the `alfred-update.timer` systemd unit pulls fresh images every fifteen minutes.
+A fully-loaded tenant runs nine Alfred-core containers plus three optional sidecar stacks (Plane, Sure, Vexa). All built from `docker-compose.yaml.njk`; image tags are `:latest` because the `alfred-update.timer` systemd unit pulls fresh images every fifteen minutes.
+
+### Alfred core (always on — 9 containers)
 
 | Service | Image | Port | Role |
 |---|---|---|---|
@@ -82,9 +89,24 @@ Eight containers per tenant. All built from `docker-compose.yaml.njk`; image tag
 | `openclaw-workers` | `ssdavidai00/alfred-openclaw` | `18790` | Background-worker gateway. Where the Clerk and ephemeral subagents run. Separate process so a long-running chore can't block Sir's chat. |
 | `alfred` | `ssdavidai00/alfred-worker` | — | Vault specialists daemon — runs the Curator, Janitor, Distiller, and Surveyor processes. |
 | `alfred-learn` | `ssdavidai00/alfred-learn` | — | Python + Temporal worker. Hosts every scheduled workflow (event processor, hourly enrichment, judgment, task runner, daily digest, reflection, and the dynamically loaded chores). |
-| `ctrl-api` | `node:22-slim` running `api.mjs` | `3100` | Tenant API. Every read and write to the vault, every stream operation, every channel send goes through here. |
+| `ctrl-api` | `node:22-slim` running `api.mjs` | `3100` | Tenant API (Docker service). Every read and write to the vault, every stream operation, every channel send goes through here. A legacy `alfred-api.service` systemd unit is kept on disk as a fallback but is gated off when the compose file exists. |
+| `mcp-server` | `ssdavidai00/alfred-mcp-server` | `8787` | Per-tenant MCP HTTP server. Cloudflared routes Claude Custom Connector OAuth + `/mcp` paths here; everything else stays on ctrl-api / openclaw. |
+
+The Vaultwarden trio (`vaultwarden`, `vault-init`, `vault-cli`) ships in the same compose file behind a `vaultwarden_enabled` flag and is on by default for new tenants — Bitwarden-compatible vault server + a one-shot fetch-and-write of `.env` from the vault + a long-running `bw serve` side-container that the MCP tool calls proxy through. Three more containers when enabled.
 
 `init` must complete before `openclaw` and `openclaw-workers` start. Both must be healthy before `alfred` boots. `alfred-learn` waits on `temporal`, `openclaw-workers`, and `ctrl-api` all being healthy. The dependency graph is enforced in compose, not by hope.
+
+### Optional sidecar stacks
+
+Each is gated behind a Nunjucks `{% if <flag>_enabled %}` block in the compose template. When the flag is off the services are absent from the compose file entirely; their `/mnt/encrypted/<name>` directory exists empty (so a flip-on doesn't require rerunning cloud-init).
+
+| Stack | Containers | What it is |
+|---|---|---|
+| Plane | 13 — `plane-db`, `plane-redis`, `plane-mq`, `plane-minio`, `plane-migrator` (one-shot), `plane-api`, `plane-worker`, `plane-beat`, `plane-web`, `plane-space`, `plane-admin`, `plane-live`, `plane-proxy` | Self-hosted PM. `plane-proxy` exposes `127.0.0.1:8080`; cloudflared routes `<sub>-plane.<domain>` to it. `plane-migrator` is one-shot so the steady-state long-running count is 12. |
+| Sure | 4 — `sure-db`, `sure-redis`, `sure-web`, `sure-worker` (plus `sure-init` one-shot) | Self-hosted personal-finance (we-promise/sure). Web on `127.0.0.1:3001`, public reach-in via cloudflared. |
+| Vexa | 9 — `api-gateway`, `admin-api`, `runtime-api`, `meeting-api`, `live-transcriber`, `dashboard`, `postgres`, `redis`, `minio` | Transcript bot that joins Google Meet calls as "Alfred", transcribes via Groq Whisper, POSTs `meeting.completed` webhooks back to ctrl-api. Runs as a separate compose project at `/opt/alfred/vexa/`, joins the `alfred_default` network so alfred-learn can reach `vexa-api-gateway`. |
+
+A bare-bones tenant (Alfred core + Vaultwarden trio, no sidecars) is twelve long-running containers plus the `init` one-shot. A fully-loaded tenant with all three sidecars is in the mid-thirties.
 
 <Tip>
 The two OpenClaw processes (`openclaw` and `openclaw-workers`) share the same Docker image but read different config files and write to different state directories. This separation means a long batch job in `openclaw-workers` cannot stall Sir's interactive chat in `openclaw`.

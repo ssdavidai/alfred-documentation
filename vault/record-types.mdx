@@ -6,12 +6,12 @@ icon: "list"
 
 Every record in your vault declares a `type` in its frontmatter. The type determines which folder the file lives in, which status values are valid, which fields the dashboard renders, and which specialist can touch it.
 
-Alfred recognises **twenty-six types** — the original nineteen from the underlying [`alfred`](https://github.com/ssdavidai/alfred) vault package, plus seven extensions added by the platform for the kinetic and intuition layers (matter, chore, ledger_entry, triage, observation, instinct, reflection).
+Alfred recognises **twenty-nine types** — the original nineteen from the underlying [`alfred`](https://github.com/ssdavidai/alfred) vault package, plus ten extensions added by the platform for the kinetic, intuition, and signal layers (matter, chore, ledger_entry, triage, observation, instinct, reflection, stream_event, signal, needs_attention).
 
 The canonical list lives in two files:
 
 - `c/alfred/src/alfred/vault/schema.py` — the original nineteen
-- `c/alfred-platform/packages/ctrl/src/api/routes/vault.ts` — the platform's full list of twenty-six
+- `packages/ctrl/src/api/routes/vault.ts` — the platform's full list of twenty-nine
 
 This page groups them by purpose.
 
@@ -179,24 +179,26 @@ Records created automatically from data flowing in through Streams and Connected
 
 | Type | Folder | Status values | When created |
 |------|--------|---------------|--------------|
-| `event` | `event/` | (no constraint) | `EventProcessorWorkflow` for every stream event (zero-LLM) |
-| `conversation` | `conversation/` | `active`, `waiting`, `resolved`, `closed`, `archived` | Curator from threaded sources; Omi audio template |
+| `stream_event` | `stream_event/` | (no constraint) | `EventProcessorWorkflow` for every stream event (zero-LLM); unified target for all sources since Phase 6.6 |
+| `event` | `event/` | (no constraint) | Steward audit records only — `steward-action-*`, `signal-action-*`, `auto-task-created-*`, `daily-digest-*`. **Not** for new stream events. |
+| `conversation` | `conversation/` | `active`, `waiting`, `resolved`, `closed`, `archived` | **Deprecated for new writes.** Pre-T6.6.1 OMI audio, voice call, and OpenClaw chat records still live here; new equivalents go to `stream_event/`. |
 | `input` | `input/` | `unprocessed`, `processed`, `deferred` | Anything dropped into `inbox/` |
 | `session` | `session/` | `active`, `completed` | `SessionTrackerWorkflow` from Alfred-Sir interactions |
 
-The `event` type is the workhorse. It carries `source`, `source_ref`, `stream_type`, and `enrichment_status` fields, and it is created by `stream_vault.py`'s per-source templates. The hourly enrichment pass adds entities, tags, and links in a single batched LLM call.
+The `stream_event` type is the workhorse. It carries `source`, `source_ref`, `stream_type`, `source_type`, and `enrichment_status` fields, and it is created by `stream_vault.py`'s per-source templates. The hourly enrichment pass adds entities, tags, and links in a single batched LLM call. T6.6.1 unified what used to be split between `event/` and `conversation/` into this single folder; the `source_type` frontmatter scalar (gmail, slack, omi, openclaw-chat, vexa, sure, gcal, plane, vault_edit, generic) lets the signal extractor classify in O(1) without filename heuristics. The migrator `packages/learn/scripts/migrate_to_stream_event.py` consolidated existing records during T6.6.1 and rewrote in-vault wikilinks accordingly.
 
-**Example: an event record from Gmail**
+**Example: a stream_event record from Gmail**
 
 ```markdown
 ---
-type: event
+type: stream_event
 created: 2026-04-12T17:03:01+00:00
 status: active
 name: "Brescia Supplier: site visit confirmation — 14 April"
 source: "993465f7-a2d0-41be-a83c-6b5d5d0e4c53"
 source_ref: "gmail:19c24755a763b506"
 stream_type: gmail
+source_type: gmail
 tags: [email]
 enrichment_status: pending
 ---
@@ -210,7 +212,22 @@ Confirming our site visit on 14 April at 10:00 — please let us know
 the access code for the building.
 ```
 
-The same `event` type covers every stream source: Gmail, Slack, GitHub, Google Calendar, Notion, Polar payments, Omi audio, voice calls, SMS. Per-source templates in `packages/learn/src/activities/stream_vault.py` shape the body and tags appropriately.
+The same `stream_event` type covers every stream source: Gmail, Slack, GitHub, Google Calendar, Notion, Polar payments, Omi audio, voice calls, SMS, OpenClaw chat. Per-source templates in `packages/learn/src/activities/stream_vault.py` shape the body and tags appropriately.
+
+<Note>
+The `event/` directory is **still alive** but only for steward audit records — `steward-action-*`, `signal-action-*`, `auto-task-created-*`, `daily-digest-*`. Those are not stream events; they are audit records emitted by `steward.apply_state_change`, `signal_actions._emit_signal_action_audit`, and the task-creation audit path. Genuine stream events written today always land under `stream_event/`.
+</Note>
+
+## Signal layer
+
+Records produced by the Phase 6 signal extractor and steward — the distilled "what should change in the world" derived from raw stream events.
+
+| Type | Folder | Status values | When created |
+|------|--------|---------------|--------------|
+| `signal` | `signal/` | `active`, `applied`, `superseded` | Signal extractor distils a stream event into an effect/target/confidence triple. Persists forever. |
+| `needs_attention` | `needs_attention/` | `open`, `resolved`, `dismissed` | Signals that did not clear the autonomy threshold and surface to Sir for explicit review. |
+
+A `signal` is the smallest reusable unit of "something happened that probably means X" — slug `<ts>-<short_hash>.md`, frontmatter carries `effect`, `target`, `confidence`, and a `source_ref` back to the originating stream event. A `needs_attention` record is what the steward writes when a signal looks real but discretion says "don't act on this autonomously" — slug `<ts>.md`, body explains what was noticed and what the steward considered. See [the signal layer](/architecture/signal-layer) for the full extract → judge → apply pipeline.
 
 ## Capabilities
 
