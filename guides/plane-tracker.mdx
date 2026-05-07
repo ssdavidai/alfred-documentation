@@ -1,0 +1,131 @@
+---
+title: "Plane Tracker"
+description: "Your tasks live in the vault — but Plane gives you a project-board view of them, two-way synced. How to use it."
+icon: "diagram-project"
+---
+
+## What Plane is, and why
+
+[Plane](https://plane.so) is an open-source project tracker — think Linear or Jira or Asana, except self-hosted and running on your own tenant. Every Alfred VPS ships with its own Plane stack baked in, alongside the vault and the rest of the workers.
+
+Plane exists because the vault is excellent storage and lousy chrome. Sir's tasks live as `task/<slug>.md` files — perfect for the agent to read and write, awful for dragging a card from "todo" to "done" with a thumb. Plane is the visual layer: kanban boards, swimlanes, sprint views, and a UI Sir can hand to a teammate without explaining Markdown.
+
+The vault stays the source of truth. Plane is a live mirror — every change rides a webhook back into the vault, and every vault edit pushes forward into Plane within seconds.
+
+---
+
+## Where to find it
+
+Plane lives at `https://<your-subdomain>-plane.alfred.black` — for example, `david-plane.alfred.black`. The exact hostname is on your dashboard's Apps page; click the **Plane** card and it opens in a new tab.
+
+Login is wired up during provisioning. Sir doesn't manage Plane credentials separately — the admin email and password are generated automatically and stored in your tenant's Vaultwarden, surfaced through the dashboard's Settings page when you need them.
+
+---
+
+## What gets synced
+
+Two record types in your vault correspond to two object types in Plane:
+
+| Vault | Plane |
+|---|---|
+| `matter/<slug>.md` | Project |
+| `task/<slug>.md` (with `parent_matter` / `related_matter` set) | Issue inside that project |
+
+State, name, description, due date, priority, and labels (derived from `related_orgs` and `topic_tags`) all flow both directions. A task without a resolvable matter still appears — it lands in a built-in **Inbox** project so Sir always has a triage surface rather than invisible orphans.
+
+Comments are bidirectional: anything Sir writes on a Plane issue gets appended to the vault task; anything Alfred posts shows up in Plane.
+
+---
+
+## The two-way sync
+
+The whole loop runs on four Temporal workflows. From Sir's perspective, here's what each common action looks like:
+
+| Sir's action | What happens | Latency |
+|---|---|---|
+| Asks Alfred in chat to create a task | Vault gets the new `task/`, ctrl-api fires a nudge, Plane gets the issue | ~1–3 s |
+| Edits a task body in the vault directly | Same nudge path | ~1–3 s |
+| Drags a card from "todo" to "done" on the Plane kanban | Webhook → reverse-sync → vault `state: done` | ~10 s |
+| Renames a project on Plane | Webhook → reverse-sync → matter title updated | ~10 s |
+| Deletes an issue on Plane via REST API | No webhook fires (Plane bug); reconciliation pass catches it and archives the vault task | within 1 hour |
+| Comments `@alfred do X` on an issue | An ephemeral subagent spawns and goes to work (subject to discretion) | ~10 s to first action |
+
+Forward sync runs every 15 seconds for steady-state catch-up and immediately on every vault write via the nudge. Reverse sync drains Plane webhooks every 10 seconds. The reconciliation pass runs hourly as the safety net for anything the webhook stream missed.
+
+<Note>
+**Vault is canonical.** If Plane and the vault ever disagree, the reconciliation pass tilts the answer toward the vault. Plane is a projection; if you nuke the Plane database tomorrow, your tasks survive intact in the vault and the next sync rebuilds Plane from scratch.
+</Note>
+
+---
+
+## What does NOT sync
+
+Most of the vault has no business in a project tracker. These record types are deliberately invisible to Plane:
+
+- `note/`, `decision/`, `observation/` — knowledge, not tasks
+- `instinct/`, `intuition/`, `reflection/` — Alfred's learning artefacts
+- `signal/`, `event/`, `conversation/` — stream-derived records
+- `person/`, `org/`, `place/` — entities
+
+Matters appear as Plane projects, but matter-level frontmatter — `related_orgs`, parent constraints, the long-form body Opus wrote — stays vault-only. Plane gets a clean projected name and description; the rich graph stays where it belongs.
+
+---
+
+## The @alfred mention pattern
+
+Plane comments are a real conversational surface. Three triggers worth knowing:
+
+- **`@alfred summarise this`** — Alfred reads the issue and any related vault context, then posts a summary comment back on the Plane card.
+- **`@alfred close as done`** — Alfred closes the issue *and* flips the vault task to `state: done`. Forward sync agrees on the next tick and writes nothing.
+- **`@alfred reassign to <person>`** — Alfred re-attributes the issue. Same change syncs back to the vault.
+
+Anything Alfred would normally treat as destructive (`delete`, `remove`, `force`, `production`) bumps the trigger from autonomous to approval-required — Sir has to confirm with a follow-up `@alfred go` or `@alfred approved` before the subagent proceeds.
+
+Alfred won't trigger himself. Comments authored by Alfred's own Plane user are dropped at the source, and every comment Alfred posts is recorded so the trigger detector recognises its own echoes. Sir can `@alfred` away without worrying about runaway loops.
+
+---
+
+## Workspace + access
+
+Every tenant has its own Plane workspace. The slug matches your tenant subdomain — so `david` gets the `david` workspace, `miguel` gets the `miguel` workspace, and so on. There is no cross-tenant project sharing; Plane data never leaves your VPS.
+
+If Sir wants a peer to see one of your projects, the route isn't through Plane — it's through the [Prime federation API](/architecture/prime-federation), which exposes a controlled subset of the vault to other Alfreds. Plane stays single-tenant on purpose.
+
+---
+
+## Common questions
+
+**Do I have to use Plane?** No. The vault and the dashboard's Errands tab work fine alone; Sir who prefers a CLI or chat-driven view can ignore Plane entirely.
+
+**Can I disable Plane sync?** Yes. Set `PLANE_SYNC_ENABLED=false` in your tenant `.env` and restart `alfred-learn`. The four Plane workflows skip registration on the next worker boot, and any pre-existing schedules are actively deleted. The Plane stack itself keeps running — Sir can still use it as a standalone tracker — but it stops receiving automatic vault updates. Flip the flag back to `true` and the next boot recreates the schedules.
+
+**What happens if Plane goes down?** Vault keeps working. Forward-sync activities throw, Temporal retries them with exponential backoff, and once Plane comes back the queue drains normally. The reconciliation pass catches any divergence within an hour.
+
+---
+
+## Configuration surface
+
+Most of Plane is invisible to Sir. The pieces you might touch:
+
+| Knob | Where | Why |
+|---|---|---|
+| Plane admin password | Vaultwarden, surfaced in Settings | Logging in, or after rotation |
+| `PLANE_SYNC_ENABLED` | Tenant `.env` | Pause the sync without uninstalling Plane |
+| `PLANE_API_TOKEN` | Tenant `.env` | Rotated automatically; manual rotation only if a token leaks |
+| `PLANE_WEBHOOK_SECRET` | Tenant `.env` | Same — automatic, manual touch only on incident response |
+
+Provisioning sets all of these. Day-to-day: open Plane, drag cards, comment, close. Alfred handles the rest.
+
+---
+
+<CardGroup cols={3}>
+  <Card title="Plane Integration (deep dive)" icon="diagram-project" href="/architecture/plane-integration">
+    The four workflows, loop guards, reconciliation, and slug mapping in detail
+  </Card>
+  <Card title="Streams & Integrations" icon="radio" href="/guides/streams-and-integrations">
+    Passive data feeds — the other major data path into the vault
+  </Card>
+  <Card title="Your Dashboard" icon="layout-dashboard" href="/guides/your-dashboard">
+    The Vault Nebula, the Intelligence menu, and the rest of the control surface
+  </Card>
+</CardGroup>

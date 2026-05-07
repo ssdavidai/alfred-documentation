@@ -1,0 +1,151 @@
+---
+title: "Sidecar State"
+description: "Files Alfred keeps outside the vault — extraction cursors, idempotency caches, and other operational state. Where they live, what they do, when to reset them."
+icon: "database"
+---
+
+## What sidecar state is
+
+Sir's vault is for **content** — tasks, notes, signals, events. The **sidecar** is everything Alfred needs to remember about *its own progress through that content*: which records have been processed, which webhook echoes are Alfred's own, where the Plane sync left off.
+
+Sidecar state lives at `/alfred-data/state/` inside the `alfred-learn` container, bind-mounted from the host's encrypted LUKS volume. It travels with the rest of Sir's data — backed up nightly, encrypted at rest, never replicated off-tenant.
+
+<Note>
+Nothing in `/alfred-data/state/` is user-facing. The dashboard and the agent treat the vault as the source of truth; the sidecar is internal bookkeeping that exists because some kinds of state don't belong in vault frontmatter.
+</Note>
+
+## Why outside the vault
+
+The earlier design tracked extraction progress inside vault frontmatter — a `signal_extracted_at` field on every stream event. Three things went wrong.
+
+| Problem | What it meant in practice |
+| --- | --- |
+| **Speed** | A vault write goes through `ctrl-api → docker exec → YAML parse → write` — hundreds of milliseconds per record. SQLite and JSONL on the local volume are sub-millisecond. |
+| **Content pollution** | Sir's vault should be Sir's content. Cursors and idempotency caches are not content. |
+| **YAML fragility** | Vault writes parse the entire frontmatter on every edit. One record with malformed Unicode broke the cursor write, causing infinite re-extraction and unbounded LLM spend on Sir's calendar backlog. The sidecar has no whole-file parse hazard. |
+
+New cursors and caches default to sidecar storage. Existing frontmatter fields are kept for diagnostics but no longer written.
+
+## Catalog of sidecar files
+
+Each file is created on first use, so a fresh tenant sees an empty `/alfred-data/state/` until the first workflow tick.
+
+| Path | Format | What it tracks |
+| --- | --- | --- |
+| `signal_extraction.db` | SQLite | Stream events seen by `SignalExtractWorkflow`. Schema: `extracted(path, extracted_at, signal_path)` plus a `bootstrap` marker. Source: `packages/learn/src/utils/extraction_index.py`. |
+| `steward/signal-task-creation.json` | JSON | Idempotency cache for auto-task creation. Maps `source_event_path → {task_path, created_at}`; capped at 10 000 entries. Source: `packages/learn/src/activities/task_creation.py`. |
+| `steward/reversal-calibration.json` | JSON | Records Steward decisions later reversed; tunes confidence thresholds. |
+| `steward/rate-guard.json` | JSON | Rate-limit ledger for Steward outbound actions. |
+| `steward/last-brief.json` | JSON | Daily brief cache — timestamp + payload to suppress duplicates. |
+| `steward/meeting-schedules.json` | JSON | Meeting-schedule index used by the transcript activity. |
+| `steward/<task_id>/` | directory | Per-task Steward scratch (vault snapshots, evaluation artefacts). |
+| `plane_sync_cursor.json` | JSON | Vault → Plane forward-sync cursor: `{last_vault_mtime, project_map, issue_map}`. Source: `packages/learn/src/activities/plane_sync.py`. |
+| `plane_outbound_signatures.json` | JSON | Hash + timestamp of every Plane write (capped at 1000). Reverse-sync uses this to recognise webhook echoes. |
+| `plane_self_comments.json` | JSON | Comment IDs Alfred has authored in Plane, so reverse-sync ignores its own threads. |
+| `plane_pending_approvals.json` | JSON | Pending human-approval requests, surfaced into the dashboard's approval queue. |
+
+Every file is safe to delete in the sense that Alfred will recreate the schema on the next boot. *Whether* the deletion is harmless depends on what the file does — see the reset section below.
+
+## Backup and restore
+
+`/alfred-data/state/` lives on the same encrypted host volume as the vault, the workspace, and the Temporal database. The nightly `alfred-backup.timer` snapshots the whole volume to Hetzner Object Storage with restic. Sidecar files are included by construction.
+
+To back up only the sidecar manually — useful before a destructive maintenance step:
+
+```bash
+docker exec compose-alfred-learn-1 \
+  tar -czf /alfred-data/sidecar-$(date +%F).tgz -C / alfred-data/state
+```
+
+To restore:
+
+```bash
+docker compose stop alfred-learn
+# untar over the host bind mount, owned by the alfred-learn uid
+sudo tar -xzf sidecar-2026-05-01.tgz -C /var/lib/alfred/
+docker compose start alfred-learn
+```
+
+<Warning>
+Never restore a sidecar snapshot from one tenant onto another. The Plane project IDs, vault paths, and idempotency keys are tenant-specific; cross-tenant restore would point Alfred at projects and tasks that don't exist on the destination.
+</Warning>
+
+## When to manually reset
+
+Three reset scenarios come up in practice. Each costs something — usually LLM calls or external API churn — so they are not routine.
+
+<AccordionGroup>
+
+<Accordion title="Re-process every stream event">
+Delete `signal_extraction.db`. The next boot recreates the schema, then the bootstrap step re-imports `signal_extracted_at` from vault frontmatter so already-processed events stay processed.
+
+**Cost:** every event whose `signal_extracted_at` is null gets re-extracted. On a tenant with a large gcal backlog this means thousands of LLM calls.
+</Accordion>
+
+<Accordion title="Reset auto-task idempotency">
+Delete `steward/signal-task-creation.json`. The cache repopulates as new no-target signals arrive. Mostly useful when testing the auto-task pipeline.
+
+**Cost:** if the same source events appear again, Alfred may auto-create duplicates of tasks Sir already has.
+</Accordion>
+
+<Accordion title="Force a full Plane resync">
+Delete `plane_sync_cursor.json`. The next forward-sync tick re-scans every matter and task. The `project_map` and `issue_map` live inside the cursor, so deleting it also drops them.
+
+**Cost:** Plane API calls scale with vault size. On a saturated tenant this runs for several minutes and may briefly trip Plane's rate limits.
+</Accordion>
+
+</AccordionGroup>
+
+<Tip>
+For most "Plane looks out of sync" complaints the right tool is `trigger_plane_sync_nudge` — it forces a single record to re-sync without dropping the cursor. Reach for the cursor delete only when nudges aren't enough.
+</Tip>
+
+## Permissions
+
+Files under `/alfred-data/state/` are owned by the `alfred-learn` container's uid (configured at image build time). The host user can't write to them without `sudo` or going through the container — and that's intentional. Sidecar writes are atomic (`temp file + os.replace`) and concurrent-writer-safe; manual edits from outside the container defeat both guarantees.
+
+To inspect a sidecar file from the host:
+
+```bash
+docker exec compose-alfred-learn-1 cat /alfred-data/state/plane_sync_cursor.json
+```
+
+The right surface for almost every operational concern is the dashboard or the API, not the sidecar.
+
+## Operator commands
+
+A small set of one-liners covers most diagnostic work:
+
+```bash
+# Sidecar size and recent activity
+docker exec compose-alfred-learn-1 ls -la /alfred-data/state/
+
+# Signal extraction state (count of processed events)
+docker exec compose-alfred-learn-1 \
+  sqlite3 /alfred-data/state/signal_extraction.db \
+  'SELECT COUNT(*) FROM extracted'
+
+# Plane cursor inspection
+docker exec compose-alfred-learn-1 \
+  cat /alfred-data/state/plane_sync_cursor.json | jq '.last_vault_mtime, (.issue_map | length)'
+
+# Drop and rebuild signal extraction
+docker exec compose-alfred-learn-1 rm /alfred-data/state/signal_extraction.db
+docker compose restart alfred-learn
+```
+
+## Future state
+
+Sidecar usage grows as new workflows land. Likely additions: cursor files for cross-tenant federation sync (Alfred Prime), per-channel rate-guard ledgers as more outbound surfaces wire up, and a distributed-lock file if a workflow ever needs serialisation stronger than Temporal's task-queue ordering. The directory convention — top-level for cross-cutting state, `steward/` for Steward scratch, `plane_*` for Plane-related state — should be respected by new cursors rather than dumping at the root.
+
+<CardGroup cols={3}>
+  <Card title="Signal layer" icon="signal" href="/architecture/signal-layer">
+    What signal extraction does and how the sidecar accelerates it
+  </Card>
+  <Card title="Plane integration" icon="kanban" href="/architecture/plane-integration">
+    How forward and reverse sync use the cursor and outbound signatures
+  </Card>
+  <Card title="Monitoring" icon="chart-line" href="/guides/monitoring">
+    Day-to-day operator commands for inspecting Sir's tenant
+  </Card>
+</CardGroup>

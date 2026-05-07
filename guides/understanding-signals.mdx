@@ -1,0 +1,154 @@
+---
+title: "Signals"
+description: "How Alfred turns your inbox, calendar, and conversations into actionable signals — and what you see on the dashboard when he does."
+icon: "wave-pulse"
+---
+
+## What a signal is
+
+A signal is the moment Alfred reads something happening in Sir's day — an email, a calendar invite, a meeting transcript, a chat with him directly — and decides *this matters*. There's an action implied, or a state change, or a fact that updates an existing matter.
+
+Stream events are the raw stuff that flows in. Signals are what Alfred decided those events mean. The distinction is load-bearing: a Magyar Posta delivery email is a stream event the moment it lands in Sir's inbox; it becomes a signal only after Alfred has read it and concluded "this implies Sir should pick up a package today."
+
+Signals are how Alfred bridges from observation to doing something. Every autonomous action, every needs-attention card, every auto-created task in Sir's inbox starts as a signal record.
+
+---
+
+## The everyday flow
+
+Here's a real example, the kind Sir will see most days.
+
+**9:14am.** A Magyar Posta delivery email arrives in Sir's inbox. It's been pulled in by the Gmail stream and stored as a stream event in the vault.
+
+**Within five minutes.** The signal extractor reads the event, runs it through a clerk LLM call, and decides: this is an `action` signal. Someone — Sir — needs to pick up a package today. There's no existing matter for "Magyar Posta packages," so the target is unresolved.
+
+**A new task appears in Sir's inbox.** Because the signal was actionable but had nowhere to attach, Alfred creates a fresh task: "Pick up Magyar Posta package from delivery agent." It's parented to the catch-all `inbox` matter.
+
+**Sir acts.** From the dashboard, Sir can do the task and check it off, defer it to tomorrow, re-parent it to the right matter (perhaps "Apartment logistics"), or dismiss it entirely if the email was a phishing attempt.
+
+This is the signal layer at work, end to end. Every minute of every day. Most signals are quieter than this — a lot of noise gets filtered out — but the shape is the same: read, decide, surface.
+
+---
+
+## What Alfred is watching
+
+The signal extractor currently looks at these source types:
+
+| Source | What it carries |
+|---|---|
+| **Gmail** | Inbound email — split between trusted-domain senders (high signal) and unknown senders (treated more cautiously) |
+| **Google Calendar** | New meetings, reschedules, cancellations |
+| **OMI conversations** | Ambient audio Sir's wearable captures throughout the day |
+| **OpenClaw chat** | Sir talking to Alfred directly — the highest-trust source, because it's literally Sir's instructions |
+| **Vexa transcripts** | Recorded meetings, with speaker attribution |
+| **Sure transactions** | Banking activity that might imply an obligation, an unexpected charge, a transfer to track |
+| **Plane comments** | Project tracker activity — comments on issues, status changes |
+| **Vault edits** | Sir hand-editing a record, which Alfred takes as direct intent |
+
+<Note>
+**Currently disabled:** Slack and GitHub via Composio. Both have been observed to be 100% API errors on existing tenants — the connector reports failures rather than real messages. They'll be re-enabled once a clean integration path replaces the noisy one. Until then, Alfred will not draw signals from those sources.
+</Note>
+
+---
+
+## Three things Alfred can decide
+
+For every event that survives the pre-filter, the extractor produces one of three verdicts.
+
+**`mutation`** — an existing matter or task should change. *"The Q3 contract is now signed"* updates a matter's status. *"The kitchen renovation is delayed two weeks"* updates a deadline. The vault record changes; nobody needs to do anything new.
+
+**`action`** — work needs doing. *"Reply to Sarah about the Acme proposal."* *"Pick up the package."* *"Pay this invoice by Friday."* An action signal almost always points at Sir, occasionally at Alfred himself when an instinct says he can handle it autonomously.
+
+**`none`** — this is noise. A delivery confirmation for something already received. A newsletter that slipped past the blocklist. A calendar event from six months ago. The signal still gets recorded for audit, but no downstream work happens.
+
+The split matters because mutation and action have different blast radii. A wrong mutation quietly corrupts a matter; a wrong action wastes Sir's attention. Alfred uses different confidence thresholds for each.
+
+---
+
+## The trust gradient (briefly)
+
+Alfred starts conservative. Every signal type carries a confidence prior — a baseline reliability score. A direct chat from Sir to Alfred is treated as 1.0; an ambient OMI transcript that might be Sir reading an article aloud sits closer to 0.7. Gmail from a trusted domain (Sir's accountant, his lawyer) is 1.0; Gmail from an unknown sender is 0.7.
+
+Alfred multiplies that prior by his own classifier confidence on the specific event. The combined score has to clear a threshold before he acts directly. Below the threshold, the signal lands in Sir's "needs attention" queue with the LLM's reasoning attached. Above the threshold *and* with a matching instinct, Alfred acts on his own and writes an audit record so Sir can review.
+
+For more on how that gradient evolves over time, see the [Intuition guide](/guides/intuition).
+
+---
+
+## Auto-task creation
+
+When Alfred sees a signal that clearly implies action — a delivery confirmation, an invoice, a meeting request, a follow-up due — and there's no existing task to attach the signal to, he creates one in `inbox`. The task gets a title, a description, sometimes a due date, and a pointer back to the originating signal.
+
+From there, Steward (Alfred's task specialist) picks it up like any other task. Sir can:
+
+- Re-parent it to the right matter — that re-parent is itself a learning event
+- Dismiss it if the auto-creation was wrong
+- Let it ride and work on it from the inbox view
+
+<Tip>
+**Auto-task creation is idempotent.** If the same email gets re-extracted (say, after a backfill), Alfred recognises the source event and returns the existing task rather than spawning a duplicate. Sir won't see the same package twice.
+</Tip>
+
+The LLM has explicit licence to decline. If the signal is borderline — "Sir mentioned he might want to call his sister sometime" — the extractor returns "don't create a task" and the signal lands in needs-attention for Sir's discretion instead of cluttering the inbox.
+
+---
+
+## What you see on the dashboard
+
+Three surfaces, all reachable from your dashboard sidebar.
+
+**Needs Attention** — signals that didn't clear the autonomy threshold. Each card shows what Alfred thought, why he wasn't confident enough to act, and a one-click "approve" or "dismiss." Sir's call clears the queue and feeds the calibration loop.
+
+**Recent autonomous actions** — what Alfred has done on his own in the last seven days. Every entry has an Undo button. Reversing an action is a teaching signal that ripples back into the trust gradient.
+
+**Inbox tasks** — auto-created tasks waiting to be re-parented or done. This is where the Magyar Posta package shows up.
+
+For the full dashboard tour, see [Your Dashboard](/guides/your-dashboard).
+
+---
+
+## When you should override Alfred
+
+Three correction patterns, each one tunes a different part of the system.
+
+**Wrong category.** Alfred classified an event as `action` when it was really noise. Sir dismisses the signal. The originating source's confidence prior drops by 0.1, which makes Alfred more sceptical of similar events from the same source going forward.
+
+**Wrong target.** Alfred attached the signal to the wrong matter, or auto-created a task that should have lived under an existing one. Sir re-parents it. That re-parent is recorded as a target-resolution correction and shapes how Alfred ranks targets next time.
+
+**Right but premature.** The signal was real, the action was correct, but Sir wanted to handle it personally rather than have Alfred fire off a reply. Sir clicks "I'll do it" instead of "Alfred do it." The instinct keeps its confidence on the classification, but the autonomy threshold for *that pattern* tightens.
+
+Alfred listens to "no" louder than to "yes." A single reversal moves the per-source confidence prior more than several quiet successes do — the system learns faster from frustration than from silence.
+
+---
+
+## Why it runs in the background
+
+Sir doesn't want every email to block waiting for Alfred to think. LLM extraction takes thirty to sixty seconds per event, sometimes longer for tool-using calls. Multiplied across a busy inbox, synchronous extraction would either lag the inbox or cap how much Alfred can analyse.
+
+So signal extraction is asynchronous. Stream events flow into the vault as durable records the moment they arrive. The extractor wakes up every five minutes, picks up whatever is unprocessed, and works through it in chunks. A busy day can backlog briefly; the next quiet window drains it.
+
+The practical consequence is predictable: a fresh email becomes a signal within five to ten minutes under normal load. If Alfred's been hammered (a thousand-event Gmail backfill after reconnecting an account), the queue can stretch to half an hour before it catches up. Both cases are visible from the dashboard.
+
+---
+
+## Privacy and reversibility
+
+Signals are durable. The original stream event gets purged after seven days — the inbox doesn't keep raw emails forever — but the signal record persists, with a 200-character preserved quote of what triggered it. That quote is Alfred's ground truth for any future re-evaluation.
+
+Every autonomous action gets an audit record. Every audit record has an Undo button for seven days after the action ran. Reversing an action triggers the calibration loop: the contributing signal's source confidence drops, and Alfred adjusts how he treats similar events going forward. There is no autonomous action Sir can't reach back and undo.
+
+Sir's vault, Sir's call, all the way down.
+
+---
+
+<CardGroup cols={3}>
+  <Card title="Signal Layer (architecture)" icon="diagram-project" href="/architecture/signal-layer">
+    The deep dive — workflows, pre-filter logic, calibration loop
+  </Card>
+  <Card title="Intuition" icon="brain" href="/guides/intuition">
+    How the trust gradient evolves and instincts form
+  </Card>
+  <Card title="Your Dashboard" icon="gauge" href="/guides/your-dashboard">
+    Where the needs-attention queue and audit log live
+  </Card>
+</CardGroup>

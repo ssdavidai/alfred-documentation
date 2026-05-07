@@ -1,0 +1,154 @@
+---
+title: "Meeting Capture"
+description: "How Alfred attends Sir's meetings as a transcription bot, captures the conversation, and turns it into actionable signals."
+icon: "microphone"
+---
+
+<Note>
+Meeting capture is a stream source like any other — except the stream is Sir's voice, captured live from inside the meeting itself. A bot named Alfred joins, transcribes, and leaves. The transcript flows into the signal layer alongside emails and calendar events.
+</Note>
+
+## What it does
+
+Sir has a Google Calendar entry. Up to ten minutes before it starts, Alfred notices a Google Meet link, dispatches a Vexa bot into the meeting, and lets it sit in the room as a visible attendee. The bot streams audio to Vexa's transcription pipeline; when the meeting ends, Vexa POSTs a webhook back to ctrl-api with the finished transcript. From that point on the transcript is a stream event of `source_type` `vexa`, indistinguishable from a Slack DM or an inbound email — it flows through the signal extractor and surfaces as candidate tasks, comments on matters, or updates to existing tasks.
+
+The pipeline is feature-gated. `VEXA_ENABLED` is off by default; David's tenant is the only one running it today. When the flag is unset the schedules aren't even registered (`packages/learn/scripts/register_schedules.py:585`), so a tenant without Vexa pays zero cost.
+
+## Two workflows on parallel 60s ticks
+
+Calendar polling and transcript ingestion are split into two workflows on the same task queue. One is calendar-driven, the other webhook-driven; they share no state and either can be paused independently.
+
+| Workflow | Schedule | Trigger | Output |
+|---|---|---|---|
+| `MeetingCaptureWorkflow` | every 60s (`register_schedules.py:79`) | gcal stream JSONL | `POST /bots` to Vexa |
+| `TranscriptIntakeWorkflow` | every 60s (`register_schedules.py:83`) | `streams/vexa-transcripts.jsonl` | `transcript:action_candidate` Steward signals |
+
+### MeetingCaptureWorkflow — bot dispatch
+
+Source: `packages/learn/src/workflows/meeting_capture.py`. Every 60 seconds the workflow reads the gcal stream — the same `composio-googlecalendar-events-list` JSONL that drives the Calendar surface in the dashboard — and asks `find_upcoming_meet_events` for any event where a Meet URL is detectable (via `conferenceData.entryPoints[]`, `hangoutLink`, `location`, or `description` — `transcript.py:166`), Sir is on the attendee list or is creator/organizer (`transcript.py:215`), and the start time is within the lookahead window. Cancelled events are dropped.
+
+The lookahead is **600 seconds** (`LOOKAHEAD_SECONDS = 600`, `meeting_capture.py:48`). The activity dedupes by gcal id so the same meeting won't be dispatched twice across ticks. There's also a **1800-second lateness window** (`LATENESS_SECONDS = 1800`, `meeting_capture.py:56`) — a meeting that started 25 minutes ago will still get a bot if Sir joins late and Composio's gcal poll only just delivered the event.
+
+For each qualifying meeting the workflow calls `vexa_join_meeting` (`transcript.py:253`), which POSTs to Vexa's `/bots`:
+
+```json
+{
+  "platform": "google_meet",
+  "native_meeting_id": "abc-defg-hij",
+  "bot_name": "Alfred",
+  "language": "en",
+  "task": "transcribe"
+}
+```
+
+Idempotency is triple-belted. The workflow's local `state/steward/meeting-schedules.json` records every dispatched `(platform, meeting_id)` pair. The activity short-circuits on re-dispatch within the same tick window. And Vexa itself returns the existing meeting record on a duplicate `POST /bots` — re-requesting an active meeting doesn't spawn a second bot. A 409 response is treated as success and cached locally (`transcript.py:340`).
+
+### TranscriptIntakeWorkflow — transcript fan-out
+
+Source: `packages/learn/src/workflows/transcript_intake.py`. Every 60 seconds the workflow reads `streams/vexa-transcripts.jsonl` (where the webhook handler appends every Vexa event), filters for `meeting.completed` / `transcript.complete` / `transcript.completed` (`transcript.py:1256`), and for each unprocessed entry:
+
+1. **Fetch the transcript.** If the webhook embedded `data.transcript.segments` the workflow normalises in-place; otherwise it calls `vexa_get_transcript` against `GET /transcripts/{platform}/{native_meeting_id}` (`transcript.py:410`) and assembles a flat `"<speaker>: <text>"` rendering.
+2. **Extract actions.** `extract_actions_from_transcript` (`transcript.py:758`) runs the Clerk through OpenClaw with a JSON-strict prompt producing zero or more `create_task` / `update_task` / `comment_on_matter` candidates. A malformed first response triggers a stricter retry; a malformed second response returns `[]` rather than poisoning the signal stream.
+3. **Emit one Steward signal per action.** Each candidate becomes a `transcript:action_candidate` record in `streams/steward-signals.jsonl` (`transcript.py:866`), carrying meeting metadata, the action body, the evidence speaker, and the direct quote that anchored the proposal.
+4. **Mark processed.** The cursor at `state/steward/transcript-cursor.json` records the event id (capped at 5,000 entries) so the next tick won't re-process it.
+
+Phase 4 deliberately stops at signal emission — the workflow does NOT mutate vault state, post to Plane, or create tasks itself. Phase 3's `apply_state_change` consumer picks up the signals on the next Steward tick on the relevant matter.
+
+## The Vexa stack — nine containers per tenant
+
+David's tenant runs Vexa as a self-contained pod in the same compose network as Alfred. There's no shared Vexa cluster — each tenant who flips `VEXA_ENABLED` gets their own.
+
+<AccordionGroup>
+<Accordion title="Public surface (3 containers)">
+- **`vexa-api-gateway`** — entry point. Container port 8000. All Alfred → Vexa traffic (`POST /bots`, `GET /transcripts/...`, `DELETE /bots/...`) lands here. `VEXA_API_URL` defaults to `http://vexa-api-gateway:8000` (`transcript.py:80`).
+- **`vexa-admin-api`** — operator-side: API-key provisioning, webhook configuration, tenant management.
+- **`vexa-runtime-api`** — bot lifecycle orchestration. Spawns and monitors the per-meeting bot containers.
+</Accordion>
+
+<Accordion title="Bot + transcription (2 containers)">
+- **`vexa-meeting-api`** — the dispatcher. Receives `POST /bots`, picks a platform adapter, hands off to a fresh bot container, tracks meeting state.
+- **`vexa-live-transcriber`** — audio-to-text. Streaming Whisper via Groq for low-latency transcription. Segments come back with speaker labels and timestamps.
+</Accordion>
+
+<Accordion title="Operator + storage (4 containers)">
+- **`vexa-dashboard`** — Vexa's own admin UI for inspecting meetings, transcripts, and bot health.
+- **`vexa-postgres`** — meeting metadata, bot states, transcript segments.
+- **`vexa-redis`** — bot dispatch queue + transient meeting state.
+- **`vexa-minio`** — recorded audio archive (when retention is enabled).
+</Accordion>
+</AccordionGroup>
+
+## Configuration
+
+Five env vars on the tenant. Set in `/opt/alfred/compose/.env`; the dashboard's auto-join toggle (`packages/ctrl/src/api/routes/vexa.ts`) edits this file in place.
+
+| Variable | Purpose |
+|---|---|
+| `VEXA_ENABLED` | Master gate. `true` enables the schedules + the compose vexa block; absent or `false` shuts the whole thing down. |
+| `VEXA_API_URL` | Vexa api-gateway URL. Defaults to `http://vexa-api-gateway:8000`. |
+| `VEXA_API_KEY` | Sent as `X-API-Key` on every Vexa call (`transcript.py:139`). |
+| `VEXA_WEBHOOK_SECRET` | HMAC-SHA-256 secret for verifying Vexa → ctrl-api webhooks (`webhooks/vexa.ts:228`). |
+| `VEXA_GCAL_STREAM_ID` | Override for the gcal stream slug. Defaults to `composio-googlecalendar-googlecalendar-events-list` plus older fallbacks (`transcript.py:1006`). |
+
+The dashboard exposes `GET /api/v1/admin/vexa/auto-join` and `POST /api/v1/admin/vexa/auto-join` so Sir can pause auto-join from Settings without SSH. The toggle does two things at once: persists `VEXA_ENABLED` to `.env` AND pauses the `al-meeting-capture` Temporal schedule. The schedule is paused, not deleted, so cron, args, and overlap policy survive across toggles (`vexa.ts:147`).
+
+## What the bot does in the room
+
+The bot joins as a meeting participant — not invisible. Other attendees see "Alfred" in the participant list with a tile, and the host can kick it like any other guest. It records the audio mix, streams to `vexa-live-transcriber`, and produces speaker-labelled segments live. On meeting end (or idle timeout, or manual hangup) the bot leaves cleanly; Vexa POSTs `meeting.completed` with the finished transcript. `bot_name` defaults to `"Alfred"` and is overridable per-tenant via `VEXA_BOT_DISPLAY_NAME` (`transcript.py:333`).
+
+<Tip>
+Vexa's `POST /bots` joins immediately — there is no "schedule for later" primitive in the public surface. The `MeetingCaptureWorkflow` handles timing in its own loop: the 600s lookahead means the workflow may fire ten minutes ahead of the meeting, but the bot dispatches on the first tick that catches the event. The bot ends up in the room a minute or two early, waiting for the host to admit it.
+</Tip>
+
+## Privacy, auth, and Sir's control
+
+Three layers of gating decide whether a bot ever joins:
+
+1. **Tenant-level**: `VEXA_ENABLED` must be true. A tenant who never opts in pays zero cost — schedules don't exist, the compose block is empty, the webhook secret isn't set.
+2. **Calendar-level**: Sir's email must appear in attendees, creator, or organizer (`is_sir_attendee`, `transcript.py:215`). A meeting Sir was BCC'd on never gets a bot.
+3. **Schedule-level**: pausing the `al-meeting-capture` Temporal schedule from the dashboard stops bot dispatch immediately without touching the env file.
+
+The webhook back from Vexa is HMAC-verified before any disk write. The signing scheme is `<unix-timestamp>.<raw-body>` keyed on `VEXA_WEBHOOK_SECRET`, with a 5-minute replay-protection window (`webhooks/vexa.ts:115`). A failed signature 401s and never touches the JSONL.
+
+## The stream event
+
+Once a transcript lands it's a vault `stream_event/` record like any other — `vexa` is in `PRE_FILTER_ALLOWLIST` (`signals.py:74`), the same set that contains `gmail`, `slack`, `omi`, `openclaw-chat`, `sure`, `gcal`, `plane`, and `vault_edit`. Source types not in this list are rejected before any LLM cost.
+
+The frontmatter carries meeting metadata: platform (`google_meet`), `native_meeting_id`, `gcal_event_id`, `scheduled_start`, attendee emails, Vexa's internal meeting id. The body is the rendered transcript — one line per segment as `<speaker>: <text>`, ordered by start time, ready for LLM consumption without further parsing.
+
+## Downstream signal extraction
+
+Vexa transcripts get a per-source confidence prior of **0.85** (`SOURCE_TYPE_CONFIDENCE_PRIORS["vexa"] = 0.85`, `signals.py:247`). Higher than ambient audio (`omi` at 0.7) — Vexa transcripts are captured during meetings Sir agreed to, not opportunistic background noise — but lower than direct openclaw chat (1.0) or vault edits (0.95), because speaker attribution and Whisper transcription are both probabilistic.
+
+Long meetings produce many candidate signals. A 90-minute strategy session might mention three invoices, two decisions, and half a dozen action items across multiple matters. Each becomes a separate `transcript:action_candidate` signal carrying its own evidence quote. The transcript-extractor caps output at 30 candidates per transcript (`transcript.py:538`) — a runaway 4-hour standup truncates rather than producing a hundred low-value signals.
+
+The signal layer routes from there: the matter slug on each candidate steers it to the right Steward loop, the confidence score (multiplied by the 0.85 prior) decides whether it lands as auto-applied or pending-confirmation, and the evidence quote shows up in the dashboard so Sir can see exactly why Alfred thought a task should be created.
+
+## Failure modes
+
+<AccordionGroup>
+<Accordion title="Bot fails to join">
+The Meet link expired, the host requires explicit admission and didn't admit, or the meeting never happened. `vexa_join_meeting` succeeds (Vexa accepted the dispatch); the bot just never sits in the room. No `meeting.completed` webhook fires, no signal is emitted. The 60s polling cadence is the natural retry boundary.
+</Accordion>
+
+<Accordion title="Transcription quality drops">
+Multiple speakers on one mic, background noise, non-English mid-conversation. Whisper still produces output but with degraded speaker labels. The 0.85 source prior already discounts this; the per-action `confidence` from the LLM extractor further discounts ambiguous evidence, and Phase 3's apply path treats anything under 0.6 as `pending_confirmation`.
+</Accordion>
+
+<Accordion title="Webhook drop">
+Vexa retries on non-2xx, but a sustained ctrl-api outage during the post-meeting window can drop a webhook. The transcript still exists in Vexa's postgres; `GET /transcripts/{platform}/{native_meeting_id}` always returns the latest version. Manual recovery: append a synthetic `meeting.completed` record to `streams/vexa-transcripts.jsonl`.
+</Accordion>
+
+<Accordion title="Clerk extraction wedged">
+The extractor uses a 10-minute activity timeout (`transcript_intake.py:253`). On a malformed first response a stricter retry runs; a malformed second response marks the event processed with zero signals. Temporal won't retry on JSON-validation failures (`maximum_attempts=1`), so a single Clerk wedge doesn't tie up a 60s tick.
+</Accordion>
+</AccordionGroup>
+
+<CardGroup cols={2}>
+  <Card title="Data layer" icon="wave-pulse" href="/architecture/data">
+    The StreamEvent envelope, the JSONL store, and the two pipelines (template vs Curator).
+  </Card>
+  <Card title="Channels" icon="messages-question" href="/architecture/channels">
+    Authorized inbound conversations vs stream events — meeting capture is a stream-side path.
+  </Card>
+</CardGroup>

@@ -93,7 +93,11 @@ That's six independent passes producing a tightly cross-referenced piece of vaul
 
 When Sir routes something — moves an inbox item to a matter, files an email under a project, dismisses a triage as noise — Alfred takes notice. Over time, those notices become instincts; once instincts are confident enough, Alfred starts handling the routine cases himself.
 
-Three workflows in `alfred-learn` make it work, all on a fifteen-minute interval (`packages/learn/scripts/register_schedules.py`).
+Three workflows in `alfred-learn` make it work, each on its own cadence (`packages/learn/scripts/register_schedules.py`): Learning every fifteen minutes, Judgment every fifteen minutes, and Reflection once a day at 02:00 tenant-local.
+
+<Note>
+Distilled knowledge (decisions, assumptions, constraints) and intuition (instincts, observations) feed Alfred's downstream awareness. See [Signal layer](/architecture/signal-layer) for how those records become the per-matter perception loop.
+</Note>
 
 ### Learning — observation capture
 

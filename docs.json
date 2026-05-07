@@ -48,6 +48,11 @@
               "architecture/data",
               "architecture/semantic",
               "architecture/kinetic",
+              "architecture/signal-layer",
+              "architecture/steward",
+              "architecture/plane-integration",
+              "architecture/meeting-capture",
+              "architecture/prime-federation",
               "architecture/interface",
               "architecture/channels"
             ]
@@ -70,24 +75,31 @@
               "guides/your-ai-agents",
               "guides/connected-apps",
               "guides/streams-and-integrations",
+              "guides/plane-tracker",
               "guides/using-the-inbox",
+              "guides/understanding-signals",
+              "guides/your-matters-and-stewards",
               "guides/email-channel",
               "guides/voice-channel",
+              "guides/meeting-capture",
               "guides/sms-channel",
               "guides/device-pairing",
               "guides/intuition",
               "guides/recipes",
               "guides/monitoring",
               "guides/security",
+              "guides/vaultwarden",
               "guides/api-keys",
               "guides/how-the-api-works",
-              "guides/billing"
+              "guides/billing",
+              "guides/operator-runbook"
             ]
           },
           {
             "group": "Reference",
             "pages": [
-              "reference/faq"
+              "reference/faq",
+              "reference/sidecar-state"
             ]
           }
         ]

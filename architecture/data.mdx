@@ -14,7 +14,7 @@ Sir doesn't manually file his life into Alfred. Connected apps, inbound emails, 
 
 | Path | What's in it | LLM calls |
 |---|---|---|
-| Stream events (Composio, webhooks, scheduled pulls) | Calendar events, emails, GitHub PRs, Slack messages, Notion pages, payments, Telegram messages, voice-call transcripts | Zero per event; one per ~200 events per hour |
+| Stream events (webhooks, direct Composio actions, scheduled pulls) | Calendar events, emails, GitHub PRs, Slack messages, Notion pages, payments, Telegram messages, voice-call transcripts, Plane issues, Vexa transcripts | Zero per event; one per ~200 events per hour |
 | Manual inbox uploads | Meeting notes, PDFs, transcribed audio, files dropped through the dashboard | Curator's 4-stage pipeline (1 + N entity calls per file) |
 | Channel inbound (authorized senders) | Email, SMS, Slack, voice from people Sir has authorized | Full conversational turn |
 | Channel inbound (everyone else) | Same channels, unauthorized senders | Same as stream events — zero on arrival |
@@ -49,13 +49,17 @@ Every event from every source — Composio, webhook, scheduled pull, channel ing
 
 The JSONL files are the source of truth — there's no shadow database. Stream event counts on the dashboard are computed by reading the files.
 
+<Note>
+Once a stream event has been processed by the signal extractor, downstream reasoning works against the resulting `signal/` records — see [Signal layer](/architecture/signal-layer) for the next-stage processing and the lifetime guarantee on signals.
+</Note>
+
 ## How events arrive
 
 There are five doors into the JSONL.
 
 <AccordionGroup>
-<Accordion title="Composio (1,000+ apps)" icon="puzzle-piece">
-The primary path. When Sir connects an app via OAuth on the Apps page, the `POST /api/v1/integrations/connect` endpoint registers the OAuth credential with Composio's vault, then auto-creates a stream backed by a Composio action (`packages/ctrl/src/api/routes/integrations.ts`). On the schedule, `StreamPullerWorkflow` calls the Composio SDK, gets back fresh items, and pushes each into `/api/v1/streams/ingest`.
+<Accordion title="Composio stream pullers (1,000+ apps, fallback path)" icon="puzzle-piece">
+The historical primary path, now a fallback. When Sir connects an app via OAuth on the Apps page, the `POST /api/v1/integrations/connect` endpoint registers the OAuth credential with Composio's vault, then auto-creates a stream backed by a Composio action (`packages/ctrl/src/api/routes/integrations.ts`). On the schedule, `StreamPullerWorkflow` calls the Composio SDK, gets back fresh items, and pushes each into `/api/v1/streams/ingest`.
 
 | Source | Action | Sync mode | Cadence |
 |---|---|---|---|
@@ -66,6 +70,8 @@ The primary path. When Sir connects an app via OAuth on the Apps page, the `POST
 | Slack, Linear, Stripe, Asana, Todoist, Drive, Zoom, ... | varies | varies | varies |
 
 A 410 Gone from Composio (sync token expired) triggers a sync reset and full backfill on the next run. Credentials never touch Sir's VPS — Composio holds them.
+
+Stream pullers exist for sources without webhook support, but webhooks (Plane, Vexa, GitHub, Stripe, Polar) and direct Composio actions invoked by the agent are the primary modern paths. On david specifically, all 7 composio stream pullers are paused — superseded by direct integrations and webhook receivers. Composio remains in use for outbound actions; see the **Connected Apps and the Composio gateway** section below.
 </Accordion>
 
 <Accordion title="Scheduled HTTP pull" icon="clock">
@@ -87,7 +93,7 @@ Files dropped onto the dashboard's Inbox page or POSTed to `/api/v1/vault/inbox`
 
 ## The two pipelines
 
-Once an event lands in the JSONL, `EventProcessorWorkflow` picks it up every two minutes (`packages/learn/src/workflows/event_processor.py`) and dispatches based on `stream_type`:
+Once an event lands in the JSONL, `EventProcessorWorkflow` picks it up every fifteen minutes (`packages/learn/src/workflows/event_processor.py`, registered in `packages/learn/scripts/register_schedules.py`) and dispatches based on `stream_type`:
 
 ```mermaid
 graph LR
@@ -95,7 +101,7 @@ graph LR
     B -->|media| MEDIA[MediaIngestionWorkflow]
     B -->|system / inbox-upload| INBOX[Curator pipeline]
     B -->|tier3 noise| DROP[Discarded]
-    B -->|everything else| TPL[Python template → vault event/ record]
+    B -->|everything else| TPL[Python template → vault stream_event/ record]
     TPL --> ENRICH[HourlyEnrichmentWorkflow]
     INBOX --> NOTE[note/ + person/ + org/ records]
     ENRICH --> ENRICHED[entities + tags + matter links + action items]
@@ -103,7 +109,7 @@ graph LR
 
 **Manual uploads** go through the Curator's full 4-stage pipeline — see [Agent](/architecture/agent#curator). They produce a richly cross-linked `note/` record plus any new `person/` and `org/` records.
 
-**Stream events** (calendar, email, GitHub, Slack, Notion, payment, SMS, voice-call) take the zero-LLM path. `stream_vault.py` dispatches the event to a per-source Python template:
+**Stream events** (calendar, email, GitHub, Slack, Notion, payment, SMS, voice-call, openclaw chat, Omi, Vexa, Plane) take the zero-LLM path. `stream_vault.py` dispatches the event to a per-source Python template:
 
 | `stream_type` / `event_type` | Template |
 |---|---|
@@ -117,7 +123,25 @@ graph LR
 | `voice-call` | `_template_voice_call` |
 | anything else | `_template_generic` |
 
-Each template returns a `(name, body, tags)` tuple. The result is written as a vault `event/` record with `enrichment_status: pending` in its frontmatter. Total cost: zero LLM calls, a few milliseconds per event.
+Each template returns a `(name, body, tags)` tuple. The result is written as a vault `stream_event/` record with `enrichment_status: pending` and `signal_extracted_at: null` in its frontmatter (`packages/learn/src/activities/stream_vault.py`). Total cost: zero LLM calls, a few milliseconds per event.
+
+<Note>
+**Path unification (T6.6.1).** All NEW stream events land in `vault/stream_event/<source>-<date>-<hash>.md`. The legacy split — `vault/event/<src>-<ts>-<hash>.md` for most templates and `vault/conversation/<...>.md` for Omi / voice-call / openclaw-chat — is deprecated. Pre-T6.6 records were relocated by `packages/learn/scripts/migrate_to_stream_event.py`.
+
+The `vault/event/` directory is **not** empty — it still holds steward audit records (`steward-action-*.md`, `signal-action-*.md`, `auto-task-created-*.md`) emitted by the steward, signal-action, and task-creation code paths. Those are deliberately not stream events; they're decision audit trail and live forever.
+</Note>
+
+### Stream-event retention and purge
+
+Stream-event records are ephemeral. Their job is to feed the signal extractor; once extraction succeeds the relevant `raw_quote` is preserved on the resulting `signal/` record (see [Signal layer](/architecture/signal-layer)), so the source event is then redundant after a 7-day grace window.
+
+`StreamEventPurgeWorkflow` (`packages/learn/src/workflows/stream_event_purge.py`) runs daily at 03:00 UTC via the `al-stream-event-purge` schedule. Each tick:
+
+1. Lists `stream_event/*.md` via ctrl-api.
+2. Deletes any record where `frontmatter.signal_extracted_at` is set AND `frontmatter.created` is older than 7 days.
+3. Counts listed / purged / kept / errors and surfaces them in the Temporal UI.
+
+Records under `event/` and `conversation/` are **never** touched by this workflow. Signal records (`signal/*.md`) are **never** purged — they are the permanent audit trail for routing decisions. The purge is gated on `STEWARD_STREAM_EVENT_PURGE_ENABLED=true` at registration time; david-only at T6.6.4, fleet rollout post-Phase-6.7.
 
 ## Hourly enrichment — one call for ~200 records
 
@@ -131,7 +155,7 @@ Every hour, `HourlyEnrichmentWorkflow` (`packages/learn/src/workflows/hourly_enr
 Net effect: a tenant doing 800+ stream events a day gets one LLM batch call per hour instead of one per event. Roughly 97% fewer model calls than the previous per-event flow, with the same downstream entity coverage.
 
 <Tip>
-The two-minute event-processor tick and the one-hour enrichment tick are deliberate. New events show up in the vault and the dashboard within a couple of minutes, so the agent can answer "what just happened?". Enrichment fills in the entities and tags within the hour, so the agent can answer "who's involved?" by the next time Sir asks.
+The fifteen-minute event-processor tick and the one-hour enrichment tick are deliberate. New events show up in the vault and the dashboard within the quarter-hour, so the agent can answer "what just happened?" without paying per-event LLM cost. Enrichment fills in the entities and tags within the hour, so the agent can answer "who's involved?" by the next time Sir asks.
 </Tip>
 
 ## Connected Apps and the Composio gateway
@@ -148,7 +172,7 @@ Composio is the system that lets Alfred both read from and write to 1,000+ third
 The same data plane handles inbound conversations from Slack, email, SMS, voice, and Telegram. The split is whether the sender is on Sir's authorized list:
 
 - **Authorized senders** (in `/vault/.auth/authorized_senders.json` for email, `/mnt/encrypted/alfred/.authorized-phone-numbers.json` for SMS/voice) get the full channel path: a one-shot openclaw session is spawned with the message preloaded, the agent reads, reasons, and replies on the same channel.
-- **Anyone else** is dropped into the same stream pipeline as everything else: a vault `event/` record via the email/sms/voice-call template, picked up by hourly enrichment, no reply.
+- **Anyone else** is dropped into the same stream pipeline as everything else: a vault `stream_event/` record via the email/sms/voice-call template, picked up by hourly enrichment, no reply.
 
 This is what makes inbound traffic safe to leave open — random senders can't trigger LLM turns or reach Sir's vault. They show up as events; the agent only thinks when Sir wants it to. See [Channels](/architecture/channels) for the full dispatch.
 
@@ -164,6 +188,9 @@ This is what makes inbound traffic safe to leave open — random senders can't t
 Webhook streams additionally show their unique URL and HMAC secret. Composio streams show their toolkit slug and the action they're polling.
 
 <CardGroup cols={2}>
+  <Card title="Signal layer" icon="signal-stream" href="/architecture/signal-layer">
+    What happens after the stream event lands: extraction, routing, and the permanent signal record.
+  </Card>
   <Card title="Semantic layer" icon="brain" href="/architecture/semantic">
     What happens once records exist: embeddings, clustering, learning.
   </Card>

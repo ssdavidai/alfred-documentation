@@ -1,0 +1,355 @@
+---
+title: "Operator Runbook"
+description: "Day-to-day operations: provisioning, monitoring, common interventions, and recovering from common failure modes."
+icon: "wrench"
+---
+
+This is the operator's bench manual — the page you keep open in a tab when something is on fire and you need the exact command. It assumes you have `aas` (the ctrl CLI) on your laptop, the per-instance SSH keys in `data/ssh_keys/`, and Tailscale up.
+
+## Pre-flight: shape of the system
+
+One SaaS host, many tenant VPSes, all tied together by a Tailscale tailnet.
+
+| Plane | What runs there | How you reach it |
+|---|---|---|
+| **SaaS host** | Wasp app at `alfred.black`, ctrl-api (SaaS-side), Caddy, Plausible, ClickHouse | SSH (key in 1Password) + browser |
+| **Tenant VPS** | Hetzner cx53, ~12 long-running containers (mid-30s with sidecars), per-instance LUKS volume | `aas ssh <name>`, `aas run <name> '<cmd>'`, or via Tailscale `https://<tailscale-hostname>:8233` |
+
+Two background loops you should know are running on every tenant before you do anything else:
+
+- **`alfred-update.timer`** — fires every 15 minutes, `docker compose pull && docker compose up -d`. New images on DockerHub roll out fleet-wide within the quarter-hour. You almost never need to push images by hand.
+- **`alfred-backup.timer`** — fires daily at 03:00 host-local. Runs `restic backup /mnt/encrypted` (LUKS volume, mounted) to Hetzner Object Storage with the Restic password from `/opt/alfred/restic.env`. Retention is 7 daily / 4 weekly / 6 monthly.
+
+Tenant network model: the only public ingress is via Tailscale Serve (TLS-terminated by Tailscale, not Caddy or Nginx). The Hetzner firewall denies everything except SSH (22/tcp), ICMP, and Tailscale's WireGuard handshake (41641/udp). All Alfred services bind to `127.0.0.1`. [Infrastructure](/architecture/infrastructure) has the full picture.
+
+---
+
+## Provisioning a new tenant
+
+End-to-end provisioning takes 3 minutes from the golden snapshot, 18–20 minutes from a clean cloud-init build. Two paths:
+
+### Path A — SaaS dashboard (preferred)
+
+The Polar webhook auto-provisions a tenant when a subscriber checks out. To trigger by hand (manual sale, comp account, or replay after a failed checkout), open the SaaS admin page and use **Provision New User** — backed by the `instanceOperations` action that creates a `ProvisioningJob` and hands it to the SaaS-side ctrl runner.
+
+### Path B — ctrl CLI
+
+```bash
+cd packages/ctrl
+npm run dev          # interactive TUI
+# or:
+node dist/index.mjs provision <name> --type cx53 --location fsn1 --snapshot auto
+```
+
+`--snapshot auto` resolves to the latest golden snapshot and shaves provisioning down to ~3 minutes. Without it, cloud-init runs from scratch.
+
+The TUI's Provision flow walks the same numbered steps as `provisioner.ts`:
+
+<Steps>
+  <Step title="Generate keypair">Ed25519, stored under `data/ssh_keys/<id>/`. Never reused.</Step>
+  <Step title="Hetzner: SSH key + firewall + volume + server">Shared firewall labelled `managed-by: alfred-ctrl` allows only SSH and ICMP.</Step>
+  <Step title="Cloud-init">LUKS2 format, fail2ban, UFW, Docker, Tailscale, `alfred-update.timer`, `alfred-backup.timer`.</Step>
+  <Step title="Upload secrets via SSH">`.env` is SFTP'd post-boot — never via cloud-init `user_data` (readable through Hetzner metadata).</Step>
+  <Step title="Render + start docker-compose">`init` scaffolds the vault, `openclaw` and `openclaw-workers` boot, then `alfred` and `alfred-learn`.</Step>
+  <Step title="Tailscale + Cloudflare Tunnel">Joins the tailnet, registers DNS records.</Step>
+  <Step title="Backup LUKS key, run health check">Keyfile lands in `data/ssh_keys/<id>/luks.key`. First health probe must come back green before the row flips to `running`.</Step>
+</Steps>
+
+If a step fails, the row stays in `provisioning` or flips to `error`. Re-running with the same name is safe — the provisioner is idempotent against existing Hetzner resources matching the label.
+
+---
+
+## Monitoring health
+
+Three layers, used in this order:
+
+### 1. Fleet view (laptop)
+
+```bash
+aas list                                       # one-line per instance + last_health_status
+aas health                                     # run health probes across all running tenants
+aas health <name>                              # SSH the tenant and run /opt/alfred/healthcheck.sh
+```
+
+In the TUI (`npm start`), the dashboard screen shows the same grid with green/yellow/red status pills.
+
+### 2. Per-tenant API (from the SaaS host)
+
+The combined dashboard endpoint returns containers + service health + vault stats in one shot:
+
+```bash
+curl -s "$ALFRED_API_BASE/api/v1/admin/dashboard" \
+  -H "Authorization: Bearer $ALFRED_API_KEY" | jq
+```
+
+Drill-downs: `GET /api/v1/admin/containers`, `GET /api/v1/admin/system/info` (CPU/mem/disk), `GET /api/v1/workers/status`, `GET /api/v1/workflows`, `GET /api/v1/schedules`. See [Monitoring](/guides/monitoring) for the full table.
+
+### 3. On-box (SSH)
+
+```bash
+aas ssh <name>
+docker ps                                      # what's actually running
+docker stats --no-stream                       # who's eating memory
+systemctl status alfred-update.timer           # next-fire + last-run
+systemctl status alfred-backup.timer
+journalctl -u alfred-update.service --since '1h ago'
+docker compose -f /opt/alfred/compose/docker-compose.yaml logs --tail 200 <service>
+```
+
+The Temporal UI is on port 8233 (localhost on the box; reachable through Tailscale at `https://<tailscale-hostname>:8233`). `aas temporal-ui <name> --open` opens it for you.
+
+---
+
+## Common interventions
+
+Everything below assumes you've identified the tenant. `<name>` is the customer name in `aas list`.
+
+### Restart a stuck workflow
+
+```bash
+aas run <name> "docker compose -f /opt/alfred/compose/docker-compose.yaml \
+  exec -T temporal temporal workflow terminate \
+  --workflow-id <workflow_id> --reason 'stuck'"
+
+# Then trigger a fresh run from the schedule:
+aas run <name> "docker compose -f /opt/alfred/compose/docker-compose.yaml \
+  exec -T temporal temporal schedule trigger --schedule-id <schedule_id>"
+```
+
+Or via the API: `POST /api/v1/workflows/<wfId>/terminate`, then `POST /api/v1/schedules/<schId>/trigger`.
+
+### Pause/unpause a schedule
+
+```bash
+# Pause
+curl -s -X POST "$ALFRED_API_BASE/api/v1/schedules/<id>/pause" \
+  -H "Authorization: Bearer $ALFRED_API_KEY" | jq
+
+# Unpause
+curl -s -X POST "$ALFRED_API_BASE/api/v1/schedules/<id>/unpause" \
+  -H "Authorization: Bearer $ALFRED_API_KEY" | jq
+```
+
+CLI equivalent on-box: `temporal schedule toggle --schedule-id <id> --pause` / `--unpause`.
+
+### Restart a container
+
+```bash
+aas run <name> "docker compose -f /opt/alfred/compose/docker-compose.yaml restart <service>"
+```
+
+Or `POST /api/v1/admin/containers/:service/restart`. Restarting `openclaw` or `ctrl-api` from the API requires the `X-Confirm-Self-Restart: yes` header — this is the guardrail that keeps an agent from killing its own session.
+
+### Force the 15-minute pull early
+
+```bash
+aas run <name> "sudo systemctl start alfred-update.service"
+```
+
+Pulls fresh images and recreates any drifted containers. Same effect as waiting for the next timer fire.
+
+### Clear a sidecar cursor
+
+When a stream pull cursor or sync cursor is stuck on a bad event and re-trying it forever, drop the cursor file to force a full rescan. See [Sidecar State](/reference/sidecar-state) for the full file inventory and atomic-rename pattern. Quick reference for the Plane sync cursor:
+
+```bash
+aas run <name> "sudo rm /mnt/encrypted/alfred/state/plane_sync_cursor.json"
+aas run <name> "docker compose -f /opt/alfred/compose/docker-compose.yaml \
+  exec -T temporal temporal schedule trigger --schedule-id al-plane-sync"
+```
+
+### Restart `alfred-learn` (chore reload, etc.)
+
+```bash
+curl -s -X POST "$ALFRED_API_BASE/api/v1/admin/restart-learn" \
+  -H "Authorization: Bearer $ALFRED_API_KEY" | jq
+```
+
+Rate-limited to one restart per 30 seconds. Returns `ready_after_seconds` so you know when it's back.
+
+---
+
+## Failure modes
+
+The recurring ones we've actually hit, with triage steps.
+
+<AccordionGroup>
+
+<Accordion title="Stream pull producing 13 MB results (Composio gmail)" icon="circle-exclamation">
+Composio `composio_pull` for Gmail with full HTML bodies has been observed to return >4 MB activity results, blowing past Temporal's gRPC frame limit. Downstream effect: the activity completes from Composio's side but Temporal can't ingest the result, the worker retries and chokes, and `signal_extract` activities behind it time out.
+
+**Symptoms:**
+- `composio_pull` activities in `RetryState_Unspecified` for minutes
+- `grpc: received message larger than max` in `alfred-learn` logs
+- inbox count stops growing on a tenant whose other streams still flow
+
+**Fix:**
+1. Pause the Gmail stream puller schedule:
+   ```bash
+   curl -s -X POST "$ALFRED_API_BASE/api/v1/schedules/<gmail-stream-schedule-id>/pause" \
+     -H "Authorization: Bearer $ALFRED_API_KEY"
+   ```
+2. Terminate any in-flight `StreamPullerWorkflow` for that stream.
+3. Cap the result size at the activity boundary (current workaround is per-tenant config; longer-term fix lives in `packages/learn/src/activities/composio_pull.py`).
+4. Unpause once the cap is in place.
+</Accordion>
+
+<Accordion title="signal_extract not draining" icon="circle-exclamation">
+Sidecar count flat for hours, `extract_failed Activity task timed out` in logs.
+
+**Common causes:**
+1. Composio pull starvation (above) — a hot stream is holding the worker.
+2. Grok timeout — the LLM call inside `signal_extract` exceeded its activity heartbeat budget.
+3. Worker activation lag — `alfred-learn` recently restarted and Temporal is replaying history.
+
+**Triage:**
+```bash
+aas run <name> "docker logs --tail 200 compose-alfred-learn-1 | grep -E 'signal_extract|extract_failed'"
+aas run <name> "docker compose -f /opt/alfred/compose/docker-compose.yaml \
+  exec -T temporal temporal task-queue describe --task-queue alfred-learn --output json" | jq
+```
+
+If the task queue shows zero pollers, restart `alfred-learn`. If pollers are present but extract activities keep timing out, the upstream LLM is the culprit — switch the model in `openclaw.json` (via `PATCH /api/v1/admin/config/openclaw`) and let the next tick recover.
+</Accordion>
+
+<Accordion title="Plane out of sync" icon="circle-exclamation">
+Tasks created in vault don't show up in Plane, or vice versa.
+
+**Triage:**
+```bash
+# Force an immediate sync
+curl -s -X POST "$ALFRED_API_BASE/api/v1/schedules/al-plane-sync/trigger" \
+  -H "Authorization: Bearer $ALFRED_API_KEY"
+
+# Inspect the cursor
+aas run <name> "sudo cat /mnt/encrypted/alfred/state/plane_sync_cursor.json | jq ."
+```
+
+If a single nudge doesn't unstick it, drop the cursor and force a full rescan:
+
+```bash
+aas run <name> "sudo rm /mnt/encrypted/alfred/state/plane_sync_cursor.json"
+curl -s -X POST "$ALFRED_API_BASE/api/v1/schedules/al-plane-sync/trigger" \
+  -H "Authorization: Bearer $ALFRED_API_KEY"
+```
+
+The next forward sync re-walks the vault and re-adopts existing Plane issues by hash. See [Plane Integration](/architecture/plane-integration) for the cursor schema.
+</Accordion>
+
+<Accordion title="Vexa bot not joining meetings" icon="circle-exclamation">
+Sir books a Meet, the bot doesn't show up.
+
+**Three causes, in order of probability:**
+1. `VEXA_ENABLED=false` (default off — david-only flag). Check `/api/v1/admin/config/env`.
+2. Google Calendar stream disabled or paused. Check the streams list — without a live gcal stream, `meeting_capture` has nothing to schedule from.
+3. Sir's Google Calendar OAuth token expired. The Connected Apps page on the dashboard shows the connection state.
+
+**Triage:**
+```bash
+aas run <name> "docker logs --tail 500 compose-alfred-learn-1 | grep meeting_capture"
+```
+
+`meeting_capture.no_events lookahead=...` means it's running but found nothing to dispatch. `meeting_capture.skip_malformed gcal=...` means events are coming through but missing a Meet link. `meeting_capture.dispatch_failed` means it tried and Vexa rejected — check the `vexa-api-gateway` logs.
+</Accordion>
+
+<Accordion title="Workflow stuck in 'Running' forever" icon="circle-exclamation">
+The classic non-determinism error: a recent code change renamed an activity, reordered logic, or changed a workflow signature without `workflow.patched()`. In-flight workflows started under the old code hit `NonDeterministicError` on replay and stall.
+
+**Symptoms:**
+- Workflow History stops advancing mid-run
+- `alfred-learn` logs contain `NonDeterministicError`
+- Schedules tied to that workflow start to back up
+
+**Fix:**
+```bash
+aas run <name> "docker compose -f /opt/alfred/compose/docker-compose.yaml \
+  exec -T temporal temporal workflow terminate \
+  --workflow-id <stuck-id> --reason 'non-determinism post-deploy'"
+```
+
+Temporal will spawn a fresh run from the schedule on the next tick. This was burned into us during the PR #628 incident (paginate `plane_sync.fetch_changed_tasks` renamed activities and rewrote logic without a patch). The protocol for safe workflow rewrites lives at `packages/learn/CLAUDE.md` — read it before merging anything that touches `packages/learn/src/workflows/**` or `packages/learn/src/activities/**`.
+</Accordion>
+
+</AccordionGroup>
+
+---
+
+## Backups + recovery
+
+`alfred-backup.timer` runs `restic backup /mnt/encrypted` daily at 03:00 host-local. Destination is Hetzner Object Storage; credentials are in `/opt/alfred/restic.env` on the box and mirrored to `data/ssh_keys/<id>/restic.env` on the operator's laptop.
+
+```bash
+# List snapshots (via the API)
+curl -s "$ALFRED_API_BASE/api/v1/admin/backups/snapshots" \
+  -H "Authorization: Bearer $ALFRED_API_KEY" | jq
+
+# Trigger an out-of-band backup
+curl -s -X POST "$ALFRED_API_BASE/api/v1/admin/backups/trigger" \
+  -H "Authorization: Bearer $ALFRED_API_KEY"
+```
+
+On-box restic invocation (verify with `npm start` for the current ctrl recovery flow before relying on a single command):
+
+```bash
+ssh <tenant>
+sudo bash -c 'set -a && source /opt/alfred/restic.env && restic snapshots'
+sudo bash -c 'set -a && source /opt/alfred/restic.env && restic restore <snapshot-id> --target /tmp/restore'
+```
+
+Full-instance restore: provision a fresh tenant, attach the LUKS keyfile from `data/ssh_keys/<old-id>/luks.key`, and restic-restore `/mnt/encrypted` from the most recent good snapshot. Even if Hetzner loses the disk entirely, the keyfile + restic snapshot is enough to reconstruct.
+
+---
+
+## Image rollback
+
+Every healthy run records the current image digests. If a fresh `:latest` tag regresses, the ctrl CLI tracks the last-healthy SHA per tenant and can roll back:
+
+```bash
+aas rollback <name>                    # to last-healthy SHA
+aas rollback <name> --sha <sha>        # to a specific SHA
+```
+
+Manual fallback if `aas rollback` doesn't fit the situation: SSH to the tenant, pin the image tag in `/opt/alfred/compose/.env` (e.g. `OPENCLAW_IMAGE_TAG=sha-<digest>`), and trigger an update:
+
+```bash
+aas ssh <name>
+sudo systemctl start alfred-update.service
+```
+
+---
+
+## Cross-tenant audit (FleetAuditWorkflow)
+
+Runs daily at 02:00 UTC. Walks every tenant's stream metadata looking for cross-tenant contamination — events that landed in the wrong tenant's vault, or connections that resolve to a different `COMPOSIO_USER_ID` than expected. Findings surface in the Daily Digest.
+
+Disable per-tenant if it's noisy or you're investigating: set `FLEET_AUDIT_ENABLED=false` in `.env` (`PATCH /api/v1/admin/config/env`) and restart `alfred-learn`. The schedule registrar removes the `al-fleet-audit` schedule on next worker boot when the flag is off.
+
+---
+
+## When to escalate
+
+One tenant's broken — that's a weekday. The list below is when you stop and call:
+
+- **Fleet-wide image regression.** Multiple tenants flip yellow/red within minutes of each other after a deploy. Roll the image back across the fleet (`aas rollback --all` if available, otherwise loop over `aas list --status running`) and only then dig in.
+- **Composio outage.** Every tenant's Composio-backed streams and `composio_execute` calls fail simultaneously. Check `status.composio.dev`. There is nothing to fix on our side — pause hot stream pullers to stop hammering the API and wait it out.
+- **Hetzner API outage.** `aas list --status running` works (DB is local), but `aas health`, provisioning, or volume operations all 5xx. Check `status.hetzner.com`. No mitigation other than back off and try later.
+- **Tailscale tailnet partition.** SaaS proxy returns 502 for every tenant; SSH still works. Check `status.tailscale.com` and the tailnet admin console — a key rotation or ACL change can knock the whole proxy path out.
+
+For all four: post in the ops channel before improvising. The first instinct on the second incident is always to push a fix; the right move is usually to wait for the upstream signal and revert on our side.
+
+---
+
+<CardGroup cols={2}>
+  <Card title="Monitoring" icon="activity" href="/guides/monitoring">
+    Every endpoint and dashboard tab the runbook references
+  </Card>
+  <Card title="Security" icon="shield-check" href="/guides/security">
+    Network model, encryption, and the isolation invariants
+  </Card>
+  <Card title="Infrastructure" icon="server" href="/architecture/infrastructure">
+    The full provisioning order and Docker stack
+  </Card>
+  <Card title="Sidecar State" icon="database" href="/reference/sidecar-state">
+    Cursor files, atomic-rename pattern, and recovery
+  </Card>
+</CardGroup>

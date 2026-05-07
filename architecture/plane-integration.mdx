@@ -1,0 +1,156 @@
+---
+title: "Plane Integration"
+description: "Two-way sync between vault tasks and Plane issues — how Alfred keeps Sir's project tracker in sync with the vault."
+icon: "diagram-project"
+---
+
+<Note>
+Vault is the source of truth. Plane is a live mirror, not a second store. Every flow in this page exists to keep that relationship intact under both Sir's edits and Alfred's writes.
+</Note>
+
+## Why Plane
+
+Alfred's vault is excellent storage and lousy chrome. A Markdown directory doesn't give Sir a kanban or a card he can drag from "todo" to "done" with a thumb. So every tenant runs [Plane](https://plane.so) — open-source, self-hosted, no shared SaaS — as an eleven-container stack alongside `alfred-learn`, `alfred`, `temporal`, and `openclaw` (`plane-api`, `plane-web`, `plane-admin`, `plane-space`, `plane-live`, `plane-proxy`, `plane-worker`, `plane-beat`, `plane-db`, `plane-mq`, `plane-redis`, `plane-minio`). All bind to localhost and reach Sir's browser through the SaaS proxy.
+
+The vault stays canonical. A task is a `task/<slug>.md` with frontmatter; the Plane issue is a projection. When Sir flips a card to "Done" in Plane, the change rides a webhook back to the vault, and the next forward-sync sees them agree and writes nothing.
+
+## The four workflows
+
+All four live in `packages/learn/src/workflows/`, run on the `alfred-learn` Temporal task queue, and share one feature flag.
+
+| Workflow | Trigger | Source |
+|---|---|---|
+| `PlaneSyncWorkflow` | every 15 s, `SKIP` overlap | `plane_sync.py` |
+| `PlaneReverseSyncWorkflow` | every 10 s, `SKIP` overlap | `plane_reverse_sync.py` |
+| `PlaneReconciliationWorkflow` | every 1 hour, `SKIP` overlap | `plane_reconciliation.py` |
+| `PlaneSyncNudgeWorkflow` | on-demand, fired by ctrl-api on vault writes | `plane_sync_nudge.py` |
+
+Cadences are registered idempotently by `packages/learn/scripts/register_schedules.py` on worker boot (schedule IDs `al-plane-sync`, `al-plane-reverse-sync`, `al-plane-reconciliation`). The nudge has no schedule; ctrl-api starts a one-shot run via `POST /api/v1/plane/nudge` (`packages/ctrl/src/api/routes/plane.ts:1371`).
+
+<Tip>
+The 5-minute `execution_timeout` and `run_timeout` on the cron schedules exist for one failure mode: a wedged run under `SKIP` overlap would block the schedule indefinitely. A healthy tick finishes in under 2 seconds; the 5-minute envelope means a wedge auto-recovers (`register_schedules.py:296-297, 375-376`).
+</Tip>
+
+## Forward sync — vault to Plane
+
+`PlaneSyncWorkflow` is the steady-state pump. Every 15 seconds it asks the vault what has changed and pushes the diff to Plane. The cursor at `state/plane_sync_cursor.json` carries three fields: `last_vault_mtime`, `project_map` (matter slug → Plane project UUID), and `issue_map` (task slug → Plane issue UUID).
+
+A run does (see `plane_sync.py`):
+
+<Steps>
+  <Step title="Feature flag + load cursor">
+    `plane_sync_is_enabled` reads `PLANE_SYNC_ENABLED`; if it isn't `"true"` the workflow returns early. `load_plane_sync_state` reads the cursor JSON, resetting on missing/unparseable.
+  </Step>
+  <Step title="Fetch + upsert matters">
+    `fetch_changed_matters(since)` lists every `matter/` record via ctrl-api and filters to those whose derived mtime (max of `frontmatter.updated`, `modified`, `created`) exceeds the cursor. Each matter is POSTed (first sync) or PATCHed (later) by `sync_matter_to_plane`. The slug becomes a 5-char Plane identifier via `_project_identifier_for_slug` — three alpha chars from the slug plus a 2-char SHA-1-derived base-36 suffix to break ties between slugs that share a prefix.
+  </Step>
+  <Step title="Ensure Inbox project">
+    `ensure_inbox_project` is idempotent and guarantees an "Inbox" Plane project exists before the task loop. Tasks with no resolvable matter go here, so Sir always has a triage surface in Plane instead of invisible "skipped" tasks.
+  </Step>
+  <Step title="Paginate task fetch + upsert">
+    Two-stage to stay under Temporal's 2 MB activity-result ceiling. `list_changed_task_paths(since)` returns lightweight `{path, slug, matter_slug, mtime}` refs; the workflow chunks them into batches of `TASK_FETCH_BATCH_SIZE = 100` (`plane_sync.py:873`) and calls `fetch_task_records_batch(paths)` per chunk. For each task, `sync_task_to_plane` resolves the destination project (matter project, else Inbox, else skip), runs a per-field staleness check against the current Plane issue, and PATCHes only fields that actually need to move. Outbound writes record a signature so reverse-sync can recognize the webhook echo. Cursor saves are per-batch, so a mid-run crash never re-does completed batches.
+  </Step>
+</Steps>
+
+Mapping lives in `plane_mapping.py`. Vault `status` becomes a Plane state group via `VAULT_TASK_TO_PLANE_STATE_GROUP`; `priority` round-trips 1:1; `alfred_tags` and `topic_tags` become Plane labels capped at `MAX_LABELS_PER_ISSUE = 10` through an allow-list. Every Alfred-owned issue carries `alfred-managed`, plus `alfred:needs-approval` when `requires_approval: true`, plus `blocked` when status is "blocked" (Plane has no native blocked state). Every Alfred-created issue is stamped with `external_id = "alfred:<slug>"` and `external_source = "alfred"` — how reverse-sync recognizes its own writes echoing back.
+
+## The nudge — sub-second forward sync
+
+15 seconds is fine for steady state. It is not fine for "Sir adds a task in chat and looks at Plane half a second later." `PlaneSyncNudgeWorkflow` closes that gap.
+
+After any vault write to a `matter/` or `task/` path, ctrl-api fires `POST /api/v1/plane/nudge` (`packages/ctrl/src/api/routes/plane.ts:1371`), which starts a one-shot Temporal workflow with `{record_type, slug}`. The nudge fetches that single record, calls the same `sync_matter_to_plane` or `sync_task_to_plane` activity the cron uses, and patches `project_map` / `issue_map` if a new Plane UUID was minted. Latency drops from ~15 s to 1–3 s. The nudge never advances `last_vault_mtime` — that's strictly the cron's job, because doing so could silently skip other records modified in the same window but not yet nudged (`plane_sync_nudge.py:268`). If the nudge fails for any reason, the cron's next tick picks up the record via the normal mtime-cursor path. Additive, never replacement.
+
+## Reverse sync — Plane to vault
+
+Plane is a real UI. Sir closes a card; a teammate adds a comment; a power user drags an issue between projects. Each of those mutations fires a webhook, and the path back into the vault has three pieces.
+
+**The webhook receiver** is `POST /api/v1/plane/webhook` in ctrl-api (`packages/ctrl/src/api/routes/plane.ts:1061`). Public route — the SaaS Caddy proxy can't add auth headers, so HMAC-SHA-256 over the raw body using `PLANE_WEBHOOK_SECRET` is the only authentication. After verification, the route deduplicates against an LRU keyed by Plane's `X-Plane-Delivery` UUID (persisted to `/alfred-data/.plane-deliveries` so restarts don't lose the last 1000 deliveries) and forwards the event into the stream pipeline as `stream_type: "plane"`.
+
+**The reverse-sync workflow** drains those stream events. `PlaneReverseSyncWorkflow` runs every 10 seconds, calls `fetch_plane_events(since_event_id)` (capped at `MAX_EVENTS_PER_RUN = 200`), and routes each event by `(plane_event, action)` pair (`plane_reverse_sync.py:271`):
+
+| Event | Action | Result |
+|---|---|---|
+| `project` | `created`/`updated` | `apply_plane_patch_to_vault("matter", path, plane_project_to_matter_patch(data), "")` |
+| `project` | `deleted` | `archive_vault_record(path, "matter")` |
+| `issue` | `created`/`updated` | Resolve vault path, then patch — or mint a fresh `task/<slug>.md` if Plane just got a brand-new human-created issue |
+| `issue` | `deleted` | `archive_vault_record(path, "task")` |
+| `issue_comment` | `created` | `append_plane_comment_to_vault(path, data)` |
+
+Issue-update path resolution must not depend on `name` — a rename changes the name but not the Plane ID — so the order is `external_id=alfred:<slug>`, then forward-sync's `issue_map`, then a vault scan by `plane_issue_id`, and only if all three miss, mint a new task (`plane_reverse_sync.py:399`).
+
+**Three loop guards** keep the pair from oscillating. Each is necessary; together they cover the three race windows:
+
+1. **Origin stamp + hash match.** Inbound events carrying `external_id == "alfred:<slug>"` whose content hash matches the last outbound signature for the same Plane ID are skipped — that's our own write echoing back.
+2. **Suppression window.** Forward-sync records a `(plane_id → {hash, ts})` entry in `state/plane_outbound_signatures.json` on every outbound write. Any inbound event within 30 seconds with a matching hash is treated as the echo and skipped.
+3. **Field-level idempotency.** Before writing any vault record, `apply_plane_patch_to_vault` compares the patch against the existing frontmatter. If nothing would change, the write is skipped entirely. No mtime bump, no forward-sync echo, no loop.
+
+Hashing is centralized in `compute_loop_guard_hash` (`plane_mapping.py:586`) — both directions serialize the canonical field set with `json.dumps(sort_keys=True, separators=(",", ":"))` so digests agree byte-for-byte.
+
+## Reconciliation — catching REST deletes
+
+Plane 1.3.0 has a quiet bug: `issue.deleted` webhooks fire only for UI deletes. A programmatic `DELETE` against the REST API returns 204 with no webhook, so reverse-sync never sees it.
+
+`PlaneReconciliationWorkflow` is the catch-up. Once an hour, `reconcile_plane_deletes` (`plane_reconciliation.py`) walks every project in the forward-sync `project_map`, paginates the live issue list (page size 100, max 200 pages, 1-second throttle, hard cap 10,000 issues per run), and cross-references against `issue_map`. Any vault task whose mapped `plane_id` isn't in Plane's live set gets archived via `_archive_vault_task_from_plane_delete` — `archived: true`, `status: "cancelled"`, `archived_reason: "plane_delete_detected_via_404"` — and the cursor entry is dropped so a future un-archive recreates cleanly.
+
+This is why forward-sync's 404-on-update branch never auto-archives: cross-project-move and genuine deletion are indistinguishable from a 404 alone. The forward path returns `stale_dropped` (drops the slug, next tick re-creates); the reconciliation workflow — which has the live project survey to confirm — owns the actual archive decision (`plane_sync.py:518`).
+
+## At-mentions in Plane
+
+`packages/learn/src/activities/plane_alfred_triggers.py` turns Plane comments into Alfred work. Reverse-sync calls `detect_alfred_plane_trigger(raw)` on every event before the vault patch — so a session spawn fires even when the event is a vault no-op (a comment mention on an already-mirrored task, an assignment update that doesn't change non-assignee fields).
+
+Three trigger types:
+
+- **Mention.** `@alfred do X` in a comment spawns a session via `spawn_alfred_for_plane_trigger`. Autonomous unless the body matches a destructive verb (`delete`, `remove`, `drop`, `force`, `production`, `push`) — those force `requires_approval=true`.
+- **Assignment.** Assigning the issue to Alfred's Plane user always spawns with `requires_approval=true`. The assigner has to confirm with a follow-up comment.
+- **Approval.** `@alfred go` / `@alfred approved` / `@alfred ok` from the requester un-gates a pending approval; `resolve_plane_approval` finds the pinned session and lets it proceed.
+
+Two echo defenses keep Alfred from triggering himself: `author_id == PLANE_ALFRED_USER_ID` is dropped at the source, and every comment Alfred posts via `POST /api/v1/plane/comment` (`packages/ctrl/src/api/routes/plane.ts:1191`) gets its ID written to `state/plane_self_comments.json`. Trigger detection skips any event whose comment ID is in the ledger.
+
+## Slug mapping
+
+The vault uses kebab-case file slugs (`matter/szab-stubn-kft-formation-business-restructuring.md`); Plane uses UUIDs and a 5-char project identifier. Mapping is bidirectional and persisted twice — in the cursor's `project_map` / `issue_map` for fast lookup, and as `plane_project_id` on each matter's frontmatter so reverse-sync can resolve a matter without scanning every record (`plane_mapping.py:444`).
+
+Tasks reference their matter through `matter`, `related_matter`, or `related_matters[0]` — `_resolve_task_matter` (`plane_sync.py:464`) honors all three so existing fleet conventions don't break. If the resolved matter slug isn't in `project_map`, the task routes to the Inbox project, identified by the sentinel `__inbox__`. When a human drags an Inbox issue into a real project inside Plane, reverse-sync sees the `project` change in the issue update and writes `related_matters: [<new-slug>]` back onto the vault task.
+
+## Failure modes
+
+The system is built to degrade quietly:
+
+| Failure | Recovery |
+|---|---|
+| Forward-sync activity throws | Temporal retries with 3-attempt exponential backoff; per-batch cursor saves keep earlier batches durable |
+| Plane webhook dropped (outage, network glitch) | Reverse-sync misses the event; reconciliation catches the divergence within an hour |
+| Plane REST delete with no webhook | Reconciliation archives the vault task within an hour |
+| Forward-sync would stomp a Plane edit | Per-field staleness filter drops the stale field; Plane's value lands in the vault via reverse-sync, the next forward tick agrees and writes nothing (`plane_sync.py:196`) |
+
+When Sir wants an immediate resync, the nudge endpoint is the manual escape hatch.
+
+## Feature flag
+
+A single environment variable gates all four workflows: `PLANE_SYNC_ENABLED`. When unset or anything other than `"true"`, the schedule registrations in `register_schedules.py` actively delete any pre-existing Temporal schedules — flipping the flag off doesn't leave a zombie sync running on an old worker. When the flag flips back on, the next worker boot recreates all three. Default is `true` for every provisioned tenant.
+
+Forward and reverse share the same flag deliberately. Either path being off without the other breaks the loop-guard contract, so they always toggle together.
+
+## Configuration
+
+Per-tenant `.env` carries the Plane credentials (`packages/ctrl/src/infra/provisioner.ts:2337`):
+
+| Variable | Purpose |
+|---|---|
+| `PLANE_API_BASE_URL` | Plane API base. On tenant VPS, `http://plane-proxy/` (Caddy in the compose network). |
+| `PLANE_API_TOKEN` | Personal Access Token with workspace-admin scope. ctrl-api and alfred-learn share this. |
+| `PLANE_WORKSPACE_SLUG` | Workspace slug used in every REST path. |
+| `PLANE_ALFRED_USER_ID` | Plane user UUID Alfred posts as; used for comment author-skip and assignment-trigger detection. |
+| `PLANE_WEBHOOK_SECRET` | HMAC-SHA-256 secret Plane signs every webhook with; verified in `routes/plane.ts`. |
+| `PLANE_WEBHOOK_STEWARD_SECRET` | Separate HMAC secret for the parallel Steward signal stream at `/api/v1/webhooks/plane/steward` — same Plane events, second consumer. |
+
+Provisioning sets these automatically; rotating any of them is a single edit to the tenant `.env` plus a restart of `alfred-learn` and `ctrl-api`.
+
+<CardGroup cols={2}>
+  <Card title="Kinetic layer" icon="gears" href="/architecture/kinetic">
+    Where errands and the Task Runner live. Every vault task that becomes a Plane issue starts here.
+  </Card>
+  <Card title="Semantic layer" icon="brain" href="/architecture/semantic">
+    The vault graph the Plane mirror is projected from.
+  </Card>
+</CardGroup>

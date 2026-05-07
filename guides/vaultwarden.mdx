@@ -1,0 +1,150 @@
+---
+title: "Vaultwarden"
+description: "Sir's per-tenant password manager. How Alfred reads from it, when he can act on it, and how to recover the master password."
+icon: "key"
+---
+
+## Why Vaultwarden
+
+Sir has a lot of credentials — bank logins, brokerage accounts, social profiles, work tools, utility portals. The wrong way to make those usable to an AI butler is to paste them into a system prompt or store them in plaintext. The right way is a real password manager Alfred talks to over an authenticated channel.
+
+That's Vaultwarden — a self-hosted, Bitwarden-compatible vault. Encrypted at rest, sitting inside Sir's own tenant. Sir manages credentials the way he already does (official Bitwarden apps); Alfred reads them through ctrl-api when a task actually needs one.
+
+---
+
+## Where it lives
+
+Every Alfred tenant gets its own Vaultwarden container. Data lives at `/mnt/encrypted/vaultwarden` on the tenant VPS — provisioning ensures that directory exists from cloud-init onwards.
+
+Inside the Docker network, the vault is reachable at `http://vaultwarden:80` (the `BW_SERVER_URL` the vault-init sidecar uses). It is not reachable from the public internet directly — only the dedicated vault subdomain is exposed via Cloudflare Tunnel.
+
+Encryption sits in two layers:
+
+| Layer | What it protects |
+|---|---|
+| **LUKS2** on the tenant data volume | The whole `/mnt/encrypted` tree, including Vaultwarden's database. Unreadable without the per-instance LUKS passphrase. |
+| **Bitwarden's per-record encryption** | Even with disk access, individual entries are encrypted under keys derived from the master password. |
+
+[Security](/guides/security) covers the broader infrastructure model.
+
+---
+
+## Setting it up
+
+There is no setup. Vaultwarden is provisioned automatically when Alfred's control plane brings up a tenant. The provisioner creates `/mnt/encrypted/vaultwarden`, starts the container, generates `VAULTWARDEN_ADMIN_TOKEN` (gates the ops-only `/admin` panel), and creates the Bitwarden account using Sir's email (`OWNER_EMAIL`) and a generated master password. All of those land in the tenant `.env` as `BW_USER` and `BW_PASSWORD`. After that, the vault-init sidecar logs in once and Alfred can talk to Vaultwarden through ctrl-api.
+
+---
+
+## Where to find the master password
+
+The master password is generated server-side and never typed by anyone. It lives in the tenant's `.env` (which Sir has no SSH access to) and is surfaced in the dashboard.
+
+In Settings, look for the **Vault Login** card (it appears whenever `BW_USER` and `BW_PASSWORD` are both set, i.e. Vaultwarden was provisioned). Three rows:
+
+- **Web URL** — the public address of Sir's vault.
+- **Email** — the Bitwarden account email (Sir's `OWNER_EMAIL`).
+- **Master Password** — masked by default; click **Reveal** to display, **Copy** to copy.
+
+<Warning>
+This is the master password to the entire vault. Copy it once into a personal password manager (1Password, Apple Passwords, the Bitwarden client itself once you're logged in) and treat that copy as canonical. Don't paste it into chat transcripts or screenshots.
+</Warning>
+
+The password is also a *service* credential — vault-init reads it on container boot. If you change it from the Bitwarden web UI's "Change Master Password" flow without coordinating with ops, you will break the service-side login. Treat it as static.
+
+---
+
+## Using Vaultwarden from Sir's devices
+
+Vaultwarden speaks the Bitwarden protocol, so the official Bitwarden apps work directly:
+
+<Steps>
+  <Step title="Install the Bitwarden client">
+    Browser extension, iOS, Android, or desktop — pick whichever you want.
+  </Step>
+  <Step title="Set the server URL">
+    Before logging in, open the client's server-URL setting and point it at your tenant's vault subdomain (the URL shown in Settings → Vault Login). Cloud Bitwarden defaults to `bitwarden.com`; change that to your private host.
+  </Step>
+  <Step title="Log in">
+    Email = `OWNER_EMAIL`. Master password = the one revealed in Settings.
+  </Step>
+  <Step title="Save locally">
+    Your client unlocks with PIN, biometrics, or the master password. After that, the master password stops mattering day-to-day.
+  </Step>
+</Steps>
+
+From here it's plain Bitwarden UX: collections, folders, autofill, attachments, generate-password.
+
+---
+
+## What Alfred can do with Vaultwarden
+
+Alfred talks to Vaultwarden through a small set of MCP tools (the `vaultwarden` catalogue), which call ctrl-api at `/api/v1/vaultwarden/*` and from there talk to the local vault-cli sidecar. Available operations:
+
+- **List** and **search** items (by name, folder, collection, organisation).
+- **Get** a single item — including username, password, and TOTP if present.
+- **Create**, **update**, **delete** items.
+- Read **folders**, **collections**, **organisations**.
+- **Generate** strong passwords (length, symbols, passphrase mode).
+- **Sync** — force the cache to refresh after Sir edits something in the web UI.
+
+Typical Alfred uses:
+
+- *"Pay this Hungarian utility bill"* — Alfred reads the saved login, then pays via the tenant's Sure integration.
+- *"Log in to Stripe and grab the latest invoice PDF"* — Alfred uses the saved credentials, retrieves the document, files it.
+- *"Generate a strong password and save it under 'Acme staging'"* — Alfred calls generate, then create.
+
+Every Vaultwarden call goes through the same bearer auth that wraps the rest of ctrl-api, so it lands in the activity log alongside everything else.
+
+---
+
+## What Alfred won't do
+
+- **Won't change the master password.** It's a service credential; rotating it without coordination breaks vault-init.
+- **Won't share with peers.** Alfred Prime cross-tenant features (`cross_tenant.ask`) explicitly exclude vault data.
+- **Won't echo secrets unprompted.** Credentials flow into the tool call but aren't surfaced in the conversation summary unless you ask.
+
+---
+
+## Recovery
+
+If Sir loses the master password, in order of preference:
+
+1. **Settings → Vault Login → Reveal.** As long as Sir is logged into the dashboard, the password is one click away. This is the normal path.
+2. **SSH into the tenant.** If the dashboard is unreachable, `BW_PASSWORD` lives in `/opt/alfred/compose/.env`. Requires the per-instance ed25519 deploy key — operator access, not self-service.
+3. **Re-provision.** Vaultwarden data is per-tenant and not federated. If both the dashboard and SSH are gone, provision a new tenant and rebuild from scratch (or from a Bitwarden export, if Sir kept one).
+
+Option 1 is what you should ever actually need.
+
+---
+
+## Cross-tenant scope
+
+Each tenant's Vaultwarden is sealed. A peer tenant — even one connected via Alfred Prime — cannot enumerate, read, or modify Sir's vault. Migrating a Bitwarden database between tenants is a manual export/import flow, not a federation feature.
+
+---
+
+## Security caveats
+
+The threat model assumes Sir trusts the operator running his tenant (himself, or whoever holds the LUKS passphrase + the deploy key). With both, the vault is recoverable. Without them, it's encrypted at rest and unreachable over the network.
+
+- **Tailscale + Cloudflare Tunnel** protect the vault in transit.
+- **LUKS2** protects the vault on disk if the underlying volume is cloned or stolen.
+- **The dashboard reveal** is gated by Sir's session — anyone with dashboard auth can read the master password, consistent with the rest of the dashboard (anyone with that auth can already act as Sir).
+- **Treat the master password the way you'd treat any other vault's master password.** It unlocks everything.
+
+---
+
+<CardGroup cols={2}>
+  <Card title="Security" icon="shield-check" href="/guides/security">
+    The full security model — LUKS, Tailscale, agent sandboxing
+  </Card>
+  <Card title="API Keys" icon="key" href="/guides/api-keys">
+    The other credential — for scripting Alfred itself
+  </Card>
+  <Card title="Connected Apps" icon="puzzle" href="/guides/connected-apps">
+    OAuth-based third-party access via Composio
+  </Card>
+  <Card title="Browsing your Vault" icon="folder-open" href="/guides/browsing-your-vault">
+    The other vault — Sir's structured memory store
+  </Card>
+</CardGroup>
